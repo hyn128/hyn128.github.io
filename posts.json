@@ -4,6 +4,36 @@
       
       
       {
+        "title": "Amazon EC2와 ELB 기반 고가용성 구성",
+        "url": "/cloud-05-aws-ec2-elb-high-availability/",
+        "description": "EC2 Instance 생성과 SSH 접속, Security Group, Elastic IP, ALB와 Auto Scaling Group을 연결해 여러 Availability Zone에 분산된 고가용성 구조를 구성합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 9월 28일",
+        "reading_time_label": "12분 읽기",
+        "search": "amazon ec2와 elb 기반 고가용성 구성 ec2 instance 생성과 ssh 접속, security group, elastic ip, alb와 auto scaling group을 연결해 여러 availability zone에 분산된 고가용성 구조를 구성합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "AWS 개요와 Global Infrastructure",
+        "url": "/cloud-04-aws-overview-global-infrastructure/",
+        "description": "AWS의 특징과 공동 책임 모델, 주요 서비스를 살펴보고 Region, Availability Zone, Edge Location으로 구성되는 Global Infrastructure를 정리합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 9월 28일",
+        "reading_time_label": "6분 읽기",
+        "search": "aws 개요와 global infrastructure aws의 특징과 공동 책임 모델, 주요 서비스를 살펴보고 region, availability zone, edge location으로 구성되는 global infrastructure를 정리합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
         "title": "systemctl을 이용한 virtual machine 자동 부팅",
         "url": "/project-2-orbit-systemctl-vagrant/",
         "description": "호스트 서버가 부팅될 때 VM 노드를 시스템 데몬으로 자동 실행하는 방법",
