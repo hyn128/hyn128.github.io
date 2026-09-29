@@ -4,6 +4,36 @@
       
       
       {
+        "title": "EC2 Database 구축과 Amazon RDS",
+        "url": "/cloud-07-aws-ec2-database-rds/",
+        "description": "EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 9월 29일",
+        "reading_time_label": "9분 읽기",
+        "search": "ec2 database 구축과 amazon rds ec2에 mysql과 mongodb를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 aws database 종류와 amazon rds의 managed service 구조를 비교합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "EC2 Snapshot·AMI와 Auto Scaling 실습",
+        "url": "/cloud-06-aws-ec2-image-auto-scaling/",
+        "description": "EBS Snapshot과 AMI의 관계를 확인하고 Launch Template, Target Group과 Auto Scaling Group을 연결해 EC2 Instance의 생성·교체·확장을 자동화합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 9월 29일",
+        "reading_time_label": "7분 읽기",
+        "search": "ec2 snapshot·ami와 auto scaling 실습 ebs snapshot과 ami의 관계를 확인하고 launch template, target group과 auto scaling group을 연결해 ec2 instance의 생성·교체·확장을 자동화합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
         "title": "Amazon EC2와 ELB 기반 고가용성 구성",
         "url": "/cloud-05-aws-ec2-elb-high-availability/",
         "description": "EC2 Instance 생성과 SSH 접속, Security Group, Elastic IP, ALB와 Auto Scaling Group을 연결해 여러 Availability Zone에 분산된 고가용성 구조를 구성합니다",

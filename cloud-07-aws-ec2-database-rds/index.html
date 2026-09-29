@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>EC2 Database 구축과 Amazon RDS | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-07-aws-ec2-database-rds/">
+<meta property="og:title" content="EC2 Database 구축과 Amazon RDS | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-07-aws-ec2-database-rds/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="EC2 Database 구축과 Amazon RDS | renamed.log">
+<meta name="twitter:description" content="EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다">
+
+  <meta property="article:published_time" content="2026-09-29T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1790689192" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1790689192" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1790689192">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1790689192" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1790689192">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "EC2 Database 구축과 Amazon RDS | renamed.log",
+    "description": "EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다",
+    "url": "https://hyn128.site/cloud-07-aws-ec2-database-rds/",
+    "datePublished": "2026-09-29T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">EC2 Database 구축과 Amazon RDS</h1>
+    
+      <p class="post-head__description">EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 9월 29일 · 9분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Database를 EC2에 직접 설치하면 OS부터 Database Engine까지 사용자가 관리합니다. Amazon RDS는 지원되는 관계형 Database Engine의 Backup, Monitoring과 Maintenance 작업을 AWS가 관리합니다. 이 글에서는 EC2에 MySQL과 MongoDB를 설치하고 Network 접근을 제한하는 방법을 먼저 살펴본 뒤, AWS Database 종류와 RDS 설정 항목을 정리합니다.</p>
+</blockquote>
+
+<h2 id="1-ec2-database와-managed-database">1. EC2 Database와 Managed Database</h2>
+
+<hr />
+
+<p>EC2에 Database를 설치하는 방식과 Amazon RDS를 사용하는 방식은 관리 책임이 다릅니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>EC2에 직접 설치</th>
+      <th>Amazon RDS</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>OS 관리</td>
+      <td>사용자가 Patch와 설정 관리</td>
+      <td>AWS가 기반 OS 관리</td>
+    </tr>
+    <tr>
+      <td>Database 설치</td>
+      <td>사용자가 설치·Upgrade</td>
+      <td>지원 Engine과 Version을 선택해 생성</td>
+    </tr>
+    <tr>
+      <td>Backup</td>
+      <td>사용자가 도구와 보존 정책 구성</td>
+      <td>Automated Backup과 Snapshot 제공</td>
+    </tr>
+    <tr>
+      <td>고가용성</td>
+      <td>Replication과 Failover 직접 구성</td>
+      <td>Multi-AZ 배포 Option 제공</td>
+    </tr>
+    <tr>
+      <td>접근 권한</td>
+      <td>OS, Firewall, Database 계정 모두 관리</td>
+      <td>VPC, Security Group과 Database 계정 관리</td>
+    </tr>
+    <tr>
+      <td>자유도</td>
+      <td>Engine, Extension과 OS를 폭넓게 선택</td>
+      <td>지원되는 Engine, Version과 Option 범위 내에서 사용</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>특정 Version이나 OS 수준의 설정이 필요하면 EC2 방식이 적합할 수 있습니다. 일반적인 관계형 Database 운영에서 OS 관리 부담을 줄이려면 RDS를 먼저 검토합니다.</p>
+
+<h2 id="2-database-network-구성-원칙">2. Database Network 구성 원칙</h2>
+
+<hr />
+
+<p>MySQL의 TCP 3306과 MongoDB의 TCP 27017을 <code class="language-plaintext highlighter-rouge">0.0.0.0/0</code>에 공개하지 않습니다. Database Process가 모든 Interface에서 Listen하도록 설정하더라도 Security Group은 신뢰할 수 있는 Source만 허용해야 합니다.</p>
+
+<p>권장 흐름은 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>외부 관리자
+    ↓ VPN, SSM Port Forwarding 또는 SSH Tunnel
+관리용 EC2
+    ↓ Private IP
+Database EC2
+</code></pre></div></div>
+
+<p>Application Server가 Database에 연결할 때는 IP CIDR보다 Application Security Group을 Source로 지정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Database</th>
+      <th style="text-align: right">Port</th>
+      <th>권장 Source</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>MySQL</td>
+      <td style="text-align: right">TCP 3306</td>
+      <td>Application EC2 Security Group</td>
+    </tr>
+    <tr>
+      <td>MongoDB</td>
+      <td style="text-align: right">TCP 27017</td>
+      <td>Application EC2 Security Group</td>
+    </tr>
+    <tr>
+      <td>실습 Client</td>
+      <td style="text-align: right">해당 Database Port</td>
+      <td>현재 Client Public IP <code class="language-plaintext highlighter-rouge">/32</code>, 실습 후 제거</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>외부 접속 실습에서는 Public IP를 가진 Database Server를 그대로 운영 환경으로 사용하지 않습니다. 실습이 끝나면 Inbound Rule을 제거하고 Database를 Private Subnet으로 이동하거나 Private 연결 방식으로 전환합니다.</p>
+
+<h2 id="3-ec2에-mysql-설치">3. EC2에 MySQL 설치</h2>
+
+<hr />
+
+<p>다음 명령은 Ubuntu EC2 Instance에서 실행합니다.</p>
+
+<h3 id="31-설치와-상태-확인">3.1 설치와 상태 확인</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>apt update
+<span class="nb">sudo </span>apt <span class="nb">install</span> <span class="nt">-y</span> mysql-server
+mysql <span class="nt">--version</span>
+<span class="nb">sudo </span>systemctl <span class="nb">enable</span> <span class="nt">--now</span> mysql
+systemctl is-active mysql
+<span class="nb">sudo </span>ss <span class="nt">-lntp</span> | <span class="nb">grep </span>mysqld
+</code></pre></div></div>
+
+<p>Ubuntu Package로 설치한 MySQL은 Local 관리 계정에 Socket 인증을 사용할 수 있습니다. 먼저 <code class="language-plaintext highlighter-rouge">sudo mysql</code>로 접속해 실제 Account와 인증 방식을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>mysql
+</code></pre></div></div>
+
+<p>MySQL 8.4에서 <code class="language-plaintext highlighter-rouge">mysql_native_password</code>는 기본적으로 비활성화되어 있고 MySQL 9.0에서는 제거되었습니다. Root Account를 <code class="language-plaintext highlighter-rouge">mysql_native_password</code>로 변경하지 않고 Application 전용 Account를 생성합니다.</p>
+
+<h3 id="32-database와-전용-사용자-생성">3.2 Database와 전용 사용자 생성</h3>
+
+<p>MySQL Shell에서 실행합니다.</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">DATABASE</span> <span class="n">appdb</span>
+  <span class="nb">CHARACTER</span> <span class="k">SET</span> <span class="n">utf8mb4</span>
+  <span class="k">COLLATE</span> <span class="n">utf8mb4_0900_ai_ci</span><span class="p">;</span>
+
+<span class="k">CREATE</span> <span class="k">USER</span> <span class="s1">'appuser'</span><span class="o">@</span><span class="s1">'10.0.%'</span>
+  <span class="n">IDENTIFIED</span> <span class="k">BY</span> <span class="s1">'&lt;STRONG_PASSWORD&gt;'</span><span class="p">;</span>
+
+<span class="k">GRANT</span> <span class="k">ALL</span> <span class="k">PRIVILEGES</span> <span class="k">ON</span> <span class="n">appdb</span><span class="p">.</span><span class="o">*</span>
+  <span class="k">TO</span> <span class="s1">'appuser'</span><span class="o">@</span><span class="s1">'10.0.%'</span><span class="p">;</span>
+
+<span class="k">SHOW</span> <span class="n">GRANTS</span> <span class="k">FOR</span> <span class="s1">'appuser'</span><span class="o">@</span><span class="s1">'10.0.%'</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">10.0.%</code>는 예제입니다. 실제 VPC CIDR과 Application 위치에 맞춰 Host 범위를 더 좁게 지정합니다. <code class="language-plaintext highlighter-rouge">'appuser'@'%'</code>처럼 모든 Host를 허용하는 Account는 실습에서도 피합니다. <code class="language-plaintext highlighter-rouge">CREATE USER</code>와 <code class="language-plaintext highlighter-rouge">GRANT</code>는 권한 Table에 즉시 반영되므로 이 절차에는 <code class="language-plaintext highlighter-rouge">FLUSH PRIVILEGES</code>가 필요하지 않습니다.</p>
+
+<h3 id="33-network-listen-주소-변경">3.3 Network Listen 주소 변경</h3>
+
+<p><code class="language-plaintext highlighter-rouge">/etc/mysql/mysql.conf.d/mysqld.cnf</code>의 <code class="language-plaintext highlighter-rouge">bind-address</code>를 EC2의 Private IP로 설정합니다.</p>
+
+<div class="language-ini highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">[mysqld]</span>
+<span class="py">bind-address</span> <span class="p">=</span> <span class="s">&lt;EC2_PRIVATE_IP&gt;</span>
+</code></pre></div></div>
+
+<p>설정을 반영하고 Listen 주소를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl restart mysql
+systemctl is-active mysql
+<span class="nb">sudo </span>ss <span class="nt">-lntp</span> | <span class="nb">grep </span>3306
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">bind-address = 0.0.0.0</code>은 모든 IPv4 Interface에서 요청을 받습니다. 여러 Interface가 있는 Server에서는 Database 전용 Private IP를 지정하는 편이 안전합니다.</p>
+
+<h3 id="34-security-group과-연결-확인">3.4 Security Group과 연결 확인</h3>
+
+<p>Database EC2 Security Group에 TCP 3306 Inbound Rule을 추가합니다. Source는 Application EC2 Security Group 또는 제한된 실습 Client <code class="language-plaintext highlighter-rouge">/32</code>로 지정합니다.</p>
+
+<p>허용된 Client에서 연결합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mysql <span class="se">\</span>
+  <span class="nt">--host</span><span class="o">=</span>&lt;MYSQL_PRIVATE_IP&gt; <span class="se">\</span>
+  <span class="nt">--port</span><span class="o">=</span>3306 <span class="se">\</span>
+  <span class="nt">--user</span><span class="o">=</span>appuser <span class="se">\</span>
+  <span class="nt">--password</span> <span class="se">\</span>
+  appdb
+</code></pre></div></div>
+
+<p>연결되지 않으면 MySQL Process, Listen 주소, EC2 Security Group, Network ACL과 Client Route 순서로 확인합니다.</p>
+
+<h2 id="4-ec2에-mongodb-설치">4. EC2에 MongoDB 설치</h2>
+
+<hr />
+
+<p>MongoDB Package Repository는 Version과 Ubuntu Release에 따라 경로가 달라집니다. 다음 예제는 MongoDB Community Edition 8.0과 Ubuntu 24.04 LTS인 <code class="language-plaintext highlighter-rouge">noble</code>을 사용합니다. Ubuntu 22.04 LTS는 공식 문서에서 <code class="language-plaintext highlighter-rouge">jammy</code>용 Repository를 선택합니다.</p>
+
+<h3 id="41-ubuntu-release-확인">4.1 Ubuntu Release 확인</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cat</span> /etc/os-release
+dpkg <span class="nt">--print-architecture</span>
+</code></pre></div></div>
+
+<p>MongoDB 8.0 Community Edition이 지원하는 Ubuntu LTS Version과 Architecture인지 먼저 확인합니다.</p>
+
+<h3 id="42-공식-repository-등록과-설치">4.2 공식 Repository 등록과 설치</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>apt-get update
+<span class="nb">sudo </span>apt-get <span class="nb">install</span> <span class="nt">-y</span> gnupg curl
+
+curl <span class="nt">-fsSL</span> https://pgp.mongodb.com/server-8.0.asc | <span class="se">\</span>
+  <span class="nb">sudo </span>gpg <span class="nt">-o</span> /usr/share/keyrings/mongodb-server-8.0.gpg <span class="se">\</span>
+  <span class="nt">--dearmor</span>
+
+<span class="nb">echo</span> <span class="s2">"deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse"</span> | <span class="se">\</span>
+  <span class="nb">sudo tee</span> /etc/apt/sources.list.d/mongodb-org-8.0.list
+
+<span class="nb">sudo </span>apt-get update
+<span class="nb">sudo </span>apt-get <span class="nb">install</span> <span class="nt">-y</span> mongodb-org
+<span class="nb">sudo </span>systemctl <span class="nb">enable</span> <span class="nt">--now</span> mongod
+systemctl is-active mongod
+</code></pre></div></div>
+
+<p>Local Shell 접속을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mongosh
+</code></pre></div></div>
+
+<h3 id="43-관리자-계정-생성">4.3 관리자 계정 생성</h3>
+
+<p>MongoDB는 처음에 Localhost에서 접속해 관리자 Account를 생성한 뒤 인증을 활성화합니다.</p>
+
+<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">use</span> <span class="nx">admin</span>
+
+<span class="nx">db</span><span class="p">.</span><span class="nx">createUser</span><span class="p">({</span>
+  <span class="na">user</span><span class="p">:</span> <span class="dl">"</span><span class="s2">adminuser</span><span class="dl">"</span><span class="p">,</span>
+  <span class="na">pwd</span><span class="p">:</span> <span class="nx">passwordPrompt</span><span class="p">(),</span>
+  <span class="na">roles</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span> <span class="na">role</span><span class="p">:</span> <span class="dl">"</span><span class="s2">userAdminAnyDatabase</span><span class="dl">"</span><span class="p">,</span> <span class="na">db</span><span class="p">:</span> <span class="dl">"</span><span class="s2">admin</span><span class="dl">"</span> <span class="p">},</span>
+    <span class="p">{</span> <span class="na">role</span><span class="p">:</span> <span class="dl">"</span><span class="s2">readWriteAnyDatabase</span><span class="dl">"</span><span class="p">,</span> <span class="na">db</span><span class="p">:</span> <span class="dl">"</span><span class="s2">admin</span><span class="dl">"</span> <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">})</span>
+</code></pre></div></div>
+
+<p>Blog 예제에 실제 Password를 기록하지 않습니다. 운영 환경에서는 업무별 Database와 최소 권한 Role을 가진 Account를 별도로 생성합니다.</p>
+
+<h3 id="44-인증과-private-network-연결-활성화">4.4 인증과 Private Network 연결 활성화</h3>
+
+<p><code class="language-plaintext highlighter-rouge">/etc/mongod.conf</code>에서 Localhost와 EC2 Private IP만 Listen하고 인증을 사용하도록 설정합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">net</span><span class="pi">:</span>
+  <span class="na">port</span><span class="pi">:</span> <span class="m">27017</span>
+  <span class="na">bindIp</span><span class="pi">:</span> <span class="s">127.0.0.1,&lt;EC2_PRIVATE_IP&gt;</span>
+
+<span class="na">security</span><span class="pi">:</span>
+  <span class="na">authorization</span><span class="pi">:</span> <span class="s">enabled</span>
+</code></pre></div></div>
+
+<p>설정을 검증하기 위해 Service를 재시작하고 Log를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl restart mongod
+systemctl is-active mongod
+<span class="nb">sudo </span>ss <span class="nt">-lntp</span> | <span class="nb">grep </span>27017
+<span class="nb">sudo </span>journalctl <span class="nt">-u</span> mongod <span class="nt">--no-pager</span> <span class="nt">-n</span> 50
+</code></pre></div></div>
+
+<p>MongoDB 공식 문서는 여러 Network Interface가 있을 때 Private 또는 내부 Interface에 Bind하도록 권고합니다. <code class="language-plaintext highlighter-rouge">bindIp: 0.0.0.0</code>과 인증 비활성화를 함께 사용하면 Internet에서 Database를 직접 조작할 수 있으므로 적용하지 않습니다.</p>
+
+<p>MongoDB EC2 Security Group에는 TCP 27017을 Application Security Group 또는 실습 Client <code class="language-plaintext highlighter-rouge">/32</code>에만 허용합니다. 허용된 Client에서 다음과 같이 접속합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mongosh <span class="se">\</span>
+  <span class="s2">"mongodb://adminuser@&lt;MONGODB_PRIVATE_IP&gt;:27017/admin"</span> <span class="se">\</span>
+  <span class="nt">--password</span>
+</code></pre></div></div>
+
+<h3 id="45-mongodb-제거">4.5 MongoDB 제거</h3>
+
+<p>다음 명령은 MongoDB Package와 Data를 제거합니다. <code class="language-plaintext highlighter-rouge">/var/lib/mongodb</code>를 삭제하면 Database Data를 복구할 수 없으므로 Snapshot이나 Backup이 필요한지 먼저 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl stop mongod
+<span class="nb">sudo </span>apt-get purge <span class="s1">'mongodb-org*'</span>
+<span class="nb">sudo rm</span> <span class="nt">-r</span> /var/log/mongodb
+<span class="nb">sudo rm</span> <span class="nt">-r</span> /var/lib/mongodb
+</code></pre></div></div>
+
+<h2 id="5-aws-database-service-종류">5. AWS Database Service 종류</h2>
+
+<hr />
+
+<p>Data Model과 Access Pattern에 따라 적합한 Database Service가 달라집니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>유형</th>
+      <th>주요 용도</th>
+      <th>AWS Service</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>관계형 Database</td>
+      <td>Transaction, ERP, CRM과 전자상거래</td>
+      <td>Amazon RDS, Amazon Aurora</td>
+    </tr>
+    <tr>
+      <td>Data Warehouse</td>
+      <td>대규모 분석과 집계</td>
+      <td>Amazon Redshift</td>
+    </tr>
+    <tr>
+      <td>Key-Value</td>
+      <td>대규모 Web, Game과 낮은 지연 시간 조회</td>
+      <td>Amazon DynamoDB</td>
+    </tr>
+    <tr>
+      <td>In-memory</td>
+      <td>Cache, Session과 순위표</td>
+      <td>Amazon ElastiCache, Amazon MemoryDB</td>
+    </tr>
+    <tr>
+      <td>Document</td>
+      <td>Content, Catalog와 User Profile</td>
+      <td>Amazon DocumentDB</td>
+    </tr>
+    <tr>
+      <td>Wide-column</td>
+      <td>대규모 분산 Workload와 Apache Cassandra 호환</td>
+      <td>Amazon Keyspaces</td>
+    </tr>
+    <tr>
+      <td>Graph</td>
+      <td>Fraud Detection, Social Network와 Recommendation</td>
+      <td>Amazon Neptune</td>
+    </tr>
+    <tr>
+      <td>Time Series</td>
+      <td>IoT, DevOps Metric과 산업 Telemetry</td>
+      <td>Amazon Timestream for LiveAnalytics</td>
+    </tr>
+    <tr>
+      <td>Ledger</td>
+      <td>변경 이력을 검증하는 원장</td>
+      <td>Amazon QLDB는 2025년 7월 31일 지원 종료</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Amazon Redshift는 SQL을 사용하지만 Transaction 중심의 일반 RDBMS보다 분석용 Data Warehouse에 가깝습니다. Amazon Timestream for LiveAnalytics는 2025년 6월 20일부터 신규 고객에게 제공되지 않으며 기존 고객만 계속 사용할 수 있습니다.</p>
+
+<p>Amazon DocumentDB는 MongoDB 호환 API를 제공하지만 MongoDB Server의 모든 기능과 동작이 같지는 않습니다. Migration 전에 사용하는 Driver, Operator와 Query의 호환성을 확인합니다.</p>
+
+<h2 id="6-amazon-rds">6. Amazon RDS</h2>
+
+<hr />
+
+<p>Amazon RDS(Relational Database Service)는 관계형 Database Engine을 VPC 안에 배포하고 운영하는 Managed Service입니다. 사용자는 Schema, Query, Account와 Application Data를 관리하고 AWS는 기반 Infrastructure와 OS, Backup·Monitoring 기능을 관리합니다.</p>
+
+<p>AWS Database Migration Service(AWS DMS)는 지원되는 Source와 Target 사이에서 Database를 Migration하거나 변경 Data를 지속적으로 복제할 때 사용합니다. Engine 조합에 따라 변환할 수 없는 Schema와 기능이 있으므로 AWS Schema Conversion Tool 또는 Engine별 변환 절차를 함께 검토합니다.</p>
+
+<h3 id="61-지원-engine">6.1 지원 Engine</h3>
+
+<p>RDS DB Instance에서는 다음 Engine을 사용할 수 있습니다.</p>
+
+<ul>
+  <li>
+    <p>Amazon RDS for Db2입니다.</p>
+  </li>
+  <li>
+    <p>MariaDB입니다.</p>
+  </li>
+  <li>
+    <p>Microsoft SQL Server입니다.</p>
+  </li>
+  <li>
+    <p>MySQL입니다.</p>
+  </li>
+  <li>
+    <p>Oracle Database입니다.</p>
+  </li>
+  <li>
+    <p>PostgreSQL입니다.</p>
+  </li>
+</ul>
+
+<p>Amazon Aurora는 MySQL-Compatible Edition과 PostgreSQL-Compatible Edition을 제공합니다. Engine Version, Instance Class와 지원 Region의 조합은 달라질 수 있으므로 생성 전에 현재 지원 표를 확인합니다.</p>
+
+<h3 id="62-rds가-관리하는-범위">6.2 RDS가 관리하는 범위</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>AWS가 관리하는 항목</th>
+      <th>사용자가 결정하는 항목</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>기반 Host와 OS</td>
+      <td>Database Engine과 Version</td>
+    </tr>
+    <tr>
+      <td>Hardware 교체</td>
+      <td>DB Instance Class</td>
+    </tr>
+    <tr>
+      <td>Automated Backup 기능</td>
+      <td>Backup 보존 기간과 Window</td>
+    </tr>
+    <tr>
+      <td>Monitoring 기능 제공</td>
+      <td>Alarm, Log Export와 대응 절차</td>
+    </tr>
+    <tr>
+      <td>Maintenance Update 제공</td>
+      <td>Maintenance Window와 적용 시점</td>
+    </tr>
+    <tr>
+      <td>Multi-AZ 기능 제공</td>
+      <td>배포 방식과 비용 수준</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Managed Service라고 해서 모든 Update가 임의의 시점에 즉시 적용되는 것은 아닙니다. Maintenance Action의 적용 가능 시점과 자동 적용 여부를 확인하고 Preferred Maintenance Window를 업무 시간과 겹치지 않게 설정합니다. 긴급 보안 Update나 지원 종료 Version은 연기를 계속할 수 없습니다.</p>
+
+<h2 id="7-db-instance-class와-비용">7. DB Instance Class와 비용</h2>
+
+<hr />
+
+<p>DB Instance Class는 EC2 Instance Type과 비슷하게 vCPU, Memory, Network와 Storage 처리 성능을 결정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Class 계열 예</th>
+      <th>목적</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">db.t</code></td>
+      <td>개발·실습과 Burstable Workload</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">db.m</code></td>
+      <td>범용 Workload</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">db.r</code>, <code class="language-plaintext highlighter-rouge">db.x</code></td>
+      <td>Memory 중심 Workload</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>모든 Engine과 Version이 모든 Class를 지원하는 것은 아닙니다. Console 또는 공식 지원 표에서 선택한 Region, Engine과 Version 조합을 확인합니다.</p>
+
+<p>RDS 비용에는 다음 항목이 포함될 수 있습니다.</p>
+
+<ul>
+  <li>
+    <p>DB Instance 실행 시간 또는 Reserved Instance 비용입니다.</p>
+  </li>
+  <li>
+    <p>Provisioning한 Storage, IOPS와 Throughput 비용입니다.</p>
+  </li>
+  <li>
+    <p>Multi-AZ와 Read Replica에 추가로 생성되는 Resource 비용입니다.</p>
+  </li>
+  <li>
+    <p>Backup 보존량과 Manual Snapshot 비용입니다.</p>
+  </li>
+  <li>
+    <p>License가 필요한 상용 Engine의 License 비용입니다.</p>
+  </li>
+  <li>
+    <p>AZ, Region과 Internet 경로에 따른 Data Transfer 비용입니다.</p>
+  </li>
+</ul>
+
+<p>Backup Storage 무료 범위를 단순히 <code class="language-plaintext highlighter-rouge">Database Storage의 100%</code>로만 계산하지 않습니다. Region의 활성 RDS Resource와 Backup 유형에 따라 과금 조건이 달라질 수 있으므로 현재 RDS Pricing과 Billing 내역을 확인합니다.</p>
+
+<h2 id="8-amazon-aurora">8. Amazon Aurora</h2>
+
+<hr />
+
+<p>Amazon Aurora는 AWS가 Cloud 환경에 맞게 설계한 관계형 Database이며 MySQL 또는 PostgreSQL 호환 Edition을 제공합니다.</p>
+
+<p>Aurora는 Compute Instance와 분산 Storage 계층을 분리합니다. Writer와 Reader가 같은 Cluster Storage를 사용하므로 일반적인 EC2 기반 MySQL Replication과 Data 전달 방식이 다릅니다.</p>
+
+<p>호환 Edition이라는 표현이 모든 Extension, Version과 동작이 동일하다는 뜻은 아닙니다. Migration 전에 SQL, Character Set, Plugin, Stored Procedure와 Driver 호환성을 확인합니다.</p>
+
+<p>다음 기준으로 배포 방식을 선택합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>방식</th>
+      <th>선택 기준</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>EC2에 MySQL·PostgreSQL 설치</td>
+      <td>OS, Extension과 Engine 설정을 직접 제어해야 하는 경우</td>
+    </tr>
+    <tr>
+      <td>Amazon RDS</td>
+      <td>일반적인 관계형 Database 운영과 관리 부담 감소가 필요한 경우</td>
+    </tr>
+    <tr>
+      <td>Amazon Aurora</td>
+      <td>Aurora의 분산 Storage, Read Scaling과 Cluster 기능이 필요한 경우</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="9-rds-설정-항목">9. RDS 설정 항목</h2>
+
+<hr />
+
+<p>RDS DB Instance를 생성할 때 다음 항목을 함께 결정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>영역</th>
+      <th>주요 설정</th>
+      <th>확인 사항</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Engine</td>
+      <td>Database 종류와 Version</td>
+      <td>Application 호환성과 지원 종료 일정</td>
+    </tr>
+    <tr>
+      <td>Instance</td>
+      <td>DB Instance Class</td>
+      <td>vCPU, Memory, Network와 예상 비용</td>
+    </tr>
+    <tr>
+      <td>Availability</td>
+      <td>Single-AZ, Multi-AZ</td>
+      <td>장애 허용 수준과 비용</td>
+    </tr>
+    <tr>
+      <td>Storage</td>
+      <td>gp3, io1·io2와 할당량</td>
+      <td>IOPS, Throughput, 암호화와 Auto Scaling</td>
+    </tr>
+    <tr>
+      <td>Identifier</td>
+      <td>DB Instance Identifier</td>
+      <td>Account와 Region 안에서 구분 가능한 이름</td>
+    </tr>
+    <tr>
+      <td>Credential</td>
+      <td>Master User와 인증 방식</td>
+      <td>Secrets Manager 또는 안전한 비밀 관리</td>
+    </tr>
+    <tr>
+      <td>Network</td>
+      <td>VPC, DB Subnet Group, Public Access</td>
+      <td>EC2와의 Private 연결 경로</td>
+    </tr>
+    <tr>
+      <td>Security</td>
+      <td>VPC Security Group, KMS</td>
+      <td>허용 Source와 암호화 Key</td>
+    </tr>
+    <tr>
+      <td>Database 환경</td>
+      <td>Database 이름, Port, Parameter Group, Option Group</td>
+      <td>Engine별 Parameter와 변경 적용 시점</td>
+    </tr>
+    <tr>
+      <td>Backup</td>
+      <td>보존 기간과 Backup Window</td>
+      <td>복구 목표와 Maintenance Window 중복 여부</td>
+    </tr>
+    <tr>
+      <td>Monitoring</td>
+      <td>Enhanced Monitoring, Performance Insights, Log Export</td>
+      <td>관찰할 Metric과 보존 비용</td>
+    </tr>
+    <tr>
+      <td>Maintenance</td>
+      <td>Preferred Maintenance Window</td>
+      <td>Application 점검 시간과 Upgrade 계획</td>
+    </tr>
+    <tr>
+      <td>Protection</td>
+      <td>Deletion Protection, Final Snapshot</td>
+      <td>오삭제 방지와 종료 절차</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">Public access 가능</code>은 다른 VPC에서 자동으로 접근할 수 있게 만드는 Option이 아닙니다. 활성화하면 외부에서 Endpoint를 조회할 때 Public IP로 해석될 수 있으며, 실제 접속은 Internet Gateway 경로와 Security Group Rule도 충족해야 합니다.</p>
+
+<p>일반적인 Application 구성에서는 RDS를 Private Subnet에 두고 Application EC2 Security Group만 Database Port에 접근하도록 허용합니다.</p>
+
+<h2 id="10-rds-for-mysql-생성">10. RDS for MySQL 생성</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">[RDS] → [데이터베이스] → [데이터베이스 생성]</code>에서 다음 순서로 진행합니다.</p>
+
+<ol>
+  <li>
+    <p>생성 방식을 선택하고 Engine으로 MySQL을 선택합니다.</p>
+  </li>
+  <li>
+    <p>Application이 지원하는 MySQL Version을 선택합니다.</p>
+  </li>
+  <li>
+    <p>실습 또는 운영 목적에 맞는 Template을 선택합니다.</p>
+  </li>
+  <li>
+    <p>DB Instance Identifier와 Master User를 지정합니다. Password는 문서나 Source Code에 기록하지 않습니다.</p>
+  </li>
+  <li>
+    <p>DB Instance Class와 Storage 유형·용량을 선택합니다.</p>
+  </li>
+  <li>
+    <p>고가용성이 필요하면 Multi-AZ 배포를 선택합니다. 실습 비용을 줄이기 위한 Single-AZ와 운영 고가용성 구성을 구분합니다.</p>
+  </li>
+  <li>
+    <p>Application EC2와 연결 가능한 VPC와 DB Subnet Group을 선택합니다.</p>
+  </li>
+  <li>
+    <p>Public Access는 기본적으로 <code class="language-plaintext highlighter-rouge">아니요</code>를 선택합니다.</p>
+  </li>
+  <li>
+    <p>RDS Security Group의 TCP 3306 Source로 Application EC2 Security Group을 지정합니다.</p>
+  </li>
+  <li>
+    <p>Backup 보존 기간, Backup Window, Maintenance Window, Log Export와 Deletion Protection을 확인합니다.</p>
+  </li>
+  <li>
+    <p>예상 월간 비용을 확인하고 DB Instance를 생성합니다.</p>
+  </li>
+</ol>
+
+<p>DB Instance 상태가 <code class="language-plaintext highlighter-rouge">Available</code>이 되면 Endpoint와 Port를 확인합니다. Application EC2에서 다음과 같이 연결합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mysql <span class="se">\</span>
+  <span class="nt">--host</span><span class="o">=</span>&lt;RDS_ENDPOINT&gt; <span class="se">\</span>
+  <span class="nt">--port</span><span class="o">=</span>3306 <span class="se">\</span>
+  <span class="nt">--user</span><span class="o">=</span>&lt;MASTER_OR_APP_USER&gt; <span class="se">\</span>
+  <span class="nt">--password</span>
+</code></pre></div></div>
+
+<p>접속이 실패하면 다음 순서로 확인합니다.</p>
+
+<ol>
+  <li>
+    <p>RDS 상태가 <code class="language-plaintext highlighter-rouge">Available</code>인지 확인합니다.</p>
+  </li>
+  <li>
+    <p>EC2와 RDS의 VPC, Subnet Route와 DNS Resolution을 확인합니다.</p>
+  </li>
+  <li>
+    <p>RDS Security Group이 EC2 Security Group을 Source로 허용하는지 확인합니다.</p>
+  </li>
+  <li>
+    <p>Endpoint와 Port가 올바른지 확인합니다.</p>
+  </li>
+  <li>
+    <p>Database Account의 Host 범위와 권한을 확인합니다.</p>
+  </li>
+  <li>
+    <p>TLS가 필요한 Client Option과 Certificate 구성을 확인합니다.</p>
+  </li>
+</ol>
+
+<h2 id="11-ec2와-rds의-실행-흐름">11. EC2와 RDS의 실행 흐름</h2>
+
+<hr />
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Client
+  ↓ HTTP/HTTPS
+Application Load Balancer
+  ↓
+Application EC2
+  ↓ TCP 3306, RDS Security Group
+Private RDS for MySQL
+  ├── Automated Backup
+  ├── Monitoring
+  └── Multi-AZ Option
+</code></pre></div></div>
+
+<p>Client는 Database에 직접 접속하지 않습니다. Application EC2가 Business Logic을 처리한 뒤 Private Endpoint로 RDS에 Query를 전송합니다. RDS Security Group은 Application EC2 Security Group에서 시작된 연결만 허용합니다.</p>
+
+<h2 id="12-실습-후-정리">12. 실습 후 정리</h2>
+
+<hr />
+
+<p>다음 Resource는 Instance를 Stop하는 것만으로 비용이 모두 중지되지 않습니다.</p>
+
+<ul>
+  <li>
+    <p>필요하지 않은 RDS DB Instance를 삭제하고 Final Snapshot 보존 여부를 결정합니다.</p>
+  </li>
+  <li>
+    <p>Manual Snapshot과 Automated Backup 보존 상태를 확인합니다.</p>
+  </li>
+  <li>
+    <p>EC2 Database Instance와 연결된 EBS Volume, Snapshot과 Elastic IP를 확인합니다.</p>
+  </li>
+  <li>
+    <p>실습용 TCP 3306과 27017 Inbound Rule을 제거합니다.</p>
+  </li>
+  <li>
+    <p>더 이상 사용하지 않는 DB Subnet Group, Parameter Group과 Security Group의 참조 여부를 확인합니다.</p>
+  </li>
+</ul>
+
+<p>RDS를 삭제할 때 Deletion Protection이 활성화되어 있으면 먼저 비활성화해야 합니다. Final Snapshot을 생략하면 삭제 시점의 Database 상태로 복구할 수 없습니다.</p>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://ubuntu.com/server/docs/install-and-configure-a-mysql-server">Ubuntu MySQL Server 설치와 설정</a></p>
+  </li>
+  <li>
+    <p><a href="https://dev.mysql.com/doc/refman/8.4/en/native-pluggable-authentication.html">MySQL Native Password 상태</a></p>
+  </li>
+  <li>
+    <p><a href="https://www.mongodb.com/docs/v8.0/tutorial/install-mongodb-on-ubuntu/">MongoDB Community Edition 8.0 Ubuntu 설치</a></p>
+  </li>
+  <li>
+    <p><a href="https://www.mongodb.com/docs/manual/core/security-mongodb-configuration/">MongoDB IP Binding 보안</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/">Amazon RDS 개요</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html">VPC의 RDS DB Instance</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_CreateDBInstance.html">Amazon RDS DB Instance 생성</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html">지원 종료된 AWS Service</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-06-aws-ec2-image-auto-scaling/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">EC2 Snapshot·AMI와 Auto Scaling 실습</strong>
+          </span>
+        </a>
+      
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1790689192"></script>
+    <script src="/assets/js/code-enhancements.js?v=1790689192"></script>
+  </body>
+</html>
