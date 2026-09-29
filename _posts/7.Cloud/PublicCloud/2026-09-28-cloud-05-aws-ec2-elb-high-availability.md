@@ -2,6 +2,7 @@
 title: Amazon EC2와 ELB 기반 고가용성 구성
 description: EC2 Instance 생성과 SSH 접속, Security Group, Elastic IP, ALB와 Auto Scaling Group을 연결해 여러 Availability Zone에 분산된 고가용성 구조를 구성합니다
 date: 2026-09-28
+updated_at: 2026-09-29
 series: Cloud
 tags:
   - Cloud
@@ -595,6 +596,8 @@ Launch Template + AMI
 - CloudWatch Log Group과 Alarm 보존 여부를 확인합니다.
 
 - Cost Explorer와 Billing Dashboard에서 Public IPv4, EC2, EBS와 ELB 비용을 확인합니다.
+
+다음 글인 [EC2 Snapshot·AMI와 Auto Scaling 실습](/cloud-06-aws-ec2-image-auto-scaling/)에서는 실행 중인 Instance를 AMI로 만들고 Launch Template과 Auto Scaling Group에 연결합니다.
 
 ## 참고 자료
 
