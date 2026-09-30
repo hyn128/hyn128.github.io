@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>Amazon S3 Backup과 Spring Boot File Upload | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-10-aws-s3-backup-spring-upload/">
+<meta property="og:title" content="Amazon S3 Backup과 Spring Boot File Upload | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-10-aws-s3-backup-spring-upload/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Amazon S3 Backup과 Spring Boot File Upload | renamed.log">
+<meta name="twitter:description" content="AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다">
+
+  <meta property="article:published_time" content="2026-09-30T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1790777843" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1790777843" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1790777843">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1790777843" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1790777843">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "Amazon S3 Backup과 Spring Boot File Upload | renamed.log",
+    "description": "AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다",
+    "url": "https://hyn128.site/cloud-10-aws-s3-backup-spring-upload/",
+    "datePublished": "2026-09-30T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">Amazon S3 Backup과 Spring Boot File Upload</h1>
+    
+      <p class="post-head__description">AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 9월 30일 · 8분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Amazon S3는 Key로 Data를 저장하는 Object Storage입니다. Backup File, Image와 정적 Asset을 Bucket에 Object로 저장하고 Storage Class와 Lifecycle로 보관 비용을 조정할 수 있습니다. 이 글에서는 On-premises와 AWS Workload의 Backup 방식을 비교하고, Public Access를 차단한 S3 Bucket에 Spring Boot Application이 IAM Role로 File을 업로드하는 구성을 정리합니다.</p>
+</blockquote>
+
+<h2 id="1-backup-대상과-복구-목표">1. Backup 대상과 복구 목표</h2>
+
+<hr />
+
+<p>Backup에는 Data 복사와 Restore 검증이 모두 포함됩니다. 먼저 다음 값을 결정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>질문</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>RPO</td>
+      <td>장애가 발생했을 때 얼마만큼의 Data 손실을 허용할 수 있는가</td>
+    </tr>
+    <tr>
+      <td>RTO</td>
+      <td>장애 이후 Service를 얼마 안에 복구해야 하는가</td>
+    </tr>
+    <tr>
+      <td>보존 기간</td>
+      <td>일·월·연 단위로 Backup을 얼마나 오래 보관하는가</td>
+    </tr>
+    <tr>
+      <td>일관성</td>
+      <td>File 복사만으로 충분한가, Database Online Backup이 필요한가</td>
+    </tr>
+    <tr>
+      <td>복구 위치</td>
+      <td>동일 Region, 다른 Region 또는 On-premises 중 어디에서 복구하는가</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Database Data File을 실행 중인 상태에서 그대로 복사하면 Transaction이 완전히 반영되지 않은 Backup이 될 수 있습니다. Engine이 제공하는 Dump, Snapshot 또는 Application-consistent Backup 절차를 사용합니다.</p>
+
+<h2 id="2-aws를-이용한-backup-방식">2. AWS를 이용한 Backup 방식</h2>
+
+<hr />
+
+<h3 id="21-aws-cli와-s3">2.1 AWS CLI와 S3</h3>
+
+<p>File 단위 Backup은 AWS CLI 또는 SDK로 S3에 직접 Upload할 수 있습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>On-premises Server
+  ↓ HTTPS, AWS CLI·SDK
+S3 Bucket
+  ↓ Lifecycle
+S3 Glacier Storage Class
+</code></pre></div></div>
+
+<p>구성이 단순하지만 Backup Scheduling, 실패 재시도, 암호화, 전송량과 복구 절차를 직접 관리해야 합니다.</p>
+
+<h3 id="22-ec2와-ebs-backup-server">2.2 EC2와 EBS Backup Server</h3>
+
+<p>EC2와 EBS로 Backup Server를 구성하면 Database Utility와 기존 Script를 유연하게 실행할 수 있습니다. 반면 Instance, OS, EBS Capacity, Patch와 Backup Software를 직접 운영하며 EBS Snapshot과 Data Transfer 비용도 고려해야 합니다.</p>
+
+<h3 id="23-aws-storage-gateway">2.3 AWS Storage Gateway</h3>
+
+<p>S3 File Gateway는 On-premises에 Virtual Appliance를 배치하고 NFS 또는 SMB File Share를 제공합니다. Client가 Share에 기록한 File은 Local Cache를 거쳐 S3 Object로 비동기 Upload됩니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>On-premises Client
+  ↓ NFS 또는 SMB
+S3 File Gateway VM
+  ├── Local Cache
+  └── HTTPS :443
+        ↓
+      S3 Bucket
+</code></pre></div></div>
+
+<p>File Gateway는 File Interface를 제공하지만 일반 NAS와 완전히 같은 File System은 아닙니다. Rename이나 Metadata 변경이 S3 Object 재생성으로 이어질 수 있으며 Versioning과 Lifecycle 설정에 따라 예상하지 못한 저장·조기 삭제 비용이 발생할 수 있습니다.</p>
+
+<h2 id="3-amazon-s3-기본-구조">3. Amazon S3 기본 구조</h2>
+
+<hr />
+
+<p>S3(Simple Storage Service)는 Bucket 안에 Object를 저장하는 Regional Object Storage Service입니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>개념</th>
+      <th>설명</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Bucket</td>
+      <td>Object를 담는 최상위 Container이며 생성 Region을 변경할 수 없음</td>
+    </tr>
+    <tr>
+      <td>Object</td>
+      <td>Data, Key와 Metadata로 구성된 저장 단위</td>
+    </tr>
+    <tr>
+      <td>Key</td>
+      <td>Bucket 안에서 Object를 식별하는 전체 이름</td>
+    </tr>
+    <tr>
+      <td>Prefix</td>
+      <td><code class="language-plaintext highlighter-rouge">/</code> 구분자를 이용해 Folder처럼 보이게 하는 Key의 앞부분</td>
+    </tr>
+    <tr>
+      <td>Version ID</td>
+      <td>Versioning 사용 시 같은 Key의 Object Version 식별자</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>S3 Console은 Key Prefix를 File System Directory처럼 표시합니다. 실제 Directory가 별도로 생성되는 구조는 아닙니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Bucket: example-private-upload
+
+Object Key
+uploads/profile/550e8400-e29b-41d4-a716-446655440000.png
+└──────── Prefix ────────┘└──────── Object Name ────────┘
+</code></pre></div></div>
+
+<p>General Purpose Bucket Name은 AWS Partition의 모든 Account에서 고유해야 합니다. Account당 기본 Bucket Quota는 10,000개이며 필요하면 Service Quotas에서 증가를 요청할 수 있습니다. 하나의 Object는 최대 50 TB이고, 5 TB를 초과하는 Object는 Multipart Upload와 분할 Download가 필요합니다.</p>
+
+<h2 id="4-storage-class와-lifecycle">4. Storage Class와 Lifecycle</h2>
+
+<hr />
+
+<p>S3 Standard를 포함한 다수의 Storage Class는 99.999999999%의 Data Durability를 목표로 설계되었습니다. Availability, 최소 보관 기간과 Retrieval 비용은 Storage Class마다 다릅니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Storage Class</th>
+      <th>대표 용도</th>
+      <th>주의 사항</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>S3 Standard</td>
+      <td>자주 접근하는 일반 Data</td>
+      <td>기본 저장 비용</td>
+    </tr>
+    <tr>
+      <td>S3 Intelligent-Tiering</td>
+      <td>접근 Pattern이 바뀌거나 예측하기 어려운 Data</td>
+      <td>Monitoring·Automation 비용 확인</td>
+    </tr>
+    <tr>
+      <td>S3 Standard-IA</td>
+      <td>자주 접근하지 않지만 즉시 복구할 Data</td>
+      <td>최소 보관 기간과 Retrieval 비용</td>
+    </tr>
+    <tr>
+      <td>S3 One Zone-IA</td>
+      <td>재생성할 수 있는 비중요 Data</td>
+      <td>단일 Availability Zone 저장</td>
+    </tr>
+    <tr>
+      <td>S3 Glacier Instant Retrieval</td>
+      <td>Archive이지만 Millisecond 접근 필요</td>
+      <td>최소 보관 기간과 Retrieval 비용</td>
+    </tr>
+    <tr>
+      <td>S3 Glacier Flexible Retrieval</td>
+      <td>수 분~수 시간 복구를 허용하는 Archive</td>
+      <td>Restore 절차 필요</td>
+    </tr>
+    <tr>
+      <td>S3 Glacier Deep Archive</td>
+      <td>장기 보관</td>
+      <td>긴 Restore 시간과 최소 보관 기간</td>
+    </tr>
+    <tr>
+      <td>Reduced Redundancy Storage</td>
+      <td>Legacy Class</td>
+      <td>현재 권장되지 않음</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Lifecycle Rule은 Object의 생성 이후 경과 일수에 따라 Storage Class를 전환하거나 삭제합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>생성
+  ↓ S3 Standard
+30일
+  ↓ S3 Standard-IA
+90일
+  ↓ S3 Glacier Flexible Retrieval
+365일
+  ↓ Expiration
+</code></pre></div></div>
+
+<p>위 기간은 예시입니다. 최소 보관 기간, Retrieval 시간, Compliance와 실제 복구 빈도를 기준으로 결정합니다. Versioning을 사용한다면 Current Version뿐 아니라 Noncurrent Version의 Transition과 Expiration도 함께 설정합니다.</p>
+
+<h2 id="5-private-bucket-생성-원칙">5. Private Bucket 생성 원칙</h2>
+
+<hr />
+
+<p>Application Upload용 Bucket은 기본적으로 비공개로 유지합니다.</p>
+
+<ol>
+  <li>
+    <p>Application과 가까운 AWS Region에 General Purpose Bucket을 생성합니다.</p>
+  </li>
+  <li>
+    <p>Object Ownership은 기본값인 <code class="language-plaintext highlighter-rouge">Bucket owner enforced</code>를 유지해 ACL을 비활성화합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Block all public access</code>를 활성화합니다.</p>
+  </li>
+  <li>
+    <p>Versioning, Default Encryption과 Lifecycle을 Data 중요도에 맞게 설정합니다.</p>
+  </li>
+  <li>
+    <p>Application에는 IAM Role을 연결하고 필요한 Bucket Prefix에만 권한을 부여합니다.</p>
+  </li>
+</ol>
+
+<p><code class="language-plaintext highlighter-rouge">Block Public Access</code>를 해제해야 외부 Upload가 가능하다는 설명은 잘못되었습니다. Backend는 IAM 인증으로 Private Bucket에 Upload할 수 있고, Browser 직접 Upload는 제한된 Presigned URL을 사용할 수 있습니다.</p>
+
+<h2 id="6-iam-최소-권한">6. IAM 최소 권한</h2>
+
+<hr />
+
+<p>EC2에서 실행하는 Spring Boot Application에는 Instance Profile을 연결합니다. ECS는 Task Role, EKS는 Pod Identity 또는 IRSA처럼 Workload용 임시 Credential을 사용합니다.</p>
+
+<p>다음 Identity Policy는 특정 Bucket의 <code class="language-plaintext highlighter-rouge">uploads/</code> Prefix에 Object를 쓰고 읽는 예제입니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"Version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"Statement"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"Sid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ListUploadPrefix"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"s3:ListBucket"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Resource"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arn:aws:s3:::example-private-upload"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Condition"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"StringLike"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"s3:prefix"</span><span class="p">:</span><span class="w"> </span><span class="s2">"uploads/*"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">}</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"Sid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ManageUploadObjects"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="s2">"s3:GetObject"</span><span class="p">,</span><span class="w">
+        </span><span class="s2">"s3:PutObject"</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"Resource"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arn:aws:s3:::example-private-upload/uploads/*"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">AmazonS3FullAccess</code>를 Application User에 부여하거나 <code class="language-plaintext highlighter-rouge">Principal: "*"</code>로 <code class="language-plaintext highlighter-rouge">PutObject</code>, <code class="language-plaintext highlighter-rouge">DeleteObject</code>를 허용하지 않습니다. 삭제 기능이 필요한 Application에만 대상 Prefix의 <code class="language-plaintext highlighter-rouge">s3:DeleteObject</code>를 추가합니다.</p>
+
+<h2 id="7-cors의-역할">7. CORS의 역할</h2>
+
+<hr />
+
+<p>CORS는 Browser가 다른 Origin의 S3 Endpoint를 호출할 수 있는지 결정합니다. IAM이나 Bucket Policy를 대신하지 않으므로 CORS에서 Method를 허용해도 S3 권한이 자동으로 생기지 않습니다.</p>
+
+<p>Browser가 Backend로 File을 보내고 Backend가 S3에 Upload한다면 Browser는 S3를 직접 호출하지 않으므로 S3 CORS가 필요하지 않습니다.</p>
+
+<p>Presigned URL로 Browser가 S3에 직접 Upload할 때만 실제 Frontend Origin과 Method를 제한해 설정합니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="w">
+  </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"AllowedHeaders"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+      </span><span class="s2">"content-type"</span><span class="w">
+    </span><span class="p">],</span><span class="w">
+    </span><span class="nl">"AllowedMethods"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+      </span><span class="s2">"PUT"</span><span class="w">
+    </span><span class="p">],</span><span class="w">
+    </span><span class="nl">"AllowedOrigins"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+      </span><span class="s2">"https://app.example.com"</span><span class="w">
+    </span><span class="p">],</span><span class="w">
+    </span><span class="nl">"ExposeHeaders"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+      </span><span class="s2">"ETag"</span><span class="w">
+    </span><span class="p">],</span><span class="w">
+    </span><span class="nl">"MaxAgeSeconds"</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+</span><span class="p">]</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Write Method와 <code class="language-plaintext highlighter-rouge">AllowedOrigins: ["*"]</code>를 함께 사용하는 설정은 피합니다.</p>
+
+<h2 id="8-spring-boot-project-의존성">8. Spring Boot Project 의존성</h2>
+
+<hr />
+
+<p>기존 AWS SDK for Java 1.x의 <code class="language-plaintext highlighter-rouge">AmazonS3Client</code>보다 현재 유지되는 AWS SDK for Java 2.x의 <code class="language-plaintext highlighter-rouge">S3Client</code>를 사용합니다. 다음은 Gradle 예제입니다.</p>
+
+<div class="language-groovy highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">dependencies</span> <span class="o">{</span>
+    <span class="n">implementation</span> <span class="nf">platform</span><span class="o">(</span><span class="s1">'software.amazon.awssdk:bom:2.55.7'</span><span class="o">)</span>
+    <span class="n">implementation</span> <span class="s1">'software.amazon.awssdk:s3'</span>
+
+    <span class="n">implementation</span> <span class="s1">'org.springframework.boot:spring-boot-starter-web'</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>SDK Version은 작성 시점의 예제 값입니다. Project의 Java·Spring Boot Version과 호환되는 현재 2.x Release를 확인한 뒤 동일 BOM 안에서 Module Version을 맞춥니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">application.yml</code>에는 Bucket과 Region만 기록합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">spring</span><span class="pi">:</span>
+  <span class="na">servlet</span><span class="pi">:</span>
+    <span class="na">multipart</span><span class="pi">:</span>
+      <span class="na">max-file-size</span><span class="pi">:</span> <span class="s">20MB</span>
+      <span class="na">max-request-size</span><span class="pi">:</span> <span class="s">20MB</span>
+
+<span class="na">app</span><span class="pi">:</span>
+  <span class="na">s3</span><span class="pi">:</span>
+    <span class="na">bucket</span><span class="pi">:</span> <span class="s">example-private-upload</span>
+    <span class="na">region</span><span class="pi">:</span> <span class="s">ap-northeast-2</span>
+</code></pre></div></div>
+
+<p>Access Key와 Secret Access Key는 설정 File이나 Git Repository에 저장하지 않습니다. Credential Provider를 별도로 지정하지 않으면 SDK는 Default Credentials Provider Chain을 사용하며 EC2 Instance Profile 같은 임시 Credential을 찾습니다.</p>
+
+<h2 id="9-s3-client-구성">9. S3 Client 구성</h2>
+
+<hr />
+
+<p>Configuration Property를 정의합니다.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">org.springframework.boot.context.properties.ConfigurationProperties</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">software.amazon.awssdk.regions.Region</span><span class="o">;</span>
+
+<span class="nd">@ConfigurationProperties</span><span class="o">(</span><span class="n">prefix</span> <span class="o">=</span> <span class="s">"app.s3"</span><span class="o">)</span>
+<span class="kd">public</span> <span class="n">record</span> <span class="nf">S3Properties</span><span class="o">(</span><span class="nc">String</span> <span class="n">bucket</span><span class="o">,</span> <span class="nc">Region</span> <span class="n">region</span><span class="o">)</span> <span class="o">{</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">S3Client</code>는 Application에서 재사용하도록 Bean으로 등록합니다.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">org.springframework.boot.context.properties.EnableConfigurationProperties</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.context.annotation.Bean</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.context.annotation.Configuration</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">software.amazon.awssdk.services.s3.S3Client</span><span class="o">;</span>
+
+<span class="nd">@Configuration</span>
+<span class="nd">@EnableConfigurationProperties</span><span class="o">(</span><span class="nc">S3Properties</span><span class="o">.</span><span class="na">class</span><span class="o">)</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">S3Configuration</span> <span class="o">{</span>
+
+    <span class="nd">@Bean</span>
+    <span class="nc">S3Client</span> <span class="nf">s3Client</span><span class="o">(</span><span class="nc">S3Properties</span> <span class="n">properties</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">return</span> <span class="nc">S3Client</span><span class="o">.</span><span class="na">builder</span><span class="o">()</span>
+                <span class="o">.</span><span class="na">region</span><span class="o">(</span><span class="n">properties</span><span class="o">.</span><span class="na">region</span><span class="o">())</span>
+                <span class="o">.</span><span class="na">build</span><span class="o">();</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>Credential Provider를 코드에서 지정하지 않았으므로 SDK가 Default Credentials Provider Chain을 사용합니다.</p>
+
+<h2 id="10-file-이름과-object-key-생성">10. File 이름과 Object Key 생성</h2>
+
+<hr />
+
+<p>Client가 보낸 원본 File Name을 그대로 Key로 사용하면 이름 충돌과 경로 조작 문제가 생길 수 있습니다. 원본 이름에서 확장자만 안전하게 추출하고 UUID로 새 이름을 만듭니다.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">java.util.Locale</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.util.Set</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.util.UUID</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">org.springframework.util.StringUtils</span><span class="o">;</span>
+
+<span class="kd">public</span> <span class="kd">final</span> <span class="kd">class</span> <span class="nc">ObjectKeyFactory</span> <span class="o">{</span>
+
+    <span class="kd">private</span> <span class="kd">static</span> <span class="kd">final</span> <span class="nc">Set</span><span class="o">&lt;</span><span class="nc">String</span><span class="o">&gt;</span> <span class="no">ALLOWED_EXTENSIONS</span> <span class="o">=</span>
+            <span class="nc">Set</span><span class="o">.</span><span class="na">of</span><span class="o">(</span><span class="s">"jpg"</span><span class="o">,</span> <span class="s">"jpeg"</span><span class="o">,</span> <span class="s">"png"</span><span class="o">,</span> <span class="s">"gif"</span><span class="o">,</span> <span class="s">"pdf"</span><span class="o">);</span>
+
+    <span class="kd">private</span> <span class="nf">ObjectKeyFactory</span><span class="o">()</span> <span class="o">{</span>
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="kd">static</span> <span class="nc">String</span> <span class="nf">create</span><span class="o">(</span><span class="nc">String</span> <span class="n">category</span><span class="o">,</span> <span class="nc">String</span> <span class="n">originalFilename</span><span class="o">)</span> <span class="o">{</span>
+        <span class="nc">String</span> <span class="n">safeCategory</span> <span class="o">=</span> <span class="n">category</span><span class="o">.</span><span class="na">replaceAll</span><span class="o">(</span><span class="s">"[^a-zA-Z0-9_-]"</span><span class="o">,</span> <span class="s">""</span><span class="o">);</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">safeCategory</span><span class="o">.</span><span class="na">isBlank</span><span class="o">())</span> <span class="o">{</span>
+            <span class="k">throw</span> <span class="k">new</span> <span class="nf">IllegalArgumentException</span><span class="o">(</span><span class="s">"유효하지 않은 category입니다."</span><span class="o">);</span>
+        <span class="o">}</span>
+
+        <span class="nc">String</span> <span class="n">extension</span> <span class="o">=</span> <span class="nc">StringUtils</span><span class="o">.</span><span class="na">getFilenameExtension</span><span class="o">(</span><span class="n">originalFilename</span><span class="o">);</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">extension</span> <span class="o">==</span> <span class="kc">null</span>
+                <span class="o">||</span> <span class="o">!</span><span class="no">ALLOWED_EXTENSIONS</span><span class="o">.</span><span class="na">contains</span><span class="o">(</span><span class="n">extension</span><span class="o">.</span><span class="na">toLowerCase</span><span class="o">(</span><span class="nc">Locale</span><span class="o">.</span><span class="na">ROOT</span><span class="o">)))</span> <span class="o">{</span>
+            <span class="k">throw</span> <span class="k">new</span> <span class="nf">IllegalArgumentException</span><span class="o">(</span><span class="s">"허용하지 않는 파일 형식입니다."</span><span class="o">);</span>
+        <span class="o">}</span>
+
+        <span class="k">return</span> <span class="s">"uploads/%s/%s.%s"</span><span class="o">.</span><span class="na">formatted</span><span class="o">(</span>
+                <span class="n">safeCategory</span><span class="o">,</span>
+                <span class="no">UUID</span><span class="o">.</span><span class="na">randomUUID</span><span class="o">(),</span>
+                <span class="n">extension</span><span class="o">.</span><span class="na">toLowerCase</span><span class="o">(</span><span class="nc">Locale</span><span class="o">.</span><span class="na">ROOT</span><span class="o">)</span>
+        <span class="o">);</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>File 확장자만 신뢰하지 않고 실제 Service 요구 사항에 따라 MIME Type, File Signature, Virus Scan과 Image Re-encoding을 추가합니다.</p>
+
+<h2 id="11-upload-service">11. Upload Service</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">MultipartFile</code>의 InputStream을 S3에 전달하고 Object Key를 반환합니다. Private Bucket이므로 Public Read ACL을 추가하지 않습니다.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">java.io.IOException</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">org.springframework.stereotype.Service</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.multipart.MultipartFile</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">software.amazon.awssdk.core.sync.RequestBody</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">software.amazon.awssdk.services.s3.S3Client</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">software.amazon.awssdk.services.s3.model.PutObjectRequest</span><span class="o">;</span>
+
+<span class="nd">@Service</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">S3FileService</span> <span class="o">{</span>
+
+    <span class="kd">private</span> <span class="kd">final</span> <span class="nc">S3Client</span> <span class="n">s3Client</span><span class="o">;</span>
+    <span class="kd">private</span> <span class="kd">final</span> <span class="nc">S3Properties</span> <span class="n">properties</span><span class="o">;</span>
+
+    <span class="kd">public</span> <span class="nf">S3FileService</span><span class="o">(</span><span class="nc">S3Client</span> <span class="n">s3Client</span><span class="o">,</span> <span class="nc">S3Properties</span> <span class="n">properties</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">s3Client</span> <span class="o">=</span> <span class="n">s3Client</span><span class="o">;</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">properties</span> <span class="o">=</span> <span class="n">properties</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="kd">public</span> <span class="nc">String</span> <span class="nf">upload</span><span class="o">(</span><span class="nc">String</span> <span class="n">category</span><span class="o">,</span> <span class="nc">MultipartFile</span> <span class="n">file</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">file</span><span class="o">.</span><span class="na">isEmpty</span><span class="o">())</span> <span class="o">{</span>
+            <span class="k">throw</span> <span class="k">new</span> <span class="nf">IllegalArgumentException</span><span class="o">(</span><span class="s">"빈 파일은 업로드할 수 없습니다."</span><span class="o">);</span>
+        <span class="o">}</span>
+
+        <span class="nc">String</span> <span class="n">key</span> <span class="o">=</span> <span class="nc">ObjectKeyFactory</span><span class="o">.</span><span class="na">create</span><span class="o">(</span><span class="n">category</span><span class="o">,</span> <span class="n">file</span><span class="o">.</span><span class="na">getOriginalFilename</span><span class="o">());</span>
+        <span class="nc">PutObjectRequest</span> <span class="n">request</span> <span class="o">=</span> <span class="nc">PutObjectRequest</span><span class="o">.</span><span class="na">builder</span><span class="o">()</span>
+                <span class="o">.</span><span class="na">bucket</span><span class="o">(</span><span class="n">properties</span><span class="o">.</span><span class="na">bucket</span><span class="o">())</span>
+                <span class="o">.</span><span class="na">key</span><span class="o">(</span><span class="n">key</span><span class="o">)</span>
+                <span class="o">.</span><span class="na">contentType</span><span class="o">(</span><span class="n">file</span><span class="o">.</span><span class="na">getContentType</span><span class="o">())</span>
+                <span class="o">.</span><span class="na">build</span><span class="o">();</span>
+
+        <span class="k">try</span> <span class="o">(</span><span class="kt">var</span> <span class="n">inputStream</span> <span class="o">=</span> <span class="n">file</span><span class="o">.</span><span class="na">getInputStream</span><span class="o">())</span> <span class="o">{</span>
+            <span class="n">s3Client</span><span class="o">.</span><span class="na">putObject</span><span class="o">(</span>
+                    <span class="n">request</span><span class="o">,</span>
+                    <span class="nc">RequestBody</span><span class="o">.</span><span class="na">fromInputStream</span><span class="o">(</span><span class="n">inputStream</span><span class="o">,</span> <span class="n">file</span><span class="o">.</span><span class="na">getSize</span><span class="o">())</span>
+            <span class="o">);</span>
+            <span class="k">return</span> <span class="n">key</span><span class="o">;</span>
+        <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="nc">IOException</span> <span class="n">exception</span><span class="o">)</span> <span class="o">{</span>
+            <span class="k">throw</span> <span class="k">new</span> <span class="nf">FileUploadException</span><span class="o">(</span><span class="s">"업로드할 파일을 읽지 못했습니다."</span><span class="o">,</span> <span class="n">exception</span><span class="o">);</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>Application Database에는 영구 Public URL 대신 Bucket과 Object Key를 저장합니다. Client가 Private Object를 내려받아야 할 때는 권한 확인 후 짧은 만료 시간을 가진 Presigned GET URL을 생성하거나 Backend가 Data를 중계합니다.</p>
+
+<h2 id="12-controller와-예외-처리">12. Controller와 예외 처리</h2>
+
+<hr />
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">java.util.Map</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">org.springframework.http.HttpStatus</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.http.ResponseEntity</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.ExceptionHandler</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.PostMapping</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.RequestParam</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.RequestPart</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.RestController</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.RestControllerAdvice</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.multipart.MaxUploadSizeExceededException</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.multipart.MultipartFile</span><span class="o">;</span>
+
+<span class="nd">@RestController</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">S3FileController</span> <span class="o">{</span>
+
+    <span class="kd">private</span> <span class="kd">final</span> <span class="nc">S3FileService</span> <span class="n">fileService</span><span class="o">;</span>
+
+    <span class="kd">public</span> <span class="nf">S3FileController</span><span class="o">(</span><span class="nc">S3FileService</span> <span class="n">fileService</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">fileService</span> <span class="o">=</span> <span class="n">fileService</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="nd">@PostMapping</span><span class="o">(</span><span class="s">"/uploads"</span><span class="o">)</span>
+    <span class="kd">public</span> <span class="nc">Map</span><span class="o">&lt;</span><span class="nc">String</span><span class="o">,</span> <span class="nc">String</span><span class="o">&gt;</span> <span class="nf">upload</span><span class="o">(</span>
+            <span class="nd">@RequestParam</span> <span class="nc">String</span> <span class="n">category</span><span class="o">,</span>
+            <span class="nd">@RequestPart</span> <span class="nc">MultipartFile</span> <span class="n">file</span>
+    <span class="o">)</span> <span class="o">{</span>
+        <span class="k">return</span> <span class="nc">Map</span><span class="o">.</span><span class="na">of</span><span class="o">(</span><span class="s">"key"</span><span class="o">,</span> <span class="n">fileService</span><span class="o">.</span><span class="na">upload</span><span class="o">(</span><span class="n">category</span><span class="o">,</span> <span class="n">file</span><span class="o">));</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+
+<span class="nd">@RestControllerAdvice</span>
+<span class="kd">class</span> <span class="nc">FileUploadExceptionHandler</span> <span class="o">{</span>
+
+    <span class="nd">@ExceptionHandler</span><span class="o">(</span><span class="nc">MaxUploadSizeExceededException</span><span class="o">.</span><span class="na">class</span><span class="o">)</span>
+    <span class="nc">ResponseEntity</span><span class="o">&lt;</span><span class="nc">Map</span><span class="o">&lt;</span><span class="nc">String</span><span class="o">,</span> <span class="nc">String</span><span class="o">&gt;&gt;</span> <span class="nf">handleMaxUploadSizeExceeded</span><span class="o">()</span> <span class="o">{</span>
+        <span class="k">return</span> <span class="nc">ResponseEntity</span><span class="o">.</span><span class="na">status</span><span class="o">(</span><span class="nc">HttpStatus</span><span class="o">.</span><span class="na">PAYLOAD_TOO_LARGE</span><span class="o">)</span>
+                <span class="o">.</span><span class="na">body</span><span class="o">(</span><span class="nc">Map</span><span class="o">.</span><span class="na">of</span><span class="o">(</span><span class="s">"message"</span><span class="o">,</span> <span class="s">"허용된 업로드 용량을 초과했습니다."</span><span class="o">));</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">FileUploadException</code>은 Runtime Exception으로 정의합니다.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">public</span> <span class="kd">class</span> <span class="nc">FileUploadException</span> <span class="kd">extends</span> <span class="nc">RuntimeException</span> <span class="o">{</span>
+
+    <span class="kd">public</span> <span class="nf">FileUploadException</span><span class="o">(</span><span class="nc">String</span> <span class="n">message</span><span class="o">,</span> <span class="nc">Throwable</span> <span class="n">cause</span><span class="o">)</span> <span class="o">{</span>
+        <span class="kd">super</span><span class="o">(</span><span class="n">message</span><span class="o">,</span> <span class="n">cause</span><span class="o">);</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h2 id="13-upload-검증">13. Upload 검증</h2>
+
+<hr />
+
+<p>Application Host의 IAM Role이 적용되었는지 먼저 확인합니다. 장기 Access Key를 출력하거나 Log에 남기지 않습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws sts get-caller-identity
+</code></pre></div></div>
+
+<p>Application을 실행한 뒤 Test File을 Upload합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-X</span> POST http://localhost:8080/uploads <span class="se">\</span>
+  <span class="nt">-F</span> <span class="s1">'category=profile'</span> <span class="se">\</span>
+  <span class="nt">-F</span> <span class="s1">'file=@sample.png'</span>
+</code></pre></div></div>
+
+<p>반환된 Key가 Bucket에 생성되었는지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws s3api head-object <span class="se">\</span>
+  <span class="nt">--bucket</span> example-private-upload <span class="se">\</span>
+  <span class="nt">--key</span> <span class="s1">'&lt;RETURNED_OBJECT_KEY&gt;'</span>
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>오류</th>
+      <th>확인 항목</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AccessDenied</code></td>
+      <td>IAM Role 연결, Resource ARN과 <code class="language-plaintext highlighter-rouge">s3:PutObject</code> 권한</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">NoSuchBucket</code></td>
+      <td>Bucket Name과 Region</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">PermanentRedirect</code></td>
+      <td>Client Region과 Bucket Region 불일치</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">413 Payload Too Large</code></td>
+      <td>Spring Multipart와 앞단 Proxy·ALB 제한</td>
+    </tr>
+    <tr>
+      <td>Browser CORS 오류</td>
+      <td>Browser 직접 S3 호출 여부, Origin·Method·Header</td>
+    </tr>
+    <tr>
+      <td>Upload 후 URL 접근 거부</td>
+      <td>Private Object의 정상 동작이며 Presigned URL 또는 Backend Download 필요</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="14-정적-website-hosting-경계">14. 정적 Website Hosting 경계</h2>
+
+<hr />
+
+<p>S3는 정적 Website Hosting Endpoint를 제공하지만 Website Endpoint 자체는 HTTPS를 지원하지 않습니다. 운영 Domain에서 HTTPS로 정적 Site를 제공할 때는 Private S3 Origin 앞에 CloudFront와 Origin Access Control을 두고 ACM Certificate를 연결하는 구성을 사용합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Client
+  ↓ HTTPS
+CloudFront + ACM
+  ↓ Origin Access Control
+Private S3 Bucket
+</code></pre></div></div>
+
+<p>정적 Website CI/CD와 CloudFront 배포는 별도 글에서 다룹니다.</p>
+
+<h2 id="15-실습-후-정리">15. 실습 후 정리</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p>실습 Object와 이전 Version을 삭제하고 Multipart Upload가 남아 있는지 확인합니다.</p>
+  </li>
+  <li>
+    <p>Bucket을 삭제하지 않을 경우 Lifecycle과 Versioning 비용을 확인합니다.</p>
+  </li>
+  <li>
+    <p>Application IAM Role의 임시 Policy와 불필요한 <code class="language-plaintext highlighter-rouge">s3:*</code> 권한을 제거합니다.</p>
+  </li>
+  <li>
+    <p>Bucket Policy, ACL과 Block Public Access 상태를 IAM Access Analyzer for S3로 점검합니다.</p>
+  </li>
+  <li>
+    <p>Source Code, Shell History와 Log에 Access Key나 Secret Key가 남아 있지 않은지 검사합니다.</p>
+  </li>
+</ul>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>S3는 Key로 Object를 식별하며 Console의 Folder는 Key Prefix를 표현합니다.</p>
+    </li>
+    <li>
+      <p>Backup은 Storage Class 전환, RPO·RTO, Application Consistency와 Restore 검증을 포함합니다.</p>
+    </li>
+    <li>
+      <p>Application은 IAM Role과 Default Credentials Provider Chain을 사용하고 Bucket을 Private으로 유지합니다.</p>
+    </li>
+    <li>
+      <p>Browser 직접 전송에는 제한된 CORS와 Presigned URL을 사용하며 CORS를 권한 설정으로 해석하지 않습니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/filegateway/latest/files3/file-gateway-concepts.html">S3 File Gateway 동작</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/create-bucket-overview.html">S3 Bucket 생성과 기본 Quota</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html">S3 Storage Class</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html">S3 Block Public Access</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html">S3 Object Ownership과 ACL 비활성화</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/credentials-chain.html">AWS SDK for Java 2.x Default Credentials Provider Chain</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html">S3 Presigned URL</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/getting-started-secure-static-website-cloudformation-template.html">CloudFront와 Private S3를 이용한 정적 Website</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-09-aws-route53-acm-https/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">Route 53과 ACM으로 Domain·HTTPS 구성</strong>
+          </span>
+        </a>
+      
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1790777843"></script>
+    <script src="/assets/js/code-enhancements.js?v=1790777843"></script>
+  </body>
+</html>

@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>Route 53과 ACM으로 Domain·HTTPS 구성 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="Route 53 Hosted Zone의 DNS Record를 EC2와 Application Load Balancer에 연결하고 ACM Public Certificate와 HTTPS Listener를 구성합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-09-aws-route53-acm-https/">
+<meta property="og:title" content="Route 53과 ACM으로 Domain·HTTPS 구성 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="Route 53 Hosted Zone의 DNS Record를 EC2와 Application Load Balancer에 연결하고 ACM Public Certificate와 HTTPS Listener를 구성합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-09-aws-route53-acm-https/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Route 53과 ACM으로 Domain·HTTPS 구성 | renamed.log">
+<meta name="twitter:description" content="Route 53 Hosted Zone의 DNS Record를 EC2와 Application Load Balancer에 연결하고 ACM Public Certificate와 HTTPS Listener를 구성합니다">
+
+  <meta property="article:published_time" content="2026-09-30T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1790777843" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1790777843" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1790777843">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1790777843" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1790777843">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "Route 53과 ACM으로 Domain·HTTPS 구성 | renamed.log",
+    "description": "Route 53 Hosted Zone의 DNS Record를 EC2와 Application Load Balancer에 연결하고 ACM Public Certificate와 HTTPS Listener를 구성합니다",
+    "url": "https://hyn128.site/cloud-09-aws-route53-acm-https/",
+    "datePublished": "2026-09-30T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">Route 53과 ACM으로 Domain·HTTPS 구성</h1>
+    
+      <p class="post-head__description">Route 53 Hosted Zone의 DNS Record를 EC2와 Application Load Balancer에 연결하고 ACM Public Certificate와 HTTPS Listener를 구성합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 9월 30일 · 5분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Route 53은 Domain 등록, Authoritative DNS와 Health Check 기능을 제공하고, AWS Certificate Manager는 AWS Service에 연결할 TLS Certificate를 발급·관리합니다. 이 글에서는 Domain과 Hosted Zone의 관계, EC2·Application Load Balancer에 맞는 DNS Record, ACM DNS 검증과 HTTPS Listener의 요청 흐름을 정리합니다.</p>
+</blockquote>
+
+<h2 id="1-domain과-dns">1. Domain과 DNS</h2>
+
+<hr />
+
+<p>IP Address는 Server 위치를 나타내지만 사용자가 기억하기 어렵고 Infrastructure 변경에 따라 바뀔 수 있습니다. DNS는 <code class="language-plaintext highlighter-rouge">app.example.com</code> 같은 Domain Name을 실제 접속 대상과 연결합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Browser
+  ↓ app.example.com 조회
+DNS Resolver
+  ↓ Authoritative DNS 질의
+Route 53 Hosted Zone
+  ↓ A 또는 Alias Record 응답
+EC2 Public IP 또는 ALB
+</code></pre></div></div>
+
+<p>Route 53의 기능은 다음 세 영역으로 구분할 수 있습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>기능</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Domain Registration</td>
+      <td>Domain을 등록하고 등록자 정보를 관리</td>
+    </tr>
+    <tr>
+      <td>DNS Service</td>
+      <td>Hosted Zone과 Record로 DNS Query에 응답</td>
+    </tr>
+    <tr>
+      <td>Health Check·Traffic Flow</td>
+      <td>Endpoint 상태와 Routing Policy에 따라 응답 대상 선택</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Domain은 Route 53이 아닌 Registrar에서 구매해도 됩니다. 외부에서 등록한 Domain을 Route 53에서 관리하려면 Public Hosted Zone을 만들고 Registrar의 Name Server를 Route 53이 제공한 NS Record로 변경합니다.</p>
+
+<h2 id="2-hosted-zone과-record">2. Hosted Zone과 Record</h2>
+
+<hr />
+
+<blockquote>
+  <p>Hosted Zone은 특정 Domain의 DNS Record를 관리하는 Container입니다. Public Hosted Zone은 Internet DNS Query에 응답하고 Private Hosted Zone은 연결한 VPC 내부에서만 사용합니다.</p>
+</blockquote>
+
+<table>
+  <thead>
+    <tr>
+      <th>Record Type</th>
+      <th>저장 값</th>
+      <th>대표 용도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">A</code></td>
+      <td>IPv4 Address</td>
+      <td>EC2 Elastic IP 또는 IPv4 대상</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AAAA</code></td>
+      <td>IPv6 Address</td>
+      <td>IPv6 대상</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">CNAME</code></td>
+      <td>다른 Domain Name</td>
+      <td>Subdomain을 다른 이름에 연결</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">MX</code></td>
+      <td>Mail Server</td>
+      <td>E-mail 수신 Server 지정</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">TXT</code></td>
+      <td>Text</td>
+      <td>Domain 소유권 검증, SPF와 기타 Metadata</td>
+    </tr>
+    <tr>
+      <td>Alias <code class="language-plaintext highlighter-rouge">A</code>·<code class="language-plaintext highlighter-rouge">AAAA</code></td>
+      <td>지원되는 AWS Resource</td>
+      <td>ALB, CloudFront와 S3 Website Endpoint 등에 연결</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Alias Record는 Route 53의 확장 기능입니다. Zone Apex인 <code class="language-plaintext highlighter-rouge">example.com</code>도 ALB처럼 지원되는 AWS Resource에 연결할 수 있고, 대상의 IP가 바뀌어도 Record를 직접 수정할 필요가 없습니다.</p>
+
+<h2 id="3-ec2에-domain-직접-연결">3. EC2에 Domain 직접 연결</h2>
+
+<hr />
+
+<p>단일 EC2에 직접 연결할 때는 Public IPv4가 변경되지 않도록 Elastic IP 사용을 검토합니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">[Route 53] → [호스팅 영역] → [레코드 생성]</code>에서 다음 값을 설정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>예제</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Record Name</td>
+      <td><code class="language-plaintext highlighter-rouge">app</code></td>
+    </tr>
+    <tr>
+      <td>Record Type</td>
+      <td><code class="language-plaintext highlighter-rouge">A</code></td>
+    </tr>
+    <tr>
+      <td>Value</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;EC2_ELASTIC_IP&gt;</code></td>
+    </tr>
+    <tr>
+      <td>TTL</td>
+      <td>변경 계획과 Cache 영향을 고려해 선택</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>DNS 응답을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dig +short app.example.com A
+</code></pre></div></div>
+
+<p>HTTP 응답까지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-I</span> http://app.example.com
+</code></pre></div></div>
+
+<p>DNS Record가 올바르더라도 EC2 Security Group, Network ACL, Web Server Listen Port와 OS Firewall이 요청을 허용해야 접속할 수 있습니다.</p>
+
+<h2 id="4-application-load-balancer에-domain-연결">4. Application Load Balancer에 Domain 연결</h2>
+
+<hr />
+
+<p>여러 EC2에 Traffic을 분산하거나 HTTPS를 Load Balancer에서 종료하려면 ALB를 사용합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Client
+  ↓ DNS Query
+Route 53 Alias A/AAAA
+  ↓
+Application Load Balancer
+  ↓ Target Group Health Check
+EC2 Instances
+</code></pre></div></div>
+
+<h3 id="41-target-group-생성">4.1 Target Group 생성</h3>
+
+<ol>
+  <li>
+    <p>Target Type과 Application Port를 선택합니다.</p>
+  </li>
+  <li>
+    <p>Health Check Protocol, Port와 Path를 설정합니다.</p>
+  </li>
+  <li>
+    <p>요청을 처리할 EC2 Instance를 등록합니다.</p>
+  </li>
+  <li>
+    <p>모든 Target이 <code class="language-plaintext highlighter-rouge">healthy</code> 상태인지 확인합니다.</p>
+  </li>
+</ol>
+
+<h3 id="42-alb-생성">4.2 ALB 생성</h3>
+
+<p>Internet에서 접속하는 Service라면 Internet-facing ALB를 두 개 이상의 Availability Zone Subnet에 배치합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Security Group</th>
+      <th>Inbound Rule</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ALB</td>
+      <td>Client에서 TCP 80·443</td>
+    </tr>
+    <tr>
+      <td>Application EC2</td>
+      <td>ALB Security Group에서 Application Port</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Application EC2의 HTTP Port를 Internet 전체에 공개하지 않고 ALB Security Group만 Source로 허용합니다.</p>
+
+<h3 id="43-alias-record-생성">4.3 Alias Record 생성</h3>
+
+<p>Hosted Zone에서 Alias <code class="language-plaintext highlighter-rouge">A</code> Record를 만들고 대상 AWS Resource로 ALB를 선택합니다. IPv6를 제공한다면 Alias <code class="language-plaintext highlighter-rouge">AAAA</code> Record도 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dig +short app.example.com A
+curl <span class="nt">-I</span> http://app.example.com
+</code></pre></div></div>
+
+<p>ALB의 Address는 고정 IP 한 개가 아니므로 ALB DNS Name을 일반 <code class="language-plaintext highlighter-rouge">A</code> Record의 Value에 IP로 복사하지 않습니다.</p>
+
+<h2 id="5-route-53-routing-policy와-health-check">5. Route 53 Routing Policy와 Health Check</h2>
+
+<hr />
+
+<p>Route 53은 Record 구성에 따라 다양한 Routing Policy를 제공합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Policy</th>
+      <th>목적</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Simple</td>
+      <td>하나의 Resource 또는 단순한 여러 Value 응답</td>
+    </tr>
+    <tr>
+      <td>Weighted</td>
+      <td>설정한 Weight 비율로 Traffic 분배</td>
+    </tr>
+    <tr>
+      <td>Latency</td>
+      <td>요청 위치에서 Latency가 낮은 Region 선택</td>
+    </tr>
+    <tr>
+      <td>Failover</td>
+      <td>Primary 장애 시 Secondary Record 응답</td>
+    </tr>
+    <tr>
+      <td>Geolocation</td>
+      <td>사용자 위치에 따라 대상 선택</td>
+    </tr>
+    <tr>
+      <td>Multivalue Answer</td>
+      <td>여러 정상 Record 중 일부 IP 응답</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Health Check를 생성하는 것만으로 Traffic이 자동으로 다른 Region으로 이동하지는 않습니다. 동일 Name과 Type의 여러 Record에 Failover·Weighted 같은 Routing Policy를 구성하고 Health 상태를 연결해야 합니다.</p>
+
+<p>ALB Alias Record에서는 <code class="language-plaintext highlighter-rouge">Evaluate target health</code>를 사용해 ALB와 Target Group 상태를 평가할 수 있습니다. 정상 대상이 하나뿐인 구성은 해당 대상 장애 시 대체할 Record가 없으므로 Multi-Region Failover가 되지 않습니다.</p>
+
+<h2 id="6-tls와-https">6. TLS와 HTTPS</h2>
+
+<hr />
+
+<p>TLS Certificate는 Client가 접속한 Domain의 Server Identity를 확인하고 전송 Data를 암호화하는 데 사용합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Client
+  ↓ TLS Handshake, Certificate 검증
+ALB HTTPS Listener :443
+  ↓ HTTP 또는 HTTPS
+Target Group
+  ↓
+Application EC2
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">HTTPS는 IP Address에 적용할 수 없다</code>고 일반화할 수는 없습니다. IP Address가 Subject Alternative Name에 포함된 Certificate도 존재합니다. 다만 ACM Public Certificate는 Domain Name에 대해 발급하므로 이 구성에서는 Domain이 필요합니다.</p>
+
+<h2 id="7-acm-public-certificate-발급">7. ACM Public Certificate 발급</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">[AWS Certificate Manager] → [인증서 요청] → [퍼블릭 인증서 요청]</code>에서 진행합니다.</p>
+
+<ol>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">app.example.com</code>처럼 실제 HTTPS에 사용할 FQDN을 입력합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">*.example.com</code> Wildcard가 필요하면 Apex Domain인 <code class="language-plaintext highlighter-rouge">example.com</code>을 별도 이름으로 추가합니다. Wildcard는 한 단계 아래 Subdomain만 보호합니다.</p>
+  </li>
+  <li>
+    <p>Validation Method로 DNS Validation을 선택합니다.</p>
+  </li>
+  <li>
+    <p>Route 53에서 관리하는 Domain이면 <code class="language-plaintext highlighter-rouge">[Route 53에서 레코드 생성]</code>으로 Validation CNAME을 추가합니다.</p>
+  </li>
+  <li>
+    <p>Certificate 상태가 <code class="language-plaintext highlighter-rouge">Issued</code>로 바뀌는지 확인합니다.</p>
+  </li>
+</ol>
+
+<p>DNS Validation CNAME을 삭제하면 자동 갱신에 실패할 수 있습니다. Certificate가 지원 AWS Service에 연결되어 사용 중이고 Validation Record가 유지되어야 Managed Renewal 대상이 됩니다.</p>
+
+<p>Certificate Region도 확인해야 합니다.</p>
+
+<ul>
+  <li>
+    <p>ALB에 연결하는 ACM Certificate는 ALB와 같은 Region에 있어야 합니다.</p>
+  </li>
+  <li>
+    <p>CloudFront에 연결하는 Certificate는 <code class="language-plaintext highlighter-rouge">us-east-1</code>에 요청하거나 Import해야 합니다.</p>
+  </li>
+</ul>
+
+<h2 id="8-alb-https-listener-구성">8. ALB HTTPS Listener 구성</h2>
+
+<hr />
+
+<p>ALB의 <code class="language-plaintext highlighter-rouge">[리스너 및 규칙]</code>에서 TCP 443이 아니라 <code class="language-plaintext highlighter-rouge">HTTPS:443</code> Listener를 추가합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>설정</th>
+      <th>값</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Protocol·Port</td>
+      <td><code class="language-plaintext highlighter-rouge">HTTPS:443</code></td>
+    </tr>
+    <tr>
+      <td>Default Action</td>
+      <td>Application Target Group으로 Forward</td>
+    </tr>
+    <tr>
+      <td>Certificate</td>
+      <td>ACM에서 발급한 Domain Certificate</td>
+    </tr>
+    <tr>
+      <td>Security Policy</td>
+      <td>Application 호환성을 만족하는 현재 TLS Policy</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>HTTP 요청도 허용해야 한다면 <code class="language-plaintext highlighter-rouge">HTTP:80</code> Listener의 Default Action을 HTTPS로 Redirect합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>HTTP :80
+  ↓ 301 Redirect
+HTTPS :443
+  ↓ Forward
+Target Group
+</code></pre></div></div>
+
+<p>ALB Security Group에는 TCP 443을 허용하고, TCP 80은 Redirect를 제공할 때만 허용합니다.</p>
+
+<h2 id="9-검증">9. 검증</h2>
+
+<hr />
+
+<p>DNS부터 Certificate와 HTTP 응답 순서로 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dig +short app.example.com A
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>openssl s_client <span class="se">\</span>
+  <span class="nt">-connect</span> app.example.com:443 <span class="se">\</span>
+  <span class="nt">-servername</span> app.example.com <span class="se">\</span>
+  &lt;/dev/null
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-I</span> http://app.example.com
+curl <span class="nt">-I</span> https://app.example.com
+</code></pre></div></div>
+
+<p>정상 구성에서는 HTTP 요청이 HTTPS로 Redirect되고 HTTPS 요청은 <code class="language-plaintext highlighter-rouge">2xx</code> 또는 Application이 의도한 응답을 반환합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>증상</th>
+      <th>확인 항목</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Domain이 해석되지 않음</td>
+      <td>Registrar의 NS, Hosted Zone과 Record Name</td>
+    </tr>
+    <tr>
+      <td>ACM이 Pending Validation</td>
+      <td>Validation CNAME의 Name·Value와 DNS 전파</td>
+    </tr>
+    <tr>
+      <td>Certificate 경고</td>
+      <td>접속 Domain과 Certificate 이름, Certificate Chain</td>
+    </tr>
+    <tr>
+      <td>ALB <code class="language-plaintext highlighter-rouge">503</code></td>
+      <td>Target Group에 등록된 정상 Target 존재 여부</td>
+    </tr>
+    <tr>
+      <td>ALB <code class="language-plaintext highlighter-rouge">502</code></td>
+      <td>Application 응답, Port와 Protocol 불일치</td>
+    </tr>
+    <tr>
+      <td>HTTPS Timeout</td>
+      <td>ALB Security Group TCP 443과 Listener</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="10-실습-후-정리">10. 실습 후 정리</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p>사용하지 않는 Alias와 A Record를 삭제합니다.</p>
+  </li>
+  <li>
+    <p>ALB와 Target Group을 삭제하고 관련 Security Group을 확인합니다.</p>
+  </li>
+  <li>
+    <p>사용하지 않는 ACM Certificate는 다른 AWS Resource에서 참조하는지 확인한 뒤 삭제합니다.</p>
+  </li>
+  <li>
+    <p>Route 53 Hosted Zone과 등록 Domain은 별도 과금 대상이므로 보존 여부를 확인합니다.</p>
+  </li>
+  <li>
+    <p>Domain을 다른 DNS Provider로 옮길 때 Registrar의 NS 변경과 DNSSEC 설정을 함께 확인합니다.</p>
+  </li>
+</ul>
+
+<p>다음 글인 <a href="/cloud-10-aws-s3-backup-spring-upload/">Amazon S3 Backup과 Spring Boot File Upload</a>에서는 S3와 Storage Gateway를 이용한 Backup 구조와 Private Bucket에 File을 올리는 Application을 구성합니다.</p>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-to-elb-load-balancer.html">Route 53을 ALB에 연결</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html">Route 53 Routing Policy</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/health-checks-how-route-53-chooses-records.html">Route 53 Health Check와 Record 선택</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate-characteristics.html">ACM Public Certificate 특징</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/acm/latest/userguide/check-certificate-renewal-status.html">ACM Managed Renewal 조건</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html">ALB HTTPS Listener</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-08-aws-dynamodb-elasticache-documentdb/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">DynamoDB·ElastiCache와 Amazon DocumentDB</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-10-aws-s3-backup-spring-upload/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">Amazon S3 Backup과 Spring Boot File Upload</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1790777843"></script>
+    <script src="/assets/js/code-enhancements.js?v=1790777843"></script>
+  </body>
+</html>

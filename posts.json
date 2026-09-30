@@ -4,6 +4,51 @@
       
       
       {
+        "title": "Amazon S3 Backup과 Spring Boot File Upload",
+        "url": "/cloud-10-aws-s3-backup-spring-upload/",
+        "description": "AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 9월 30일",
+        "reading_time_label": "8분 읽기",
+        "search": "amazon s3 backup과 spring boot file upload aws storage gateway와 s3 lifecycle을 이용한 backup 구조를 비교하고 private s3 bucket에 spring boot application이 file을 안전하게 업로드하는 방법을 정리합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "Route 53과 ACM으로 Domain·HTTPS 구성",
+        "url": "/cloud-09-aws-route53-acm-https/",
+        "description": "Route 53 Hosted Zone의 DNS Record를 EC2와 Application Load Balancer에 연결하고 ACM Public Certificate와 HTTPS Listener를 구성합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 9월 30일",
+        "reading_time_label": "5분 읽기",
+        "search": "route 53과 acm으로 domain·https 구성 route 53 hosted zone의 dns record를 ec2와 application load balancer에 연결하고 acm public certificate와 https listener를 구성합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "DynamoDB·ElastiCache와 Amazon DocumentDB",
+        "url": "/cloud-08-aws-dynamodb-elasticache-documentdb/",
+        "description": "AWS의 Key-Value·In-memory Database인 DynamoDB와 ElastiCache를 비교하고 Amazon DocumentDB Cluster를 Private Network에서 안전하게 연결하는 방법을 정리합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 9월 30일",
+        "reading_time_label": "6분 읽기",
+        "search": "dynamodb·elasticache와 amazon documentdb aws의 key-value·in-memory database인 dynamodb와 elasticache를 비교하고 amazon documentdb cluster를 private network에서 안전하게 연결하는 방법을 정리합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
         "title": "EC2 Database 구축과 Amazon RDS",
         "url": "/cloud-07-aws-ec2-database-rds/",
         "description": "EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다",

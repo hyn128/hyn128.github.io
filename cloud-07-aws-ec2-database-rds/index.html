@@ -49,13 +49,15 @@
   <meta property="article:published_time" content="2026-09-29T00:00:00+09:00">
 
 
-<link rel="icon" href="/assets/images/favicon.svg?v=1790761542" type="image/png" sizes="256x256">
-<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1790761542" type="image/png">
-<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1790761542">
-<link rel="mask-icon" href="/assets/images/profile.svg?v=1790761542" color="#495057">
+  <meta property="article:modified_time" content="2026-09-30T00:00:00+09:00">
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1790777843" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1790777843" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1790777843">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1790777843" color="#495057">
 <link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
 
-<link rel="stylesheet" href="/assets/css/main.css?v=1790761542">
+<link rel="stylesheet" href="/assets/css/main.css?v=1790777843">
 <script>
   (function () {
     function applyTheme(theme) {
@@ -109,7 +111,8 @@
     "headline": "EC2 Database 구축과 Amazon RDS | renamed.log",
     "description": "EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다",
     "url": "https://hyn128.site/cloud-07-aws-ec2-database-rds/",
-    "datePublished": "2026-09-29T00:00:00+09:00"
+    "datePublished": "2026-09-29T00:00:00+09:00",
+    "dateModified": "2026-09-30T00:00:00+09:00"
   }
 </script>
 
@@ -238,7 +241,7 @@
       <div class="post-head__meta-block">
         <strong>Dohyeon Kim</strong>
         <span>
-          2026년 9월 29일 · 9분 읽기
+          2026년 9월 29일 · 9분 읽기 · 수정 2026년 9월 30일
         </span>
       </div>
     </div>
@@ -969,6 +972,8 @@ Private RDS for MySQL
 
 <p>RDS를 삭제할 때 Deletion Protection이 활성화되어 있으면 먼저 비활성화해야 합니다. Final Snapshot을 생략하면 삭제 시점의 Database 상태로 복구할 수 없습니다.</p>
 
+<p>다음 글인 <a href="/cloud-08-aws-dynamodb-elasticache-documentdb/">DynamoDB·ElastiCache와 Amazon DocumentDB</a>에서는 Key-Value·In-memory Database의 용도와 MongoDB 호환 Document Database의 연결 구조를 살펴봅니다.</p>
+
 <h2 id="참고-자료">참고 자료</h2>
 
 <hr />
@@ -1017,6 +1022,18 @@ Private RDS for MySQL
           </span>
         </a>
       
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-08-aws-dynamodb-elasticache-documentdb/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">DynamoDB·ElastiCache와 Amazon DocumentDB</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
       
     </nav>
   
@@ -1092,7 +1109,7 @@ Private RDS for MySQL
 
     
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-    <script src="/assets/js/site.js?v=1790761542"></script>
-    <script src="/assets/js/code-enhancements.js?v=1790761542"></script>
+    <script src="/assets/js/site.js?v=1790777843"></script>
+    <script src="/assets/js/code-enhancements.js?v=1790777843"></script>
   </body>
 </html>

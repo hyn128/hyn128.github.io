@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>DynamoDB·ElastiCache와 Amazon DocumentDB | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="AWS의 Key-Value·In-memory Database인 DynamoDB와 ElastiCache를 비교하고 Amazon DocumentDB Cluster를 Private Network에서 안전하게 연결하는 방법을 정리합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb/">
+<meta property="og:title" content="DynamoDB·ElastiCache와 Amazon DocumentDB | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="AWS의 Key-Value·In-memory Database인 DynamoDB와 ElastiCache를 비교하고 Amazon DocumentDB Cluster를 Private Network에서 안전하게 연결하는 방법을 정리합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="DynamoDB·ElastiCache와 Amazon DocumentDB | renamed.log">
+<meta name="twitter:description" content="AWS의 Key-Value·In-memory Database인 DynamoDB와 ElastiCache를 비교하고 Amazon DocumentDB Cluster를 Private Network에서 안전하게 연결하는 방법을 정리합니다">
+
+  <meta property="article:published_time" content="2026-09-30T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1790777843" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1790777843" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1790777843">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1790777843" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1790777843">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "DynamoDB·ElastiCache와 Amazon DocumentDB | renamed.log",
+    "description": "AWS의 Key-Value·In-memory Database인 DynamoDB와 ElastiCache를 비교하고 Amazon DocumentDB Cluster를 Private Network에서 안전하게 연결하는 방법을 정리합니다",
+    "url": "https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb/",
+    "datePublished": "2026-09-30T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">DynamoDB·ElastiCache와 Amazon DocumentDB</h1>
+    
+      <p class="post-head__description">AWS의 Key-Value·In-memory Database인 DynamoDB와 ElastiCache를 비교하고 Amazon DocumentDB Cluster를 Private Network에서 안전하게 연결하는 방법을 정리합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 9월 30일 · 6분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>DynamoDB는 Key를 기준으로 Item을 조회하는 Serverless NoSQL Database이고, ElastiCache는 반복 조회 결과와 Session처럼 빠르게 접근해야 하는 데이터를 Memory에 보관하는 Managed Cache입니다. Amazon DocumentDB는 MongoDB 호환 API를 제공하는 Managed Document Database이며 VPC 내부에서 접근하는 것이 기본입니다. 이 글에서는 세 Service의 역할을 구분하고 DocumentDB를 EC2와 Application에서 연결하는 흐름을 정리합니다.</p>
+</blockquote>
+
+<h2 id="1-data-model에-따른-database-선택">1. Data Model에 따른 Database 선택</h2>
+
+<hr />
+
+<p>관계형 Database가 Table 사이의 관계와 Transaction을 중심으로 Data를 다룬다면 Key-Value Database는 고유한 Key로 Value를 빠르게 찾는 Access Pattern에 집중합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Key                         Value
+user:1001        →          {name: "adam", role: "engineer"}
+session:8f2a     →          {userId: 1001, expiresAt: ...}
+</code></pre></div></div>
+
+<p>Schema를 먼저 고정하고 Join하는 방식보다 조회에 사용할 Key와 예상 Query를 먼저 설계합니다. 대규모 Web Service, Game State와 IoT Data처럼 요청량이 많고 짧은 응답 시간이 필요한 경우에 적합합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>DynamoDB</th>
+      <th>ElastiCache</th>
+      <th>DocumentDB</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>주된 역할</td>
+      <td>지속 가능한 Key-Value·Document Data 저장</td>
+      <td>Cache, Session, Ranking</td>
+      <td>MongoDB 호환 Document Data 저장</td>
+    </tr>
+    <tr>
+      <td>저장 위치</td>
+      <td>AWS가 관리하는 분산 Storage</td>
+      <td>Memory 중심</td>
+      <td>AWS가 관리하는 분산 Cluster Storage</td>
+    </tr>
+    <tr>
+      <td>접근 방식</td>
+      <td>HTTPS API와 AWS SDK</td>
+      <td>Valkey·Redis OSS·Memcached Protocol</td>
+      <td>MongoDB Driver와 Wire Protocol</td>
+    </tr>
+    <tr>
+      <td>Network</td>
+      <td>Public Service Endpoint 또는 VPC Endpoint</td>
+      <td>VPC 내부</td>
+      <td>VPC 내부</td>
+    </tr>
+    <tr>
+      <td>대표 선택 기준</td>
+      <td>Key 기반 조회와 자동 확장</td>
+      <td>매우 짧은 지연 시간과 반복 조회 감소</td>
+      <td>JSON 형태의 Document와 MongoDB 호환 API</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="2-amazon-dynamodb">2. Amazon DynamoDB</h2>
+
+<hr />
+
+<p>DynamoDB는 Server를 직접 생성하거나 Patch하지 않고 Table을 만드는 Serverless NoSQL Database입니다. Item은 Primary Key로 식별하며 Key-Value와 Document Data Model을 지원합니다.</p>
+
+<p>주요 특성은 다음과 같습니다.</p>
+
+<ul>
+  <li>
+    <p>AWS SDK가 DynamoDB HTTPS API를 호출하므로 RDBMS처럼 Database Process에 TCP Session을 맺고 Connection Pool을 관리하지 않습니다. 다만 SDK 내부의 HTTP Connection 재사용과 Timeout 설정은 여전히 성능에 영향을 줍니다.</p>
+  </li>
+  <li>
+    <p>단일 Item 작업 외에 ACID Transaction을 지원합니다.</p>
+  </li>
+  <li>
+    <p>Encryption at Rest, IAM 기반 접근 제어와 VPC Endpoint를 사용할 수 있습니다.</p>
+  </li>
+  <li>
+    <p>Global Table을 사용하면 여러 Region에 Replica를 두고 변경 사항을 복제할 수 있습니다.</p>
+  </li>
+  <li>
+    <p>Capacity Mode는 On-demand와 Provisioned 중에서 선택합니다.</p>
+  </li>
+</ul>
+
+<table>
+  <thead>
+    <tr>
+      <th>Capacity Mode</th>
+      <th>동작</th>
+      <th>적합한 경우</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>On-demand</td>
+      <td>실제 Read·Write 요청량을 기준으로 과금</td>
+      <td>요청량을 예측하기 어렵거나 급변하는 Workload</td>
+    </tr>
+    <tr>
+      <td>Provisioned</td>
+      <td>RCU와 WCU를 지정하고 필요하면 Auto Scaling 적용</td>
+      <td>요청량이 예측 가능하고 Capacity를 직접 관리할 Workload</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Serverless라는 표현이 언제나 <code class="language-plaintext highlighter-rouge">요청이 없으면 비용이 전혀 없다</code>는 뜻은 아닙니다. Provisioned Capacity, Backup, Global Table, Data Transfer와 Storage 사용량에 따라 비용이 발생합니다.</p>
+
+<h2 id="3-amazon-elasticache">3. Amazon ElastiCache</h2>
+
+<hr />
+
+<p>ElastiCache는 Valkey, Redis OSS와 Memcached Engine을 지원하는 Managed In-memory Cache입니다. Application과 원본 Database 사이에 Cache를 두면 반복 Query와 원본 Database 부하를 줄일 수 있습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Application
+  ├── Cache Hit  → ElastiCache에서 즉시 응답
+  └── Cache Miss → Database 조회 → Cache 저장 → 응답
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Engine</th>
+      <th>주요 특징</th>
+      <th>대표 용도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Valkey·Redis OSS</td>
+      <td>다양한 Data Type, Replication과 Persistence Option 지원</td>
+      <td>Session, Ranking, Cache</td>
+    </tr>
+    <tr>
+      <td>Memcached</td>
+      <td>단순한 분산 Key-Value Cache와 Multi-thread 처리</td>
+      <td>일시적인 Object Cache</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>In-memory Service를 모두 <code class="language-plaintext highlighter-rouge">재시작하면 Data가 사라지는 Database</code>로 설명할 수는 없습니다. Valkey와 Redis OSS는 구성에 따라 Replica와 Backup을 사용할 수 있습니다. 그러나 Cache Data는 제거되거나 만료될 수 있다는 전제로 설계하고, 복구할 수 없는 원본 Data의 유일한 저장소로 사용하지 않습니다.</p>
+
+<h2 id="4-amazon-documentdb-구조">4. Amazon DocumentDB 구조</h2>
+
+<hr />
+
+<blockquote>
+  <p>Amazon DocumentDB는 MongoDB 호환 API를 제공하는 Managed Document Database입니다. MongoDB 자체를 Hosting하는 Service가 아니므로 지원 Command, Index와 동작 차이를 Migration 전에 확인해야 합니다.</p>
+</blockquote>
+
+<p>Document는 BSON 형태로 저장되며 Field가 다른 Data를 같은 Collection에서 다룰 수 있습니다. Cluster는 Instance와 Cluster Storage로 구성되고, Application은 Cluster Endpoint 또는 Reader Endpoint에 연결합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Application EC2
+  ↓ TCP 27017, TLS
+DocumentDB Cluster Endpoint
+  ├── Writer Instance
+  ├── Reader Instance
+  └── Cluster Storage
+</code></pre></div></div>
+
+<p>DocumentDB Cluster는 VPC에 배포됩니다. Internet에서 직접 접근할 Public Endpoint를 제공하지 않으므로 Application은 같은 VPC, 연결된 VPC 또는 Private Network 경로에서 접속해야 합니다.</p>
+
+<h2 id="5-documentdb-cluster-생성">5. DocumentDB Cluster 생성</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">[Amazon DocumentDB] → [클러스터] → [생성]</code>에서 다음 항목을 결정합니다.</p>
+
+<ol>
+  <li>
+    <p>Application과 Driver가 지원하는 Engine Version을 선택합니다.</p>
+  </li>
+  <li>
+    <p>예상 Data와 Query 부하에 맞는 Instance Class를 선택합니다.</p>
+  </li>
+  <li>
+    <p>Application EC2와 통신할 수 있는 VPC와 DB Subnet Group을 선택합니다.</p>
+  </li>
+  <li>
+    <p>운영 고가용성이 필요하면 여러 Availability Zone에 Instance를 배치합니다.</p>
+  </li>
+  <li>
+    <p>Master Username을 지정하고 Password는 AWS Secrets Manager 또는 별도 비밀 관리 수단에 저장합니다.</p>
+  </li>
+  <li>
+    <p>DocumentDB Security Group의 TCP 27017 Source로 Application EC2 Security Group을 지정합니다.</p>
+  </li>
+  <li>
+    <p>Backup 보존 기간, Maintenance Window, Encryption과 Log Export를 확인합니다.</p>
+  </li>
+</ol>
+
+<p>EC2 연결 Option은 필요한 Network Rule을 구성하는 데 도움을 줄 수 있지만, 선택하지 않았다고 DocumentDB가 VPC 밖에 생성되는 것은 아닙니다. 접속 가능 여부는 VPC Route, Security Group과 DNS Resolution이 함께 결정합니다.</p>
+
+<h2 id="6-ec2에서-documentdb-연결">6. EC2에서 DocumentDB 연결</h2>
+
+<hr />
+
+<p>다음 명령은 DocumentDB와 같은 VPC 또는 연결된 Private Network의 EC2에서 실행합니다.</p>
+
+<h3 id="61-ca-bundle-다운로드">6.1 CA Bundle 다운로드</h3>
+
+<p>TLS Server Certificate를 검증하기 위해 AWS Trust Store의 CA Bundle을 받습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-fsSLo</span> global-bundle.pem <span class="se">\</span>
+  https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+</code></pre></div></div>
+
+<p>파일이 내려받아졌는지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">test</span> <span class="nt">-s</span> global-bundle.pem
+openssl x509 <span class="nt">-in</span> global-bundle.pem <span class="nt">-noout</span> <span class="nt">-subject</span> 2&gt;/dev/null <span class="o">||</span> <span class="nb">true</span>
+</code></pre></div></div>
+
+<p>Bundle에는 여러 Certificate가 들어 있으므로 첫 Certificate 정보만 출력되거나 <code class="language-plaintext highlighter-rouge">openssl x509</code> 확인이 제한될 수 있습니다. Application 연결 시 이 File을 CA File로 지정합니다.</p>
+
+<h3 id="62-mongosh-연결">6.2 mongosh 연결</h3>
+
+<p>Password를 명령행 인수로 직접 남기지 않고 Prompt에서 입력합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mongosh <span class="se">\</span>
+  <span class="nt">--host</span> &lt;DOCUMENTDB_CLUSTER_ENDPOINT&gt; <span class="se">\</span>
+  <span class="nt">--port</span> 27017 <span class="se">\</span>
+  <span class="nt">--tls</span> <span class="se">\</span>
+  <span class="nt">--tlsCAFile</span> global-bundle.pem <span class="se">\</span>
+  <span class="nt">--retryWrites</span><span class="o">=</span><span class="nb">false</span> <span class="se">\</span>
+  <span class="nt">--username</span> &lt;DOCUMENTDB_USER&gt; <span class="se">\</span>
+  <span class="nt">--password</span>
+</code></pre></div></div>
+
+<p>DocumentDB는 Retryable Write를 지원하지 않으므로 <code class="language-plaintext highlighter-rouge">retryWrites=false</code>를 사용합니다. 연결 후 <code class="language-plaintext highlighter-rouge">ping</code>으로 통신을 확인합니다.</p>
+
+<div class="language-javascript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">db</span><span class="p">.</span><span class="nx">runCommand</span><span class="p">({</span> <span class="na">ping</span><span class="p">:</span> <span class="mi">1</span> <span class="p">})</span>
+</code></pre></div></div>
+
+<h2 id="7-외부-client의-ssh-port-forwarding">7. 외부 Client의 SSH Port Forwarding</h2>
+
+<hr />
+
+<p>Local PC에서 일시적으로 관리해야 한다면 같은 VPC의 EC2를 Jump Host로 사용해 Local Port를 전달할 수 있습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Local PC localhost:27017
+  ↓ SSH Local Forwarding, TCP 22
+Jump Host EC2
+  ↓ Private Network, TCP 27017
+DocumentDB Cluster
+</code></pre></div></div>
+
+<h3 id="71-security-group">7.1 Security Group</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>대상</th>
+      <th>Inbound Source</th>
+      <th style="text-align: right">Port</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Jump Host EC2</td>
+      <td>관리자 Public IP <code class="language-plaintext highlighter-rouge">/32</code></td>
+      <td style="text-align: right">TCP 22</td>
+    </tr>
+    <tr>
+      <td>DocumentDB</td>
+      <td>Jump Host Security Group</td>
+      <td style="text-align: right">TCP 27017</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>DocumentDB의 TCP 27017을 <code class="language-plaintext highlighter-rouge">0.0.0.0/0</code>에 개방하지 않습니다.</p>
+
+<h3 id="72-tunnel-생성">7.2 Tunnel 생성</h3>
+
+<p>다음 명령은 Local PC에서 실행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ssh <span class="nt">-i</span> &lt;EC2_KEY_PATH&gt; <span class="se">\</span>
+  <span class="nt">-L</span> 27017:&lt;DOCUMENTDB_CLUSTER_ENDPOINT&gt;:27017 <span class="se">\</span>
+  &lt;EC2_USER&gt;@&lt;EC2_PUBLIC_DNS&gt; <span class="se">\</span>
+  <span class="nt">-N</span>
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Option</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-i</code></td>
+      <td>Jump Host 인증에 사용할 Private Key 지정</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-L</code></td>
+      <td>Local Port를 Remote Destination으로 전달</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-N</code></td>
+      <td>Remote Shell 없이 Port Forwarding만 수행</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>별도 Terminal에서 <code class="language-plaintext highlighter-rouge">localhost:27017</code>의 Listen 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>lsof <span class="nt">-nP</span> <span class="nt">-iTCP</span>:27017 <span class="nt">-sTCP</span>:LISTEN
+</code></pre></div></div>
+
+<p>SSH Tunnel에서는 Client가 <code class="language-plaintext highlighter-rouge">localhost</code>에 연결하지만 Certificate는 DocumentDB Endpoint용이므로 Hostname 검증이 일치하지 않습니다. AWS의 외부 VPC 연결 예제는 이 경우 Invalid Hostname 허용 Option을 사용합니다. 이 Option은 Server Identity 검증을 약화하므로 임시 관리 실습에만 사용하고, 운영 Application은 VPC 내부에서 실제 Cluster Endpoint와 CA Bundle로 연결합니다.</p>
+
+<p>Compass에서도 Host를 <code class="language-plaintext highlighter-rouge">localhost</code>, Port를 <code class="language-plaintext highlighter-rouge">27017</code>로 지정하고 Username, Password와 <code class="language-plaintext highlighter-rouge">global-bundle.pem</code>을 설정합니다. SSH 설정에는 Jump Host 주소, OS User와 Private Key를 지정합니다.</p>
+
+<h2 id="8-python-application-연결">8. Python Application 연결</h2>
+
+<hr />
+
+<p>운영 Application은 DocumentDB와 Private Network로 통신하는 EC2, Container 또는 Lambda에 배치합니다. 다음 예제는 같은 VPC의 Application Host에서 실행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> pip <span class="nb">install </span>pymongo
+</code></pre></div></div>
+
+<p>Credential과 Endpoint는 Source Code에 넣지 않고 Environment Variable 또는 Secrets Manager에서 주입합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">export </span><span class="nv">DOCDB_HOST</span><span class="o">=</span><span class="s1">'&lt;DOCUMENTDB_CLUSTER_ENDPOINT&gt;'</span>
+<span class="nb">export </span><span class="nv">DOCDB_USER</span><span class="o">=</span><span class="s1">'&lt;DOCUMENTDB_USER&gt;'</span>
+<span class="nb">export </span><span class="nv">DOCDB_PASSWORD</span><span class="o">=</span><span class="s1">'&lt;DOCUMENTDB_PASSWORD&gt;'</span>
+<span class="nb">export </span><span class="nv">DOCDB_CA_FILE</span><span class="o">=</span><span class="s1">'/opt/app/certs/global-bundle.pem'</span>
+</code></pre></div></div>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">from</span> <span class="nn">pymongo</span> <span class="kn">import</span> <span class="n">MongoClient</span>
+
+
+<span class="n">client</span> <span class="o">=</span> <span class="n">MongoClient</span><span class="p">(</span>
+    <span class="n">host</span><span class="o">=</span><span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">[</span><span class="s">"DOCDB_HOST"</span><span class="p">],</span>
+    <span class="n">port</span><span class="o">=</span><span class="mi">27017</span><span class="p">,</span>
+    <span class="n">username</span><span class="o">=</span><span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">[</span><span class="s">"DOCDB_USER"</span><span class="p">],</span>
+    <span class="n">password</span><span class="o">=</span><span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">[</span><span class="s">"DOCDB_PASSWORD"</span><span class="p">],</span>
+    <span class="n">authSource</span><span class="o">=</span><span class="s">"admin"</span><span class="p">,</span>
+    <span class="n">tls</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+    <span class="n">tlsCAFile</span><span class="o">=</span><span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">[</span><span class="s">"DOCDB_CA_FILE"</span><span class="p">],</span>
+    <span class="n">replicaSet</span><span class="o">=</span><span class="s">"rs0"</span><span class="p">,</span>
+    <span class="n">readPreference</span><span class="o">=</span><span class="s">"secondaryPreferred"</span><span class="p">,</span>
+    <span class="n">retryWrites</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">client</span><span class="p">.</span><span class="n">admin</span><span class="p">.</span><span class="n">command</span><span class="p">(</span><span class="s">"ping"</span><span class="p">)</span>
+
+    <span class="n">users</span> <span class="o">=</span> <span class="n">client</span><span class="p">[</span><span class="s">"test_database"</span><span class="p">][</span><span class="s">"users"</span><span class="p">]</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">users</span><span class="p">.</span><span class="n">insert_one</span><span class="p">(</span>
+        <span class="p">{</span><span class="s">"name"</span><span class="p">:</span> <span class="s">"adam"</span><span class="p">,</span> <span class="s">"role"</span><span class="p">:</span> <span class="s">"engineer"</span><span class="p">,</span> <span class="s">"framework"</span><span class="p">:</span> <span class="s">"FastAPI"</span><span class="p">}</span>
+    <span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">result</span><span class="p">.</span><span class="n">inserted_id</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">users</span><span class="p">.</span><span class="n">find_one</span><span class="p">({</span><span class="s">"_id"</span><span class="p">:</span> <span class="n">result</span><span class="p">.</span><span class="n">inserted_id</span><span class="p">}))</span>
+<span class="k">finally</span><span class="p">:</span>
+    <span class="n">client</span><span class="p">.</span><span class="n">close</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>실제 Service에서는 Environment Variable에 장기 Password를 직접 저장하는 대신 Secrets Manager에서 실행 시점에 조회하고, Application IAM Role에는 해당 Secret과 필요한 KMS Key에 대한 최소 권한만 부여합니다.</p>
+
+<h2 id="9-연결-실패-점검">9. 연결 실패 점검</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>증상</th>
+      <th>확인 항목</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Connection Timeout</td>
+      <td>VPC Route, TCP 27017 Security Group, Endpoint와 DNS</td>
+    </tr>
+    <tr>
+      <td>Authentication Failed</td>
+      <td>Username, Password와 <code class="language-plaintext highlighter-rouge">authSource=admin</code></td>
+    </tr>
+    <tr>
+      <td>TLS 오류</td>
+      <td>CA Bundle 경로, File 권한과 Cluster TLS 설정</td>
+    </tr>
+    <tr>
+      <td>Retryable Write 오류</td>
+      <td>URI 또는 Driver Option의 <code class="language-plaintext highlighter-rouge">retryWrites=false</code></td>
+    </tr>
+    <tr>
+      <td>Tunnel은 열렸지만 접속 실패</td>
+      <td>SSH Process, Local Port 충돌과 Jump Host에서 Cluster 접근 가능 여부</td>
+    </tr>
+    <tr>
+      <td>Migration 후 Query 오류</td>
+      <td>DocumentDB Version별 지원 API와 MongoDB 기능 차이</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="10-실습-후-정리">10. 실습 후 정리</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p>사용하지 않는 DocumentDB Cluster와 Instance를 삭제하기 전에 Final Snapshot 필요 여부를 확인합니다.</p>
+  </li>
+  <li>
+    <p>실습용 Jump Host를 종료하거나 삭제하고 Elastic IP, EBS Volume과 Snapshot을 확인합니다.</p>
+  </li>
+  <li>
+    <p>Jump Host의 TCP 22 Rule과 DocumentDB의 임시 TCP 27017 Rule을 제거합니다.</p>
+  </li>
+  <li>
+    <p>Local PC에 저장한 Private Key, CA Bundle과 Shell History의 Credential 노출 여부를 확인합니다.</p>
+  </li>
+</ul>
+
+<p>다음 글인 <a href="/cloud-09-aws-route53-acm-https/">Route 53과 ACM으로 Domain·HTTPS 구성</a>에서는 Domain을 EC2 또는 Application Load Balancer에 연결하고 ACM Certificate로 HTTPS Listener를 구성합니다.</p>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/capacity-mode.html">DynamoDB Capacity Mode</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_HowItWorks.html">DynamoDB Global Table 동작</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/SelectEngine.html">ElastiCache Engine 비교</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/documentdb/latest/devguide/functional-differences.html">Amazon DocumentDB와 MongoDB의 기능 차이</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/documentdb/latest/developerguide/connect-from-outside-a-vpc.html">VPC 외부에서 DocumentDB 연결</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-07-aws-ec2-database-rds/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">EC2 Database 구축과 Amazon RDS</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-09-aws-route53-acm-https/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">Route 53과 ACM으로 Domain·HTTPS 구성</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1790777843"></script>
+    <script src="/assets/js/code-enhancements.js?v=1790777843"></script>
+  </body>
+</html>
