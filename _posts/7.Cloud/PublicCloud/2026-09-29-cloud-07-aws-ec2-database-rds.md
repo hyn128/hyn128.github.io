@@ -2,6 +2,7 @@
 title: EC2 Database 구축과 Amazon RDS
 description: EC2에 MySQL과 MongoDB를 직접 설치하고 외부 연결을 제한적으로 구성한 뒤 AWS Database 종류와 Amazon RDS의 Managed Service 구조를 비교합니다
 date: 2026-09-29
+updated_at: 2026-09-30
 series: Cloud
 tags:
   - Cloud
@@ -464,6 +465,8 @@ Client는 Database에 직접 접속하지 않습니다. Application EC2가 Busin
 - 더 이상 사용하지 않는 DB Subnet Group, Parameter Group과 Security Group의 참조 여부를 확인합니다.
 
 RDS를 삭제할 때 Deletion Protection이 활성화되어 있으면 먼저 비활성화해야 합니다. Final Snapshot을 생략하면 삭제 시점의 Database 상태로 복구할 수 없습니다.
+
+다음 글인 [DynamoDB·ElastiCache와 Amazon DocumentDB](/cloud-08-aws-dynamodb-elasticache-documentdb/)에서는 Key-Value·In-memory Database의 용도와 MongoDB 호환 Document Database의 연결 구조를 살펴봅니다.
 
 ## 참고 자료
 
