@@ -2,6 +2,7 @@
 title: Amazon S3 Backup과 Spring Boot File Upload
 description: AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다
 date: 2026-09-30
+updated_at: 2026-10-01
 series: Cloud
 tags:
   - Cloud
@@ -538,3 +539,5 @@ Private S3 Bucket
 - [S3 Presigned URL](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
 
 - [CloudFront와 Private S3를 이용한 정적 Website](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/getting-started-secure-static-website-cloudformation-template.html)
+
+다음 글인 [S3·CloudFront 정적 Website와 GitHub Actions 배포](/cloud-11-aws-s3-cloudfront-github-actions/)에서는 Private S3 Origin, CloudFront와 GitHub Actions OIDC를 연결해 정적 Website를 배포합니다.
