@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>Django REST API 생성과 Container 배포 준비 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="Python 가상환경에서 Django Project와 REST API Application을 만들고 설정·URL·검증 절차를 Container 배포 전 단계까지 구성합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-13-django-rest-api-container-preparation/">
+<meta property="og:title" content="Django REST API 생성과 Container 배포 준비 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="Python 가상환경에서 Django Project와 REST API Application을 만들고 설정·URL·검증 절차를 Container 배포 전 단계까지 구성합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-13-django-rest-api-container-preparation/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Django REST API 생성과 Container 배포 준비 | renamed.log">
+<meta name="twitter:description" content="Python 가상환경에서 Django Project와 REST API Application을 만들고 설정·URL·검증 절차를 Container 배포 전 단계까지 구성합니다">
+
+  <meta property="article:published_time" content="2026-10-01T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1790858010" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1790858010" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1790858010">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1790858010" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1790858010">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "Django REST API 생성과 Container 배포 준비 | renamed.log",
+    "description": "Python 가상환경에서 Django Project와 REST API Application을 만들고 설정·URL·검증 절차를 Container 배포 전 단계까지 구성합니다",
+    "url": "https://hyn128.site/cloud-13-django-rest-api-container-preparation/",
+    "datePublished": "2026-10-01T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">Django REST API 생성과 Container 배포 준비</h1>
+    
+      <p class="post-head__description">Python 가상환경에서 Django Project와 REST API Application을 만들고 설정·URL·검증 절차를 Container 배포 전 단계까지 구성합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 1일 · 5분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>ECS에 Application을 배포하기 전에 Local에서 재현 가능한 Django Project와 REST Endpoint를 준비합니다. Python 가상환경으로 의존성을 격리하고, Django Project와 Application의 역할을 분리하며, 환경 변수로 Host와 Secret을 주입할 수 있게 구성합니다. 이 글은 Container Image, ECR와 ECS 배포 전 단계인 Application 생성과 Local 검증까지 다룹니다.</p>
+</blockquote>
+
+<h2 id="1-django-project와-application">1. Django Project와 Application</h2>
+
+<hr />
+
+<p>Django에서 Project와 Application은 역할이 다릅니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>역할</th>
+      <th>이 글의 이름</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Project</td>
+      <td>전체 Site의 설정, Root URL, WSGI·ASGI Entry Point 관리</td>
+      <td><code class="language-plaintext highlighter-rouge">apiserver</code></td>
+    </tr>
+    <tr>
+      <td>Application</td>
+      <td>특정 Domain의 View, Model, URL과 Test 관리</td>
+      <td><code class="language-plaintext highlighter-rouge">api</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>하나의 Project는 여러 Application을 포함할 수 있습니다. <code class="language-plaintext highlighter-rouge">apiserver</code> Package 자체를 업무 기능 Application처럼 <code class="language-plaintext highlighter-rouge">INSTALLED_APPS</code>에 추가하지 않고 실제 기능을 담당하는 <code class="language-plaintext highlighter-rouge">api</code> Application을 생성합니다.</p>
+
+<h2 id="2-작업-directory와-가상환경-생성">2. 작업 Directory와 가상환경 생성</h2>
+
+<hr />
+
+<p>Python 가상환경은 Project별 Package Version을 분리합니다. Python 3.10 이상을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python3 <span class="nt">--version</span>
+</code></pre></div></div>
+
+<p>Project Directory를 만들고 이동합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">mkdir </span>django-api
+<span class="nb">cd </span>django-api
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">.venv</code> Directory에 가상환경을 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python3 <span class="nt">-m</span> venv .venv
+</code></pre></div></div>
+
+<p>운영체제와 Shell에 맞는 명령으로 활성화합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>환경</th>
+      <th>명령</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Linux·macOS Bash/Zsh</td>
+      <td><code class="language-plaintext highlighter-rouge">source .venv/bin/activate</code></td>
+    </tr>
+    <tr>
+      <td>Windows PowerShell</td>
+      <td><code class="language-plaintext highlighter-rouge">.venv\Scripts\Activate.ps1</code></td>
+    </tr>
+    <tr>
+      <td>Windows Command Prompt</td>
+      <td><code class="language-plaintext highlighter-rouge">.venv\Scripts\activate.bat</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>활성화된 Python과 <code class="language-plaintext highlighter-rouge">pip</code>가 <code class="language-plaintext highlighter-rouge">.venv</code>를 가리키는지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-c</span> <span class="s1">'import sys; print(sys.executable)'</span>
+python <span class="nt">-m</span> pip <span class="nt">--version</span>
+</code></pre></div></div>
+
+<h2 id="3-django와-django-rest-framework-설치">3. Django와 Django REST Framework 설치</h2>
+
+<hr />
+
+<p>이 예제는 장기 지원 버전인 Django 5.2 계열을 사용합니다. <code class="language-plaintext highlighter-rouge">pip</code> 자체를 갱신한 뒤 Django와 Django REST Framework를 설치합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> pip <span class="nb">install</span> <span class="nt">--upgrade</span> pip
+python <span class="nt">-m</span> pip <span class="nb">install</span> <span class="s2">"Django==5.2.*"</span> djangorestframework
+</code></pre></div></div>
+
+<p>설치 Version을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> django <span class="nt">--version</span>
+python <span class="nt">-m</span> pip show djangorestframework
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">pip</code> 대신 <code class="language-plaintext highlighter-rouge">python -m pip</code>를 사용하면 현재 활성화한 Python Interpreter와 Package 설치 위치를 일치시키기 쉽습니다.</p>
+
+<h2 id="4-project와-application-생성">4. Project와 Application 생성</h2>
+
+<hr />
+
+<p>현재 Directory에 <code class="language-plaintext highlighter-rouge">manage.py</code>와 <code class="language-plaintext highlighter-rouge">apiserver</code> Package를 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>django-admin startproject apiserver <span class="nb">.</span>
+</code></pre></div></div>
+
+<p>REST Endpoint를 담당할 <code class="language-plaintext highlighter-rouge">api</code> Application을 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py startapp api
+</code></pre></div></div>
+
+<p>생성된 주요 구조는 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>django-api/
+├── .venv/
+├── api/
+│   ├── migrations/
+│   ├── apps.py
+│   ├── models.py
+│   ├── tests.py
+│   └── views.py
+├── apiserver/
+│   ├── settings.py
+│   ├── urls.py
+│   ├── asgi.py
+│   └── wsgi.py
+└── manage.py
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>File</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">manage.py</code></td>
+      <td>개발 Server, Migration, Test와 점검 명령 실행</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apiserver/settings.py</code></td>
+      <td>Application, Database, Time Zone와 보안 설정</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apiserver/urls.py</code></td>
+      <td>Project의 Root URL Routing</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apiserver/wsgi.py</code></td>
+      <td>WSGI Server의 Application Entry Point</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apiserver/asgi.py</code></td>
+      <td>ASGI Server의 Application Entry Point</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">api/views.py</code></td>
+      <td>HTTP 요청 처리와 Response 생성</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">api/urls.py</code></td>
+      <td><code class="language-plaintext highlighter-rouge">api</code> Application 내부 URL Routing</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="5-project-설정">5. Project 설정</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">apiserver/settings.py</code>에서 표준 Library의 <code class="language-plaintext highlighter-rouge">os</code>를 Import합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+</code></pre></div></div>
+
+<p>배포 환경에서 Secret Key를 Source Code에 고정하지 않도록 환경 변수에서 읽습니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">SECRET_KEY</span> <span class="o">=</span> <span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">[</span><span class="s">"DJANGO_SECRET_KEY"</span><span class="p">]</span>
+</code></pre></div></div>
+
+<p>허용할 Host도 환경 변수로 주입합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">ALLOWED_HOSTS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">host</span><span class="p">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s">"DJANGO_ALLOWED_HOSTS"</span><span class="p">,</span>
+        <span class="s">"127.0.0.1,localhost"</span><span class="p">,</span>
+    <span class="p">).</span><span class="n">split</span><span class="p">(</span><span class="s">","</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">host</span><span class="p">.</span><span class="n">strip</span><span class="p">()</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">ALLOWED_HOSTS = ["*"]</code>는 모든 Host Header를 허용하므로 운영 기본값으로 사용하지 않습니다. ALB Domain, Service Domain과 Health Check 경로에 실제로 필요한 Host만 지정합니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">INSTALLED_APPS</code>에는 Django REST Framework와 생성한 Application을 등록합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">INSTALLED_APPS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s">"django.contrib.admin"</span><span class="p">,</span>
+    <span class="s">"django.contrib.auth"</span><span class="p">,</span>
+    <span class="s">"django.contrib.contenttypes"</span><span class="p">,</span>
+    <span class="s">"django.contrib.sessions"</span><span class="p">,</span>
+    <span class="s">"django.contrib.messages"</span><span class="p">,</span>
+    <span class="s">"django.contrib.staticfiles"</span><span class="p">,</span>
+    <span class="s">"rest_framework"</span><span class="p">,</span>
+    <span class="s">"api"</span><span class="p">,</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p>Time Zone을 설정합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">TIME_ZONE</span> <span class="o">=</span> <span class="s">"Asia/Seoul"</span>
+<span class="n">USE_TZ</span> <span class="o">=</span> <span class="bp">True</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">USE_TZ = True</code>이면 Django는 내부 DateTime을 UTC 기준으로 다루고 표시 단계에서 설정한 Time Zone으로 변환합니다.</p>
+
+<h2 id="6-local-환경-변수-설정">6. Local 환경 변수 설정</h2>
+
+<hr />
+
+<p>Local Shell에서 개발용 값을 설정합니다. <code class="language-plaintext highlighter-rouge">&lt;LOCAL_DEVELOPMENT_SECRET&gt;</code>에는 실제 운영 Secret과 다른 충분히 긴 임의 값을 사용합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">export </span><span class="nv">DJANGO_SECRET_KEY</span><span class="o">=</span><span class="s1">'&lt;LOCAL_DEVELOPMENT_SECRET&gt;'</span>
+<span class="nb">export </span><span class="nv">DJANGO_ALLOWED_HOSTS</span><span class="o">=</span><span class="s1">'127.0.0.1,localhost'</span>
+</code></pre></div></div>
+
+<p>운영 환경에서는 ECS Task Definition의 평문 Environment Variable에 Secret을 직접 입력하지 않고 AWS Secrets Manager 또는 Systems Manager Parameter Store를 이용해 주입합니다. 실제 값과 <code class="language-plaintext highlighter-rouge">.env</code> File은 Git에 Commit하지 않습니다.</p>
+
+<p>환경 변수 이름만 확인하고 값은 출력하지 않습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">test</span> <span class="nt">-n</span> <span class="s2">"</span><span class="nv">$DJANGO_SECRET_KEY</span><span class="s2">"</span> <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s1">'DJANGO_SECRET_KEY is set'</span>
+</code></pre></div></div>
+
+<h2 id="7-rest-api-view-작성">7. REST API View 작성</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">api/views.py</code>에 GET 요청을 처리하는 View를 작성합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">rest_framework</span> <span class="kn">import</span> <span class="n">status</span>
+<span class="kn">from</span> <span class="nn">rest_framework.decorators</span> <span class="kn">import</span> <span class="n">api_view</span>
+<span class="kn">from</span> <span class="nn">rest_framework.response</span> <span class="kn">import</span> <span class="n">Response</span>
+
+
+<span class="o">@</span><span class="n">api_view</span><span class="p">([</span><span class="s">"GET"</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s">"result"</span><span class="p">:</span> <span class="s">"success"</span><span class="p">,</span>
+        <span class="s">"data"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s">"id"</span><span class="p">:</span> <span class="s">"user-001"</span><span class="p">,</span> <span class="s">"name"</span><span class="p">:</span> <span class="s">"Example User"</span><span class="p">},</span>
+            <span class="p">{</span><span class="s">"id"</span><span class="p">:</span> <span class="s">"user-002"</span><span class="p">,</span> <span class="s">"name"</span><span class="p">:</span> <span class="s">"Sample User"</span><span class="p">},</span>
+        <span class="p">],</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">Response</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="n">status</span><span class="p">.</span><span class="n">HTTP_200_OK</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">@api_view(["GET"])</code>는 허용할 HTTP Method를 제한하고 Django REST Framework가 Request와 Response를 처리하게 합니다. 다른 Method로 요청하면 <code class="language-plaintext highlighter-rouge">405 Method Not Allowed</code>가 반환됩니다.</p>
+
+<h2 id="8-application-url-구성">8. Application URL 구성</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">api/urls.py</code>를 새로 생성합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">django.urls</span> <span class="kn">import</span> <span class="n">path</span>
+
+<span class="kn">from</span> <span class="nn">.views</span> <span class="kn">import</span> <span class="n">index</span>
+
+
+<span class="n">app_name</span> <span class="o">=</span> <span class="s">"api"</span>
+
+<span class="n">urlpatterns</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">path</span><span class="p">(</span><span class="s">""</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s">"index"</span><span class="p">),</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p>Project의 <code class="language-plaintext highlighter-rouge">apiserver/urls.py</code>에서 <code class="language-plaintext highlighter-rouge">api</code> URL을 포함합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">django.contrib</span> <span class="kn">import</span> <span class="n">admin</span>
+<span class="kn">from</span> <span class="nn">django.urls</span> <span class="kn">import</span> <span class="n">include</span><span class="p">,</span> <span class="n">path</span>
+
+
+<span class="n">urlpatterns</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">path</span><span class="p">(</span><span class="s">"admin/"</span><span class="p">,</span> <span class="n">admin</span><span class="p">.</span><span class="n">site</span><span class="p">.</span><span class="n">urls</span><span class="p">),</span>
+    <span class="n">path</span><span class="p">(</span><span class="s">"api/"</span><span class="p">,</span> <span class="n">include</span><span class="p">(</span><span class="s">"api.urls"</span><span class="p">)),</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p>Routing 흐름은 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>GET /api/
+  ↓ apiserver/urls.py
+include("api.urls")
+  ↓ api/urls.py
+index View
+  ↓
+JSON Response
+</code></pre></div></div>
+
+<h2 id="9-database-초기화와-설정-점검">9. Database 초기화와 설정 점검</h2>
+
+<hr />
+
+<p>Django 기본 Application이 사용하는 Database Table을 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py migrate
+</code></pre></div></div>
+
+<p>Project 설정과 URL 구성을 점검합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py check
+</code></pre></div></div>
+
+<p>Migration 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py showmigrations
+</code></pre></div></div>
+
+<p>기본 설정은 Local SQLite File을 사용합니다. Container를 교체하면 Container 내부의 SQLite File도 사라질 수 있으므로 운영 ECS 환경에서는 RDS 같은 외부 Database와 Network·Credential 구성을 별도로 준비합니다.</p>
+
+<h2 id="10-api-test-작성">10. API Test 작성</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">api/tests.py</code>에 Endpoint의 Status Code와 JSON 구조를 검증하는 Test를 작성합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">django.test</span> <span class="kn">import</span> <span class="n">TestCase</span>
+<span class="kn">from</span> <span class="nn">django.urls</span> <span class="kn">import</span> <span class="n">reverse</span>
+
+
+<span class="k">class</span> <span class="nc">IndexApiTest</span><span class="p">(</span><span class="n">TestCase</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">test_index_returns_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="n">reverse</span><span class="p">(</span><span class="s">"api:index"</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="p">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">response</span><span class="p">.</span><span class="n">status_code</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">response</span><span class="p">.</span><span class="n">json</span><span class="p">()[</span><span class="s">"result"</span><span class="p">],</span> <span class="s">"success"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">response</span><span class="p">.</span><span class="n">json</span><span class="p">()[</span><span class="s">"data"</span><span class="p">]),</span> <span class="mi">2</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Test를 실행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py <span class="nb">test</span>
+</code></pre></div></div>
+
+<p>Test가 통과해야 Build Pipeline이 다음 단계로 진행하도록 CI에 연결할 수 있습니다.</p>
+
+<h2 id="11-개발-server-실행과-검증">11. 개발 Server 실행과 검증</h2>
+
+<hr />
+
+<p>Django 개발 Server를 Local Loopback Address에서 실행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py runserver 127.0.0.1:8000
+</code></pre></div></div>
+
+<p>다른 Terminal에서 API를 호출합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-i</span> http://127.0.0.1:8000/api/
+</code></pre></div></div>
+
+<p>예상 Body는 다음과 같습니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"success"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user-001"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Example User"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user-002"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Sample User"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>지원하지 않는 Method가 거부되는지도 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-i</span> <span class="nt">-X</span> POST http://127.0.0.1:8000/api/
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">runserver</code>는 개발용이며 Production Traffic을 처리하도록 설계되지 않았습니다. Container 배포에서는 Gunicorn 같은 Production WSGI Server 또는 요구 사항에 맞는 ASGI Server를 사용합니다.</p>
+
+<h2 id="12-의존성-고정">12. 의존성 고정</h2>
+
+<hr />
+
+<p>현재 가상환경의 Package Version을 <code class="language-plaintext highlighter-rouge">requirements.txt</code>로 저장합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> pip freeze <span class="o">&gt;</span> requirements.txt
+</code></pre></div></div>
+
+<p>생성된 File을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sed</span> <span class="nt">-n</span> <span class="s1">'1,120p'</span> requirements.txt
+</code></pre></div></div>
+
+<p>다른 환경에서 동일한 의존성을 설치할 때 사용합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> pip <span class="nb">install</span> <span class="nt">-r</span> requirements.txt
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">pip freeze</code>는 직접 설치하지 않은 하위 의존성도 모두 기록합니다. 운영 Project에서는 Dependabot 같은 도구로 취약점과 Update를 관리하고 변경 후 Test를 수행합니다.</p>
+
+<h2 id="13-container-배포-전-점검">13. Container 배포 전 점검</h2>
+
+<hr />
+
+<p>Application을 Image로 만들기 전에 다음 항목을 확인합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>점검 항목</th>
+      <th>확인 방법</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>설정 오류</td>
+      <td><code class="language-plaintext highlighter-rouge">python manage.py check</code></td>
+    </tr>
+    <tr>
+      <td>Unit Test</td>
+      <td><code class="language-plaintext highlighter-rouge">python manage.py test</code></td>
+    </tr>
+    <tr>
+      <td>의존성 고정</td>
+      <td><code class="language-plaintext highlighter-rouge">requirements.txt</code> 생성·재설치 확인</td>
+    </tr>
+    <tr>
+      <td>Secret 분리</td>
+      <td>실제 Secret이 Source와 Git History에 없는지 검사</td>
+    </tr>
+    <tr>
+      <td>Host 제한</td>
+      <td>운영 Domain과 Health Check Host만 허용</td>
+    </tr>
+    <tr>
+      <td>Database</td>
+      <td>Container 외부 Database와 Migration 전략 준비</td>
+    </tr>
+    <tr>
+      <td>Static File</td>
+      <td><code class="language-plaintext highlighter-rouge">collectstatic</code>과 S3·CloudFront 사용 여부 결정</td>
+    </tr>
+    <tr>
+      <td>Process Server</td>
+      <td><code class="language-plaintext highlighter-rouge">runserver</code> 대신 Production WSGI·ASGI Server 선택</td>
+    </tr>
+    <tr>
+      <td>Health Check</td>
+      <td>Container와 Load Balancer가 호출할 Endpoint 정의</td>
+    </tr>
+    <tr>
+      <td>Log</td>
+      <td>Standard Output·Error로 출력해 중앙 수집 준비</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>현재 단계의 요청 흐름은 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Local Client
+  ↓ GET /api/
+Django Development Server
+  ↓ URL Resolver
+DRF Function View
+  ↓
+JSON Response
+</code></pre></div></div>
+
+<p>후속 Container 배포에서는 <code class="language-plaintext highlighter-rouge">Dockerfile → Image Build → ECR Push → ECS Task Definition → ECS Service</code> 흐름으로 확장합니다. 이 글에는 아직 Dockerfile, ECR Repository와 ECS Resource를 생성하는 절차를 포함하지 않습니다.</p>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Django Project는 전체 설정과 Root URL을 관리하고 Application은 실제 기능을 분리합니다.</p>
+    </li>
+    <li>
+      <p><code class="language-plaintext highlighter-rouge">SECRET_KEY</code>와 허용 Host는 환경 변수로 주입하고 실제 값을 Repository에 저장하지 않습니다.</p>
+    </li>
+    <li>
+      <p>REST Endpoint는 Application URL을 Project URL에 포함해 연결합니다.</p>
+    </li>
+    <li>
+      <p><code class="language-plaintext highlighter-rouge">check</code>, Test와 Local HTTP 호출을 통과한 Application을 다음 단계에서 Container Image로 만듭니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.djangoproject.com/en/5.2/intro/tutorial01/">Django 5.2 첫 Application 작성</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/">Django 배포 점검 목록</a></p>
+  </li>
+  <li>
+    <p><a href="https://www.django-rest-framework.org/#installation">Django REST Framework 설치</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.python.org/3/library/venv.html">Python venv</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-12-aws-container-services-architecture/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">AWS Container Service와 ECS·EKS 실행 구조</strong>
+          </span>
+        </a>
+      
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1790858010"></script>
+    <script src="/assets/js/code-enhancements.js?v=1790858010"></script>
+  </body>
+</html>

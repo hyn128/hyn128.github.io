@@ -1,4 +1,1752 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-10-01T19:10:46+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">DynamoDB·ElastiCache와 Amazon DocumentDB</title><link href="https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb/" rel="alternate" type="text/html" title="DynamoDB·ElastiCache와 Amazon DocumentDB" /><published>2026-09-30T00:00:00+09:00</published><updated>2026-09-30T00:00:00+09:00</updated><id>https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb</id><content type="html" xml:base="https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb/"><![CDATA[<h2 id="요약">요약</h2>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-10-01T21:33:30+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">S3·CloudFront 정적 Website와 GitHub Actions 배포</title><link href="https://hyn128.site/cloud-11-aws-s3-cloudfront-github-actions/" rel="alternate" type="text/html" title="S3·CloudFront 정적 Website와 GitHub Actions 배포" /><published>2026-10-01T00:00:00+09:00</published><updated>2026-10-01T00:00:00+09:00</updated><id>https://hyn128.site/cloud-11-aws-s3-cloudfront-github-actions</id><content type="html" xml:base="https://hyn128.site/cloud-11-aws-s3-cloudfront-github-actions/"><![CDATA[<h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>S3는 HTML, CSS, JavaScript와 Image 같은 정적 File을 저장하고 CloudFront는 이를 전 세계 Edge Location에 Cache해 전달합니다. 운영 환경에서는 S3 Website Endpoint를 공개하기보다 Private S3 Bucket을 CloudFront Origin으로 연결하고 Origin Access Control로 접근을 제한합니다. 이 글에서는 정적 Application을 Build하고 GitHub Actions가 OIDC로 AWS IAM Role을 맡아 S3 Upload와 CloudFront Cache 무효화를 수행하는 흐름을 정리합니다.</p>
+</blockquote>
+
+<h2 id="1-정적-website-배포-구조">1. 정적 Website 배포 구조</h2>
+
+<hr />
+
+<p>정적 Frontend Application은 Build 결과만 Web Server에서 제공하면 됩니다. API 요청은 별도의 Backend Endpoint로 전달합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>GitHub Repository
+  ↓ push
+GitHub Actions Runner
+  ├── npm ci
+  ├── npm run build
+  ├── S3 Sync
+  └── CloudFront Invalidation
+        ↓
+Private S3 Bucket
+  ↑ Origin Access Control
+CloudFront + ACM Certificate
+  ↑
+Route 53 Alias
+  ↑ HTTPS
+Client
+</code></pre></div></div>
+
+<p>S3 정적 Website Hosting과 Private S3 Origin은 같은 구성이 아닙니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>구성</th>
+      <th>Origin</th>
+      <th>HTTPS</th>
+      <th>S3 공개 여부</th>
+      <th>용도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>S3 Website Endpoint 직접 접속</td>
+      <td><code class="language-plaintext highlighter-rouge">s3-website</code> Endpoint</td>
+      <td>지원하지 않음</td>
+      <td>공개 읽기 필요</td>
+      <td>기능 확인용 단순 실습</td>
+    </tr>
+    <tr>
+      <td>CloudFront + S3 Website Endpoint</td>
+      <td>Website Endpoint</td>
+      <td>CloudFront에서 제공</td>
+      <td>Website Endpoint가 공개됨</td>
+      <td>S3 Redirect·Website 기능이 필요한 경우</td>
+    </tr>
+    <tr>
+      <td>CloudFront + Private S3 Origin</td>
+      <td>S3 REST Endpoint</td>
+      <td>CloudFront에서 제공</td>
+      <td>비공개 유지</td>
+      <td>일반적인 운영 구성</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Origin Access Control(OAC)은 S3 REST Endpoint에 적용합니다. S3 Website Endpoint는 Custom Origin으로 취급되므로 OAC를 사용할 수 없습니다.</p>
+
+<h2 id="2-s3-bucket-준비">2. S3 Bucket 준비</h2>
+
+<hr />
+
+<p>운영용 Bucket은 다음 원칙으로 생성합니다.</p>
+
+<ol>
+  <li>
+    <p>CloudFront Origin으로 사용할 General Purpose Bucket을 생성합니다.</p>
+  </li>
+  <li>
+    <p>Object Ownership은 <code class="language-plaintext highlighter-rouge">Bucket owner enforced</code>를 유지합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Block all public access</code>를 활성화합니다.</p>
+  </li>
+  <li>
+    <p>Versioning과 Default Encryption을 요구 사항에 맞게 설정합니다.</p>
+  </li>
+  <li>
+    <p>CloudFront OAC를 생성한 뒤 해당 Distribution만 Object를 읽을 수 있도록 Bucket Policy를 연결합니다.</p>
+  </li>
+</ol>
+
+<p>정적 File을 직접 Upload해 동작을 확인할 때도 <code class="language-plaintext highlighter-rouge">--acl public-read</code>를 사용하지 않습니다. ACL이 비활성화된 Bucket에서는 해당 Option이 실패하며, OAC 구성에서는 Public ACL이 필요하지 않습니다.</p>
+
+<h2 id="3-frontend-application-생성과-build">3. Frontend Application 생성과 Build</h2>
+
+<hr />
+
+<p>Create React App은 신규 Application을 위한 도구로 Deprecated되었습니다. 기존 Project의 <code class="language-plaintext highlighter-rouge">npm run build</code>는 계속 사용할 수 있지만 새 Project는 Vite 같은 Build Tool을 사용할 수 있습니다.</p>
+
+<p>다음 명령은 Vite 기반 React Project를 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>npm create vite@latest static-web <span class="nt">--</span> <span class="nt">--template</span> react
+<span class="nb">cd </span>static-web
+npm <span class="nb">install
+</span>npm run dev
+</code></pre></div></div>
+
+<p>개발 Server는 Local 확인용입니다. 배포할 정적 File을 만들려면 Production Build를 수행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>npm run build
+</code></pre></div></div>
+
+<p>Vite의 기본 Output Directory는 <code class="language-plaintext highlighter-rouge">dist/</code>입니다. 기존 Create React App Project는 <code class="language-plaintext highlighter-rouge">build/</code>을 사용하므로 Workflow의 경로를 Project에 맞게 지정해야 합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>도구</th>
+      <th>기본 Build Directory</th>
+      <th>확인 항목</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Vite</td>
+      <td><code class="language-plaintext highlighter-rouge">dist/</code></td>
+      <td><code class="language-plaintext highlighter-rouge">vite.config.*</code>의 <code class="language-plaintext highlighter-rouge">build.outDir</code></td>
+    </tr>
+    <tr>
+      <td>Create React App</td>
+      <td><code class="language-plaintext highlighter-rouge">build/</code></td>
+      <td><code class="language-plaintext highlighter-rouge">package.json</code>의 Build Script</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Build 전에 불필요한 Import, Type Error와 Lint Error를 Local에서도 검사합니다. CI 환경은 <code class="language-plaintext highlighter-rouge">CI</code> 설정이나 Build Tool Version에 따라 Warning을 Error로 처리할 수 있습니다.</p>
+
+<h2 id="4-aws-cli로-수동-배포-확인">4. AWS CLI로 수동 배포 확인</h2>
+
+<hr />
+
+<p>Local에서 AWS CLI를 사용할 때는 기본 Profile과 분리된 이름을 사용할 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws configure <span class="nt">--profile</span> static-site-deploy
+</code></pre></div></div>
+
+<p>이 명령은 Access Key를 Source Code에 기록하지 않지만 장기 IAM User Credential을 Local 설정 File에 저장합니다. 실습 이후에는 불필요한 Key를 폐기하고, EC2·CloudShell·CI 환경에서는 IAM Role과 임시 Credential을 우선합니다.</p>
+
+<p>현재 Identity를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws sts get-caller-identity <span class="se">\</span>
+  <span class="nt">--profile</span> static-site-deploy
+</code></pre></div></div>
+
+<p>Build 결과를 Bucket과 동기화합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws s3 <span class="nb">sync </span>dist/ s3://example-static-site <span class="se">\</span>
+  <span class="nt">--delete</span> <span class="se">\</span>
+  <span class="nt">--profile</span> static-site-deploy
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">--delete</code>는 Local Output에 없는 Object를 대상 Bucket에서도 삭제합니다. 전용 배포 Bucket이나 Prefix에서만 사용하고 Upload 대상 경로를 먼저 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws s3 <span class="nb">sync </span>dist/ s3://example-static-site <span class="se">\</span>
+  <span class="nt">--delete</span> <span class="se">\</span>
+  <span class="nt">--dryrun</span> <span class="se">\</span>
+  <span class="nt">--profile</span> static-site-deploy
+</code></pre></div></div>
+
+<h2 id="5-cloudfront-distribution-구성">5. CloudFront Distribution 구성</h2>
+
+<hr />
+
+<p>CloudFront Distribution은 다음 항목을 기준으로 구성합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>설정 방향</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Origin Domain</td>
+      <td>S3 Website Endpoint가 아닌 Bucket REST Endpoint</td>
+    </tr>
+    <tr>
+      <td>Origin Access</td>
+      <td>Origin Access Control 생성·연결</td>
+    </tr>
+    <tr>
+      <td>Signing Behavior</td>
+      <td>요청을 항상 서명</td>
+    </tr>
+    <tr>
+      <td>Viewer Protocol Policy</td>
+      <td>HTTP를 HTTPS로 Redirect</td>
+    </tr>
+    <tr>
+      <td>Default Root Object</td>
+      <td><code class="language-plaintext highlighter-rouge">index.html</code></td>
+    </tr>
+    <tr>
+      <td>Cache Policy</td>
+      <td>정적 Asset 특성에 맞는 Managed 또는 Custom Policy</td>
+    </tr>
+    <tr>
+      <td>Alternate Domain</td>
+      <td><code class="language-plaintext highlighter-rouge">www.example.com</code> 같은 실제 Domain</td>
+    </tr>
+    <tr>
+      <td>Certificate</td>
+      <td><code class="language-plaintext highlighter-rouge">us-east-1</code>에서 발급한 ACM Certificate</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>OAC를 Distribution에 연결하면 Console이 제안하는 S3 Bucket Policy를 적용합니다. Policy의 <code class="language-plaintext highlighter-rouge">AWS:SourceArn</code>은 특정 CloudFront Distribution ARN으로 제한합니다.</p>
+
+<p>Single Page Application은 <code class="language-plaintext highlighter-rouge">/users/1</code>처럼 실제 S3 Object가 없는 경로로 직접 접근할 수 있습니다. 이 경우 <code class="language-plaintext highlighter-rouge">403</code> 또는 <code class="language-plaintext highlighter-rouge">404</code> 응답을 <code class="language-plaintext highlighter-rouge">index.html</code>로 매핑하는 Custom Error Response가 필요한지 Router 동작과 함께 결정합니다. API 오류까지 <code class="language-plaintext highlighter-rouge">index.html</code>로 바꾸지 않도록 Behavior와 Origin을 분리합니다.</p>
+
+<h2 id="6-github-actions와-aws-oidc">6. GitHub Actions와 AWS OIDC</h2>
+
+<hr />
+
+<p>GitHub Actions에 장기 <code class="language-plaintext highlighter-rouge">AWS_ACCESS_KEY_ID</code>와 <code class="language-plaintext highlighter-rouge">AWS_SECRET_ACCESS_KEY</code>를 저장하지 않습니다. GitHub의 OIDC Token을 신뢰하는 IAM Role을 만들고 Workflow 실행 시 짧은 수명의 AWS Credential을 발급받습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>GitHub Actions Job
+  ↓ OIDC Token
+AWS IAM Role Trust Policy
+  ↓ AssumeRoleWithWebIdentity
+Temporary AWS Credential
+  ↓
+S3 Sync + CloudFront Invalidation
+</code></pre></div></div>
+
+<p>IAM Role의 Trust Policy는 Repository와 Branch 또는 GitHub Environment를 제한합니다. 다음 예제는 <code class="language-plaintext highlighter-rouge">example-org/static-web</code> Repository의 <code class="language-plaintext highlighter-rouge">main</code> Branch만 허용합니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"Version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"Statement"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Principal"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"Federated"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arn:aws:iam::&lt;AWS_ACCOUNT_ID&gt;:oidc-provider/token.actions.githubusercontent.com"</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sts:AssumeRoleWithWebIdentity"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Condition"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"StringEquals"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"token.actions.githubusercontent.com:aud"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sts.amazonaws.com"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"token.actions.githubusercontent.com:sub"</span><span class="p">:</span><span class="w"> </span><span class="s2">"repo:example-org/static-web:ref:refs/heads/main"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Role의 Permission Policy에는 배포 대상만 허용합니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"Version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"Statement"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="s2">"s3:ListBucket"</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"Resource"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arn:aws:s3:::example-static-site"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="s2">"s3:DeleteObject"</span><span class="p">,</span><span class="w">
+        </span><span class="s2">"s3:GetObject"</span><span class="p">,</span><span class="w">
+        </span><span class="s2">"s3:PutObject"</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"Resource"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arn:aws:s3:::example-static-site/*"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cloudfront:CreateInvalidation"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Resource"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arn:aws:cloudfront::&lt;AWS_ACCOUNT_ID&gt;:distribution/&lt;DISTRIBUTION_ID&gt;"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">s3:DeleteObject</code>는 <code class="language-plaintext highlighter-rouge">aws s3 sync --delete</code>에 필요합니다. 삭제 동기화를 사용하지 않으면 제거할 수 있습니다.</p>
+
+<h2 id="7-repository-variable-구성">7. Repository Variable 구성</h2>
+
+<hr />
+
+<p>GitHub Repository의 <code class="language-plaintext highlighter-rouge">Settings → Secrets and variables → Actions</code>에서 다음 Variable을 등록합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>역할</th>
+      <th>예제 형식</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AWS_ROLE_ARN</code></td>
+      <td>Workflow가 맡을 IAM Role</td>
+      <td><code class="language-plaintext highlighter-rouge">arn:aws:iam::&lt;AWS_ACCOUNT_ID&gt;:role/&lt;ROLE_NAME&gt;</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AWS_REGION</code></td>
+      <td>S3 Bucket Region</td>
+      <td><code class="language-plaintext highlighter-rouge">ap-northeast-2</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AWS_S3_BUCKET</code></td>
+      <td>배포 대상 Bucket Name</td>
+      <td><code class="language-plaintext highlighter-rouge">example-static-site</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AWS_CLOUDFRONT_DISTRIBUTION_ID</code></td>
+      <td>Cache 무효화 대상</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;DISTRIBUTION_ID&gt;</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>이 값들은 인증 Secret 자체가 아닙니다. 다만 Repository 구조와 운영 Resource 식별자를 외부에 공개하지 않아야 한다면 GitHub Environment 또는 Secret으로 접근 범위를 제한할 수 있습니다.</p>
+
+<h2 id="8-github-actions-workflow">8. GitHub Actions Workflow</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">.github/workflows/deploy-static-site.yml</code>을 작성합니다. <code class="language-plaintext highlighter-rouge">$</code> 표현은 GitHub Actions가 Runtime에 해석합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">name</span><span class="pi">:</span> <span class="s">Deploy static site</span>
+
+<span class="na">on</span><span class="pi">:</span>
+  <span class="na">push</span><span class="pi">:</span>
+    <span class="na">branches</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="s">main</span>
+
+<span class="na">permissions</span><span class="pi">:</span>
+  <span class="na">id-token</span><span class="pi">:</span> <span class="s">write</span>
+  <span class="na">contents</span><span class="pi">:</span> <span class="s">read</span>
+
+<span class="na">jobs</span><span class="pi">:</span>
+  <span class="na">deploy</span><span class="pi">:</span>
+    <span class="na">runs-on</span><span class="pi">:</span> <span class="s">ubuntu-latest</span>
+    <span class="na">environment</span><span class="pi">:</span> <span class="s">production</span>
+
+    <span class="na">steps</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Checkout source</span>
+        <span class="na">uses</span><span class="pi">:</span> <span class="s">actions/checkout@v6</span>
+
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Set up Node.js</span>
+        <span class="na">uses</span><span class="pi">:</span> <span class="s">actions/setup-node@v6</span>
+        <span class="na">with</span><span class="pi">:</span>
+          <span class="na">node-version</span><span class="pi">:</span> <span class="m">22</span>
+          <span class="na">cache</span><span class="pi">:</span> <span class="s">npm</span>
+
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Install dependencies</span>
+        <span class="na">run</span><span class="pi">:</span> <span class="s">npm ci</span>
+
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Build</span>
+        <span class="na">run</span><span class="pi">:</span> <span class="s">npm run build</span>
+
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Configure temporary AWS credentials</span>
+        <span class="na">uses</span><span class="pi">:</span> <span class="s">aws-actions/configure-aws-credentials@v6.3.0</span>
+        <span class="na">with</span><span class="pi">:</span>
+          <span class="na">role-to-assume</span><span class="pi">:</span> <span class="s">${{ vars.AWS_ROLE_ARN }}</span>
+          <span class="na">aws-region</span><span class="pi">:</span> <span class="s">${{ vars.AWS_REGION }}</span>
+
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Upload build output to S3</span>
+        <span class="na">run</span><span class="pi">:</span> <span class="s">aws s3 sync dist/ "s3://${{ vars.AWS_S3_BUCKET }}" --delete</span>
+
+      <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Invalidate CloudFront cache</span>
+        <span class="na">run</span><span class="pi">:</span> <span class="pi">&gt;-</span>
+          <span class="s">aws cloudfront create-invalidation</span>
+          <span class="s">--distribution-id "${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID }}"</span>
+          <span class="s">--paths "/*"</span>
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>설정</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">id-token: write</code></td>
+      <td>GitHub OIDC Token 발급 허용</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">contents: read</code></td>
+      <td>Repository Checkout 허용</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">npm ci</code></td>
+      <td>Lock File과 일치하는 의존성을 재현 가능하게 설치</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">aws s3 sync</code></td>
+      <td>변경된 정적 File Upload와 제거된 File 삭제</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">create-invalidation</code></td>
+      <td>Edge Cache의 기존 Object 무효화 요청</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Production Environment에 Required Reviewer를 설정하면 승인 이후에만 AWS Role을 맡도록 통제할 수 있습니다. 이 경우 IAM Trust Policy의 <code class="language-plaintext highlighter-rouge">sub</code> 조건도 Branch 대신 Environment 형식으로 맞춰야 합니다.</p>
+
+<h2 id="9-cache-갱신-전략">9. Cache 갱신 전략</h2>
+
+<hr />
+
+<p>CloudFront Cache를 항상 <code class="language-plaintext highlighter-rouge">/*</code>로 무효화하면 배포는 단순하지만 Invalidation 비용과 Cache Miss가 늘어납니다.</p>
+
+<p>정적 Asset에는 Content Hash가 포함된 File Name을 사용합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>app.8f32c1.js
+style.a91b20.css
+</code></pre></div></div>
+
+<p>새 Build는 새 File Name을 만들기 때문에 기존 Cache와 충돌하지 않습니다. 짧은 Cache를 적용한 <code class="language-plaintext highlighter-rouge">index.html</code>과 삭제된 File만 무효화하면 Cache 효율을 높일 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws cloudfront create-invalidation <span class="se">\</span>
+  <span class="nt">--distribution-id</span> <span class="s1">'&lt;DISTRIBUTION_ID&gt;'</span> <span class="se">\</span>
+  <span class="nt">--paths</span> <span class="s1">'/index.html'</span>
+</code></pre></div></div>
+
+<h2 id="10-domain과-https-연결">10. Domain과 HTTPS 연결</h2>
+
+<hr />
+
+<p>CloudFront에 연결할 Public ACM Certificate는 <code class="language-plaintext highlighter-rouge">us-east-1</code> Region에서 요청해야 합니다.</p>
+
+<ol>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">us-east-1</code>의 ACM에서 Domain Certificate를 요청합니다.</p>
+  </li>
+  <li>
+    <p>DNS Validation Record를 Route 53 Hosted Zone에 등록합니다.</p>
+  </li>
+  <li>
+    <p>CloudFront Distribution의 Alternate Domain Name과 Certificate를 연결합니다.</p>
+  </li>
+  <li>
+    <p>Route 53에서 CloudFront Distribution을 대상으로 Alias <code class="language-plaintext highlighter-rouge">A</code> Record를 생성합니다.</p>
+  </li>
+  <li>
+    <p>IPv6를 사용하면 Alias <code class="language-plaintext highlighter-rouge">AAAA</code> Record도 생성합니다.</p>
+  </li>
+</ol>
+
+<p>DNS와 TLS 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dig +short www.example.com A
+curl <span class="nt">-I</span> https://www.example.com
+</code></pre></div></div>
+
+<h2 id="11-배포-결과-검증">11. 배포 결과 검증</h2>
+
+<hr />
+
+<p>GitHub Actions 실행 결과와 AWS Resource를 함께 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws s3 <span class="nb">ls </span>s3://example-static-site <span class="nt">--recursive</span>
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws cloudfront get-distribution <span class="se">\</span>
+  <span class="nt">--id</span> <span class="s1">'&lt;DISTRIBUTION_ID&gt;'</span> <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'Distribution.Status'</span>
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-I</span> https://www.example.com/index.html
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>증상</th>
+      <th>확인 항목</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>S3 <code class="language-plaintext highlighter-rouge">AccessDenied</code></td>
+      <td>OIDC Role, Permission Policy, Bucket ARN과 Prefix</td>
+    </tr>
+    <tr>
+      <td>CloudFront <code class="language-plaintext highlighter-rouge">403</code></td>
+      <td>OAC 연결, Bucket Policy, Origin Domain</td>
+    </tr>
+    <tr>
+      <td>이전 화면 표시</td>
+      <td>Object Cache-Control, File Versioning, Invalidation 상태</td>
+    </tr>
+    <tr>
+      <td>하위 Route 새로고침 실패</td>
+      <td>SPA Router와 Custom Error Response</td>
+    </tr>
+    <tr>
+      <td>Certificate 오류</td>
+      <td><code class="language-plaintext highlighter-rouge">us-east-1</code> Certificate, Domain 일치, Distribution 배포 완료</td>
+    </tr>
+    <tr>
+      <td>Workflow Build 실패</td>
+      <td>Node Version, Lock File, Lint·Type Error, Build Directory</td>
+    </tr>
+  </tbody>
+</table>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>S3 Website Endpoint는 HTTP만 지원하며 OAC를 사용할 수 없습니다.</p>
+    </li>
+    <li>
+      <p>운영 정적 Website는 Private S3 REST Origin과 CloudFront OAC를 이용해 S3 직접 접근을 차단할 수 있습니다.</p>
+    </li>
+    <li>
+      <p>GitHub Actions는 장기 Access Key 대신 OIDC로 IAM Role을 맡아 임시 Credential을 사용합니다.</p>
+    </li>
+    <li>
+      <p>Content Hash와 필요한 범위의 Invalidation을 조합하면 Cache 효율과 배포 반영 속도를 함께 관리할 수 있습니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesOrigin.html">CloudFront에서 S3 Origin 선택</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html">Origin Access Control로 S3 접근 제한</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html">CloudFront File 무효화</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/acm/latest/userguide/acm-services.html">CloudFront에서 ACM Certificate 사용</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws">GitHub Actions에서 AWS OIDC 사용</a></p>
+  </li>
+  <li>
+    <p><a href="https://github.com/aws-actions/configure-aws-credentials">AWS Credential Action</a></p>
+  </li>
+  <li>
+    <p><a href="https://react.dev/blog/2025/02/14/sunsetting-create-react-app">Create React App Deprecated 안내</a></p>
+  </li>
+</ul>
+
+<p>다음 글인 <a href="/cloud-12-aws-container-services-architecture/">AWS Container Service와 ECS·EKS 실행 구조</a>에서는 ECS·EKS Control Plane과 EC2·Fargate Data Plane의 조합을 비교합니다.</p>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[Private S3 Origin과 CloudFront로 정적 Website를 제공하고 GitHub Actions OIDC로 Build·배포·Cache 무효화를 자동화합니다]]></summary></entry><entry><title type="html">AWS Container Service와 ECS·EKS 실행 구조</title><link href="https://hyn128.site/cloud-12-aws-container-services-architecture/" rel="alternate" type="text/html" title="AWS Container Service와 ECS·EKS 실행 구조" /><published>2026-10-01T00:00:00+09:00</published><updated>2026-10-01T00:00:00+09:00</updated><id>https://hyn128.site/cloud-12-aws-container-services-architecture</id><content type="html" xml:base="https://hyn128.site/cloud-12-aws-container-services-architecture/"><![CDATA[<h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>AWS에서 Container를 실행하려면 Image를 보관하는 Registry, 배치 상태를 관리하는 Orchestrator와 실제 Workload가 실행되는 Compute 환경을 함께 선택해야 합니다. ECS와 EKS는 Container 배치를 제어하고, EC2와 Fargate는 Task 또는 Pod가 실행될 Compute를 제공합니다. 이 글에서는 각 구성 요소의 책임 범위와 네 가지 대표 조합을 비교합니다.</p>
+</blockquote>
+
+<h2 id="1-container-도입-전에-확인할-사항">1. Container 도입 전에 확인할 사항</h2>
+
+<hr />
+
+<p>Container는 Application과 Library를 Image에 묶어 실행 환경의 일관성을 높입니다. 여러 Container가 Network로 통신하는 구조가 되면 분산 시스템의 특성도 함께 나타납니다.</p>
+
+<ul>
+  <li>
+    <p>Container 내부 File System은 교체 시 사라질 수 있으므로 영구 Data를 외부 Storage나 Managed Database에 보관합니다.</p>
+  </li>
+  <li>
+    <p>Service 사이의 결합도를 낮추고 Timeout, Retry와 장애 격리를 설계합니다.</p>
+  </li>
+  <li>
+    <p>Image Build부터 Registry Push, 배포와 Rollback까지의 흐름을 관리합니다.</p>
+  </li>
+  <li>
+    <p>Image 취약점, Runtime 권한, Secret과 Network 경계를 통제합니다.</p>
+  </li>
+  <li>
+    <p>Log와 Metric을 Container 외부로 전송해 교체 이후에도 조사할 수 있게 합니다.</p>
+  </li>
+</ul>
+
+<p>The Twelve-Factor App은 환경별 설정 분리, Stateless Process, Log Stream과 빠른 시작·종료처럼 Cloud Application을 설계할 때 참고할 원칙을 제공합니다. 모든 항목을 기계적으로 적용하는 규칙은 아니며 Workload 특성에 맞게 선택합니다.</p>
+
+<h2 id="2-aws-container-구성-요소">2. AWS Container 구성 요소</h2>
+
+<hr />
+
+<p>AWS Container 환경은 다음 세 영역으로 나누어 이해할 수 있습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Source Code
+  ↓ Build
+Container Image
+  ↓ Push
+Amazon ECR
+  ↓ Pull
+ECS 또는 EKS Control Plane
+  ↓ 배치 결정
+EC2 또는 Fargate Compute
+  ↓
+Task 또는 Pod 실행
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>영역</th>
+      <th>AWS Service</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Image Registry</td>
+      <td>Amazon ECR</td>
+      <td>Image 저장, Version·Lifecycle과 취약점 Scan 관리</td>
+    </tr>
+    <tr>
+      <td>Orchestration</td>
+      <td>Amazon ECS</td>
+      <td>AWS 고유 Task·Service Model로 Container 배치 관리</td>
+    </tr>
+    <tr>
+      <td>Orchestration</td>
+      <td>Amazon EKS</td>
+      <td>AWS가 Kubernetes Control Plane을 관리</td>
+    </tr>
+    <tr>
+      <td>Compute</td>
+      <td>Amazon EC2</td>
+      <td>사용자가 Instance와 OS를 관리하는 실행 환경</td>
+    </tr>
+    <tr>
+      <td>Compute</td>
+      <td>AWS Fargate</td>
+      <td>Host를 직접 관리하지 않는 Serverless Container Compute</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>ECS와 EKS를 단순히 Control Plane Service, EC2와 Fargate를 Data Plane 선택지로 구분하면 구조를 이해하기 쉽습니다. 다만 실제 서비스 경계는 더 넓습니다. ECS는 Scheduling, Service Desired Count와 Deployment를 관리하고, EKS에서는 Kubernetes API와 Controller가 Pod의 원하는 상태를 관리합니다.</p>
+
+<h2 id="3-amazon-ecs">3. Amazon ECS</h2>
+
+<hr />
+
+<p>Amazon Elastic Container Service(ECS)는 AWS가 제공하는 Managed Container Orchestrator입니다.</p>
+
+<p>주요 Resource는 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Cluster</td>
+      <td>Service와 Task를 논리적으로 묶는 경계</td>
+    </tr>
+    <tr>
+      <td>Task Definition</td>
+      <td>Image, CPU·Memory, Port, Environment와 IAM Role 정의</td>
+    </tr>
+    <tr>
+      <td>Task</td>
+      <td>Task Definition으로 실행된 Workload Instance</td>
+    </tr>
+    <tr>
+      <td>Service</td>
+      <td>원하는 Task 수를 유지하고 Deployment와 Load Balancer 연결 관리</td>
+    </tr>
+    <tr>
+      <td>Capacity Provider</td>
+      <td>Task가 사용할 Fargate 또는 EC2 Capacity와 Scaling 전략 정의</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>ECS 자체가 Application Container를 실행하는 Host는 아닙니다. Scheduler가 배치할 위치를 결정하고 실제 Task는 Fargate 또는 ECS Cluster에 등록된 EC2 Capacity에서 실행됩니다.</p>
+
+<p>현재 ECS는 Fargate·Fargate Spot, EC2 Auto Scaling Group, ECS Managed Instances와 External Instance 같은 Capacity 선택지를 제공합니다. 이 글에서는 기본 구조를 비교하기 위해 EC2와 Fargate에 집중합니다.</p>
+
+<h2 id="4-amazon-eks">4. Amazon EKS</h2>
+
+<hr />
+
+<p>Amazon Elastic Kubernetes Service(EKS)는 Managed Kubernetes Service입니다. AWS가 Kubernetes API Server와 etcd를 포함한 Control Plane의 가용성과 운영을 담당합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Developer 또는 CI/CD
+  ↓ Kubernetes API
+EKS Control Plane
+  ↓ Scheduling·Desired State
+EC2 Node Group 또는 Fargate Profile
+  ↓ kubelet 또는 Fargate Runtime
+Pod 실행
+</code></pre></div></div>
+
+<p>Managed Control Plane을 사용해도 다음 책임은 사용자에게 남습니다.</p>
+
+<ul>
+  <li>
+    <p>Kubernetes Version Upgrade 계획과 API Compatibility 확인</p>
+  </li>
+  <li>
+    <p>Node Group 또는 Fargate Profile 구성</p>
+  </li>
+  <li>
+    <p>Core Add-on, Network, Load Balancer Controller와 Storage Driver 관리</p>
+  </li>
+  <li>
+    <p>Workload Manifest, Resource Request·Limit과 Pod Security 설정</p>
+  </li>
+  <li>
+    <p>Application, Cluster Event와 Workload Log Monitoring</p>
+  </li>
+</ul>
+
+<p>EKS Kubernetes Minor Version은 Standard Support 14개월 이후 Extended Support 12개월을 제공합니다. Extended Support에는 추가 비용이 발생하므로 Version별 종료 시점을 확인하고 Upgrade를 계획합니다.</p>
+
+<h2 id="5-ec2를-실행-환경으로-사용할-때">5. EC2를 실행 환경으로 사용할 때</h2>
+
+<hr />
+
+<p>EC2를 ECS Container Instance 또는 EKS Node로 사용하면 Instance Type, OS, Kernel, Storage와 Network 구성을 세밀하게 선택할 수 있습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>장점</th>
+      <th>운영 책임</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>GPU, 큰 Memory와 특수 Instance 사용</td>
+      <td>Instance Provisioning과 Capacity 계획</td>
+    </tr>
+    <tr>
+      <td>Daemon, Privileged Workload와 Host 설정 제어</td>
+      <td>OS Patch와 Container Runtime 관리</td>
+    </tr>
+    <tr>
+      <td>Image Cache와 Instance 단위 비용 최적화</td>
+      <td>Auto Scaling, 장애 Node 교체와 Monitoring</td>
+    </tr>
+    <tr>
+      <td>EBS Instance Store 등 Storage 선택 폭</td>
+      <td>보안 설정과 AMI Lifecycle 관리</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>EC2 Instance가 준비되어 있어도 Task 또는 Pod의 Resource Request를 수용할 여유가 없으면 Scheduling에 실패합니다. Workload Scaling과 Node Scaling을 함께 설계해야 합니다.</p>
+
+<h2 id="6-fargate를-실행-환경으로-사용할-때">6. Fargate를 실행 환경으로 사용할 때</h2>
+
+<hr />
+
+<p>AWS Fargate는 ECS Task 또는 EKS Pod를 실행할 Host를 AWS가 Provisioning하고 관리하는 Serverless Container Compute입니다.</p>
+
+<p>사용자는 다음 값을 중심으로 정의합니다.</p>
+
+<ul>
+  <li>
+    <p>Container Image와 실행 Command</p>
+  </li>
+  <li>
+    <p>vCPU와 Memory 조합</p>
+  </li>
+  <li>
+    <p>Network, Security Group과 Subnet</p>
+  </li>
+  <li>
+    <p>IAM Role, Environment Variable과 Secret</p>
+  </li>
+  <li>
+    <p>Ephemeral Storage와 영구 Storage 연결</p>
+  </li>
+</ul>
+
+<p>Host OS Patch와 Cluster Capacity 확보를 직접 수행하지 않는다는 장점이 있지만 Host Kernel을 조정하거나 Host에 접근하는 Workload에는 적합하지 않습니다. Fargate가 항상 EC2보다 비싸거나 TCO가 항상 낮다고 단정할 수 없습니다. Task 이용률, EC2 예약 할인, 운영 인력, Scaling Pattern과 중단 허용 여부를 함께 계산합니다.</p>
+
+<p>ECS Fargate의 Linux Task Size는 현재 0.25 vCPU부터 32 vCPU까지의 정해진 CPU·Memory 조합을 제공합니다. 32 vCPU Task는 60 GiB, 120 GiB 또는 244 GiB Memory를 선택할 수 있습니다. 지원 조합과 Platform Version은 변경될 수 있으므로 배포 Region의 최신 표를 확인합니다. 기본 Ephemeral Storage는 20 GiB이며 21~200 GiB 범위로 확장할 수 있습니다.</p>
+
+<p>Linux Task와 Pod의 사용량은 Image Download 시작부터 종료까지 초 단위로 계산되며 최소 1분이 청구됩니다. vCPU, Memory, 추가 Ephemeral Storage뿐 아니라 Public IPv4, Data Transfer와 CloudWatch 같은 연계 Service 비용도 합산합니다.</p>
+
+<blockquote>
+  <p><strong>주의</strong>
+Fargate를 사용하는 ECS Task와 EKS Pod의 지원 기능은 같지 않습니다. EKS Fargate는 DaemonSet, Privileged Container와 GPU를 지원하지 않으며 Pod별로 격리된 Compute 경계에서 실행됩니다. EBS Volume은 Fargate Pod에 Mount할 수 없고 정적으로 Provisioning한 EFS를 사용할 수 있습니다.</p>
+</blockquote>
+
+<h2 id="7-amazon-ecr">7. Amazon ECR</h2>
+
+<hr />
+
+<p>Amazon Elastic Container Registry(ECR)는 Private·Public Container Image Repository를 제공하는 Managed Registry입니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Developer 또는 CI Runner
+  ↓ Authenticate
+Docker Build
+  ↓ Tag
+ECR Repository
+  ↓ Pull
+ECS Task 또는 EKS Pod
+</code></pre></div></div>
+
+<p>Repository 운영 시 다음 항목을 관리합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>목적</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Immutable Tag</td>
+      <td>배포된 Tag가 다른 Image로 덮어써지는 문제 방지</td>
+    </tr>
+    <tr>
+      <td>Lifecycle Policy</td>
+      <td>오래된 Image와 Untagged Image 정리</td>
+    </tr>
+    <tr>
+      <td>Image Scan</td>
+      <td>OS와 Package 취약점 확인</td>
+    </tr>
+    <tr>
+      <td>Encryption</td>
+      <td>저장 Image 암호화</td>
+    </tr>
+    <tr>
+      <td>Repository Policy·IAM</td>
+      <td>Push·Pull 주체 최소 권한 부여</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">latest</code>만 배포 기준으로 사용하면 실행 중인 Revision을 추적하기 어렵습니다. Commit SHA나 Release Version처럼 변경되지 않는 Tag를 함께 사용합니다.</p>
+
+<h2 id="8-ecs-on-ec2">8. ECS on EC2</h2>
+
+<hr />
+
+<p>ECS on EC2는 ECS가 Task를 배치하고 사용자가 관리하는 EC2 Instance에서 Container가 실행되는 구조입니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ECS Service
+  ↓ Task 배치
+EC2 Auto Scaling Group
+  ├── ECS Task A
+  ├── ECS Task B
+  └── ECS Agent
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>관점</th>
+      <th>특성</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>비용</td>
+      <td>Instance 단위 구매이므로 이용률을 높이면 효율적이지만 유휴 Capacity 비용이 발생</td>
+    </tr>
+    <tr>
+      <td>확장</td>
+      <td>Task Scaling과 EC2 Capacity Scaling을 함께 구성</td>
+    </tr>
+    <tr>
+      <td>운영</td>
+      <td>AMI, Patch, ECS Agent와 장애 Instance 교체 관리 필요</td>
+    </tr>
+    <tr>
+      <td>유연성</td>
+      <td>GPU, 특수 Instance, Host 설정과 Storage 선택 폭이 넓음</td>
+    </tr>
+    <tr>
+      <td>조사</td>
+      <td>Systems Manager Session Manager, ECS Exec와 Log를 이용 가능</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Host에 직접 SSH하는 방식은 Key와 Inbound Port 관리 부담이 있습니다. 운영 조사에는 Systems Manager Session Manager나 ECS Exec를 우선 검토합니다.</p>
+
+<h2 id="9-ecs-on-fargate">9. ECS on Fargate</h2>
+
+<hr />
+
+<p>ECS on Fargate는 ECS Service가 원하는 Task 수를 관리하고 Fargate가 각 Task의 Compute를 제공합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ECS Service
+  ↓ Desired Count
+Fargate
+  ├── Task A + ENI
+  ├── Task B + ENI
+  └── Task C + ENI
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>관점</th>
+      <th>특성</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>비용</td>
+      <td>Task에 할당한 vCPU·Memory·Storage와 실행 시간 기준 과금</td>
+    </tr>
+    <tr>
+      <td>확장</td>
+      <td>Host Capacity를 먼저 확보하지 않고 Task 수 확장 가능</td>
+    </tr>
+    <tr>
+      <td>운영</td>
+      <td>Host OS와 Container Runtime을 AWS가 관리</td>
+    </tr>
+    <tr>
+      <td>제약</td>
+      <td>지원 CPU·Memory 조합, Host 접근과 Kernel 조정 제한</td>
+    </tr>
+    <tr>
+      <td>Network</td>
+      <td><code class="language-plaintext highlighter-rouge">awsvpc</code> Mode로 Task마다 ENI와 Security Group 적용</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Image Pull과 ENI 준비가 필요하므로 새 Task 시작 시간이 Workload와 Network 상태에 따라 달라집니다. 필요 Capacity를 항상 즉시 확보할 수 있다고 가정하지 않고 Service Auto Scaling, Health Check와 Deployment 설정을 검증합니다.</p>
+
+<h2 id="10-eks-on-ec2">10. EKS on EC2</h2>
+
+<hr />
+
+<p>EKS on EC2는 AWS가 Control Plane을 관리하고 사용자가 Managed Node Group, Self-managed Node 또는 Auto Mode 등으로 Worker Capacity를 제공합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>관점</th>
+      <th>특성</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>비용</td>
+      <td>EKS Cluster 요금과 EC2·EBS·Load Balancer 등 Resource 비용 발생</td>
+    </tr>
+    <tr>
+      <td>확장</td>
+      <td>Pod Autoscaling과 Node Scaling을 함께 설계</td>
+    </tr>
+    <tr>
+      <td>운영</td>
+      <td>Kubernetes와 Node OS·AMI Upgrade 책임이 함께 존재</td>
+    </tr>
+    <tr>
+      <td>유연성</td>
+      <td>DaemonSet, GPU, Privileged Workload와 다양한 CSI Driver 사용 가능</td>
+    </tr>
+    <tr>
+      <td>생태계</td>
+      <td>Kubernetes API와 Tool을 활용할 수 있으나 학습·운영 범위가 넓음</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>AWS는 EKS Control Plane을 관리하지만 사용자가 설치한 Controller와 Workload의 오류까지 자동으로 해결하지는 않습니다. Pod 상태, Event, Node Condition과 Add-on Compatibility를 직접 확인해야 합니다.</p>
+
+<h2 id="11-eks-on-fargate">11. EKS on Fargate</h2>
+
+<hr />
+
+<p>EKS on Fargate는 Fargate Profile의 Namespace와 Label Selector에 일치하는 Pod를 Fargate에서 실행합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Pod 생성 요청
+  ↓
+EKS Scheduler
+  ↓ Fargate Profile 일치
+Fargate Compute 준비
+  ↓
+Pod 실행
+</code></pre></div></div>
+
+<p>하나의 Fargate Pod는 전용 Compute 경계를 사용하며 여러 Container가 포함된 Pod라면 그 Container들은 같은 경계 안에서 실행됩니다. 일반 EC2 Node처럼 사용자가 Node에 로그인하거나 여러 Pod를 직접 Packing하도록 관리하지 않습니다.</p>
+
+<p>Fargate가 Worker Host 운영을 줄여도 EKS Control Plane Version과 Kubernetes Add-on Upgrade는 계속 관리해야 합니다. Fargate Host OS를 직접 Upgrade하지 않는다는 뜻과 EKS Cluster Upgrade가 필요 없다는 뜻을 구분합니다.</p>
+
+<p>외부 Traffic은 Service와 Ingress 또는 Gateway API Resource로 선언하고 AWS Load Balancer Controller가 실제 Load Balancer를 구성합니다. Resource 종류만으로 ALB·NLB가 자동 결정되는 것은 아니며 Controller Version과 Annotation 또는 지원 필드를 확인합니다.</p>
+
+<p>다음 Workload에는 EC2 Node를 검토합니다.</p>
+
+<ul>
+  <li>
+    <p>DaemonSet이 필요한 Node Agent</p>
+  </li>
+  <li>
+    <p>Privileged Container나 Host Network·Host Port가 필요한 Workload</p>
+  </li>
+  <li>
+    <p>GPU Workload</p>
+  </li>
+  <li>
+    <p>EBS Volume을 직접 Mount해야 하는 Pod</p>
+  </li>
+  <li>
+    <p>특정 Kernel, Device 또는 Host 설정이 필요한 Workload</p>
+  </li>
+</ul>
+
+<h2 id="12-ecseks와-ec2fargate-비교">12. ECS·EKS와 EC2·Fargate 비교</h2>
+
+<hr />
+
+<p>Architecture는 Service 사용료만으로 선택하지 않습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>판단 기준</th>
+      <th>확인할 내용</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>비용</td>
+      <td>Compute·Storage·Network 요금, 유휴 Capacity, 운영 인력과 교육 비용</td>
+    </tr>
+    <tr>
+      <td>확장성</td>
+      <td>배포 시작 시간, 수평 Scaling, 개별 Task·Pod의 수직 Resource 범위</td>
+    </tr>
+    <tr>
+      <td>신뢰성</td>
+      <td>장애 영역, 자동 복구, 조사 수단, Backup·Rollback과 지원 범위</td>
+    </tr>
+    <tr>
+      <td>운영성</td>
+      <td>Patch, Version Upgrade, Image Lifecycle, Observability와 권한 관리</td>
+    </tr>
+    <tr>
+      <td>인력</td>
+      <td>ECS·AWS 운영 경험 또는 Kubernetes 전문성 확보 가능 여부</td>
+    </tr>
+  </tbody>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th>조합</th>
+      <th>적합한 경우</th>
+      <th>주요 부담·제약</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ECS on EC2</td>
+      <td>AWS 중심 운영, GPU·특수 Instance, 높은 지속 이용률</td>
+      <td>EC2 Capacity와 OS 운영</td>
+    </tr>
+    <tr>
+      <td>ECS on Fargate</td>
+      <td>AWS 중심 운영, Host 관리 최소화, 독립적인 Task Scaling</td>
+      <td>지원 사양과 Host 기능 제한</td>
+    </tr>
+    <tr>
+      <td>EKS on EC2</td>
+      <td>Kubernetes API·생태계, 복잡한 Workload와 Node 제어</td>
+      <td>Kubernetes와 Node 운영 범위</td>
+    </tr>
+    <tr>
+      <td>EKS on Fargate</td>
+      <td>Kubernetes Pod 중 Host 기능이 필요 없는 일부 Workload</td>
+      <td>DaemonSet·GPU·Privileged·EBS 제약</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Control Plane과 Compute를 선택할 때 다음 순서로 판단합니다.</p>
+
+<ol>
+  <li>
+    <p>Kubernetes API와 생태계가 필수인지 결정합니다.</p>
+  </li>
+  <li>
+    <p>GPU, DaemonSet, Privileged Mode, Host Tuning과 Storage 요구를 확인합니다.</p>
+  </li>
+  <li>
+    <p>Workload가 지속형인지 변동형인지 확인하고 Compute 비용을 계산합니다.</p>
+  </li>
+  <li>
+    <p>Cluster와 Host 운영에 투입할 인력과 Upgrade 주기를 확인합니다.</p>
+  </li>
+  <li>
+    <p>장애 복구, 배포 속도, 관측성과 Support 요구를 검증합니다.</p>
+  </li>
+</ol>
+
+<h2 id="13-관련-compute-service">13. 관련 Compute Service</h2>
+
+<hr />
+
+<h3 id="131-aws-lambda">13.1 AWS Lambda</h3>
+
+<p>Lambda는 Event에 따라 Function Code나 Lambda 호환 Container Image를 실행하는 Serverless Compute입니다. 기본 Lambda 실행 환경은 Firecracker MicroVM 기술로 격리되며 사용자가 ECS·EKS Cluster나 Worker Node를 구성하지 않습니다.</p>
+
+<p>Function Code, Memory·Timeout, IAM Execution Role과 Trigger를 중심으로 관리합니다. 짧은 Event 처리, API Handler와 Schedule 작업에 적합하지만 실행 시간, Runtime, Storage와 Network Model이 일반 Container Service와 다릅니다. Container Image를 지원한다는 이유만으로 ECS Task와 동일한 Runtime으로 해석하지 않습니다.</p>
+
+<h3 id="132-aws-app-runner">13.2 AWS App Runner</h3>
+
+<p>App Runner는 Source Repository 또는 Container Image에서 Web Application을 Build·배포하고 Network, Load Balancing과 Scaling을 관리하는 Service입니다.</p>
+
+<p>현재 AWS는 App Runner를 신규 고객에게 제공하지 않으며 기존 고객만 새 Resource와 Service를 계속 만들 수 있습니다. 신규 기능도 계획되어 있지 않습니다. AWS는 기존 App Runner Workload의 대안으로 ECS Express Mode를 안내합니다. 따라서 신규 Architecture의 기본 선택지로 App Runner를 채택하기 전에 Account 사용 가능 여부와 Migration 방향을 확인합니다.</p>
+
+<h2 id="14-적용-사례">14. 적용 사례</h2>
+
+<hr />
+
+<h3 id="141-gpu-또는-machine-learning-workload">14.1 GPU 또는 Machine Learning Workload</h3>
+
+<p>Fargate는 GPU를 지원하지 않으므로 GPU Instance를 사용하는 ECS on EC2 또는 EKS on EC2를 선택합니다. Training Framework, Scheduling과 Kubernetes 생태계가 필요하지 않다면 ECS가 단순할 수 있습니다.</p>
+
+<h3 id="142-큰-local-disk가-필요한-full-node">14.2 큰 Local Disk가 필요한 Full Node</h3>
+
+<p>Blockchain Network의 Node는 역할에 따라 Full Node, Validator와 Miner 등으로 나뉩니다. 전체 Block Data를 보관하는 Full Node처럼 큰 Storage와 Host Tuning이 필요한 Workload는 EC2 기반 구성이 적합할 수 있습니다. EBS Volume 크기는 유한하므로 무제한 Storage로 표현하지 않고 증가 한도, Throughput, Snapshot과 복구 시간을 설계합니다.</p>
+
+<h3 id="143-변동이-큰-stateless-api">14.3 변동이 큰 Stateless API</h3>
+
+<p>Host 운영을 줄이고 Task 단위로 확장하려면 ECS on Fargate를 우선 검토할 수 있습니다. 요청량, 최소 Task 수, Cold Start 영향과 Database Connection 수를 함께 확인합니다.</p>
+
+<h3 id="144-kubernetes-표준-api가-필요한-platform">14.4 Kubernetes 표준 API가 필요한 Platform</h3>
+
+<p>여러 팀이 Kubernetes Resource와 Operator를 사용하거나 Cloud 사이 이식성이 중요한 경우 EKS를 검토합니다. Kubernetes 사용 자체가 이식성을 자동으로 보장하지는 않으며 AWS Load Balancer, IAM과 Storage 연동은 AWS 종속성을 만듭니다.</p>
+
+<h3 id="145-self-managed-kubernetes가-필요한-환경">14.5 Self-managed Kubernetes가 필요한 환경</h3>
+
+<p>On-premises 또는 EC2에서 Control Plane과 Worker를 모두 직접 운영하면 Distribution, Network와 보안 구성을 가장 넓게 제어할 수 있습니다. 반면 etcd Backup, Control Plane 고가용성, Certificate와 Version Upgrade 책임도 모두 운영 팀에 있습니다. 규제, 기존 Platform 제약이나 명확한 비용 근거가 있을 때 선택합니다.</p>
+
+<h3 id="146-높은-resource-이용률이-필요한-환경">14.6 높은 Resource 이용률이 필요한 환경</h3>
+
+<p>지속적으로 실행되는 Task를 EC2에 조밀하게 배치하면 Instance 비용을 효율적으로 사용할 수 있습니다. 변동이 큰 Workload는 Fargate에서 필요한 vCPU·Memory를 Task 단위로 할당하는 편이 운영상 단순할 수 있습니다. CPU와 Memory를 100%에 가깝게 사용하는 것 자체를 목표로 삼지 않고 응답 지연, Throttling, 장애 여유와 Scaling 시간을 함께 측정합니다.</p>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>ECR은 Image를 저장하고 ECS·EKS는 원하는 Container 상태와 배치를 관리합니다.</p>
+    </li>
+    <li>
+      <p>EC2는 Host 제어와 선택 폭이 넓지만 Capacity, OS와 Patch를 사용자가 운영합니다.</p>
+    </li>
+    <li>
+      <p>Fargate는 Host 운영을 줄이지만 지원 사양과 Host 기능에 제약이 있습니다.</p>
+    </li>
+    <li>
+      <p>비용, 확장성, 신뢰성과 운영 인력을 함께 비교해야 하며 하나의 조합이 모든 Workload에 항상 유리하지는 않습니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/capacity-launch-type-comparison.html">Amazon ECS Launch Type과 Capacity Provider 비교</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html">ECS Fargate Task 정의</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-storage.html">ECS Fargate Ephemeral Storage</a></p>
+  </li>
+  <li>
+    <p><a href="https://aws.amazon.com/fargate/pricing/">AWS Fargate 요금과 지원 Resource 조합</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/userguide/fargate.html">Amazon EKS의 AWS Fargate</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html">Amazon EKS Kubernetes Version</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECR/latest/userguide/concept-and-components.html">Amazon ECR 개념</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html">AWS App Runner Availability 변경</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtime-environment.html">AWS Lambda 실행 환경 Lifecycle</a></p>
+  </li>
+  <li>
+    <p><a href="https://12factor.net/">The Twelve-Factor App</a></p>
+  </li>
+</ul>
+
+<p>다음 글인 <a href="/cloud-13-django-rest-api-container-preparation/">Django REST API 생성과 Container 배포 준비</a>에서는 Python 가상환경, Django Project·Application과 REST Endpoint를 구성합니다.</p>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[ECS·EKS Control Plane과 EC2·Fargate Data Plane의 역할을 구분하고 비용·확장성·운영 책임에 따라 Container 실행 구조를 선택합니다]]></summary></entry><entry><title type="html">Django REST API 생성과 Container 배포 준비</title><link href="https://hyn128.site/cloud-13-django-rest-api-container-preparation/" rel="alternate" type="text/html" title="Django REST API 생성과 Container 배포 준비" /><published>2026-10-01T00:00:00+09:00</published><updated>2026-10-01T00:00:00+09:00</updated><id>https://hyn128.site/cloud-13-django-rest-api-container-preparation</id><content type="html" xml:base="https://hyn128.site/cloud-13-django-rest-api-container-preparation/"><![CDATA[<h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>ECS에 Application을 배포하기 전에 Local에서 재현 가능한 Django Project와 REST Endpoint를 준비합니다. Python 가상환경으로 의존성을 격리하고, Django Project와 Application의 역할을 분리하며, 환경 변수로 Host와 Secret을 주입할 수 있게 구성합니다. 이 글은 Container Image, ECR와 ECS 배포 전 단계인 Application 생성과 Local 검증까지 다룹니다.</p>
+</blockquote>
+
+<h2 id="1-django-project와-application">1. Django Project와 Application</h2>
+
+<hr />
+
+<p>Django에서 Project와 Application은 역할이 다릅니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>역할</th>
+      <th>이 글의 이름</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Project</td>
+      <td>전체 Site의 설정, Root URL, WSGI·ASGI Entry Point 관리</td>
+      <td><code class="language-plaintext highlighter-rouge">apiserver</code></td>
+    </tr>
+    <tr>
+      <td>Application</td>
+      <td>특정 Domain의 View, Model, URL과 Test 관리</td>
+      <td><code class="language-plaintext highlighter-rouge">api</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>하나의 Project는 여러 Application을 포함할 수 있습니다. <code class="language-plaintext highlighter-rouge">apiserver</code> Package 자체를 업무 기능 Application처럼 <code class="language-plaintext highlighter-rouge">INSTALLED_APPS</code>에 추가하지 않고 실제 기능을 담당하는 <code class="language-plaintext highlighter-rouge">api</code> Application을 생성합니다.</p>
+
+<h2 id="2-작업-directory와-가상환경-생성">2. 작업 Directory와 가상환경 생성</h2>
+
+<hr />
+
+<p>Python 가상환경은 Project별 Package Version을 분리합니다. Python 3.10 이상을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python3 <span class="nt">--version</span>
+</code></pre></div></div>
+
+<p>Project Directory를 만들고 이동합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">mkdir </span>django-api
+<span class="nb">cd </span>django-api
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">.venv</code> Directory에 가상환경을 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python3 <span class="nt">-m</span> venv .venv
+</code></pre></div></div>
+
+<p>운영체제와 Shell에 맞는 명령으로 활성화합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>환경</th>
+      <th>명령</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Linux·macOS Bash/Zsh</td>
+      <td><code class="language-plaintext highlighter-rouge">source .venv/bin/activate</code></td>
+    </tr>
+    <tr>
+      <td>Windows PowerShell</td>
+      <td><code class="language-plaintext highlighter-rouge">.venv\Scripts\Activate.ps1</code></td>
+    </tr>
+    <tr>
+      <td>Windows Command Prompt</td>
+      <td><code class="language-plaintext highlighter-rouge">.venv\Scripts\activate.bat</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>활성화된 Python과 <code class="language-plaintext highlighter-rouge">pip</code>가 <code class="language-plaintext highlighter-rouge">.venv</code>를 가리키는지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-c</span> <span class="s1">'import sys; print(sys.executable)'</span>
+python <span class="nt">-m</span> pip <span class="nt">--version</span>
+</code></pre></div></div>
+
+<h2 id="3-django와-django-rest-framework-설치">3. Django와 Django REST Framework 설치</h2>
+
+<hr />
+
+<p>이 예제는 장기 지원 버전인 Django 5.2 계열을 사용합니다. <code class="language-plaintext highlighter-rouge">pip</code> 자체를 갱신한 뒤 Django와 Django REST Framework를 설치합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> pip <span class="nb">install</span> <span class="nt">--upgrade</span> pip
+python <span class="nt">-m</span> pip <span class="nb">install</span> <span class="s2">"Django==5.2.*"</span> djangorestframework
+</code></pre></div></div>
+
+<p>설치 Version을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> django <span class="nt">--version</span>
+python <span class="nt">-m</span> pip show djangorestframework
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">pip</code> 대신 <code class="language-plaintext highlighter-rouge">python -m pip</code>를 사용하면 현재 활성화한 Python Interpreter와 Package 설치 위치를 일치시키기 쉽습니다.</p>
+
+<h2 id="4-project와-application-생성">4. Project와 Application 생성</h2>
+
+<hr />
+
+<p>현재 Directory에 <code class="language-plaintext highlighter-rouge">manage.py</code>와 <code class="language-plaintext highlighter-rouge">apiserver</code> Package를 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>django-admin startproject apiserver <span class="nb">.</span>
+</code></pre></div></div>
+
+<p>REST Endpoint를 담당할 <code class="language-plaintext highlighter-rouge">api</code> Application을 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py startapp api
+</code></pre></div></div>
+
+<p>생성된 주요 구조는 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>django-api/
+├── .venv/
+├── api/
+│   ├── migrations/
+│   ├── apps.py
+│   ├── models.py
+│   ├── tests.py
+│   └── views.py
+├── apiserver/
+│   ├── settings.py
+│   ├── urls.py
+│   ├── asgi.py
+│   └── wsgi.py
+└── manage.py
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>File</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">manage.py</code></td>
+      <td>개발 Server, Migration, Test와 점검 명령 실행</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apiserver/settings.py</code></td>
+      <td>Application, Database, Time Zone와 보안 설정</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apiserver/urls.py</code></td>
+      <td>Project의 Root URL Routing</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apiserver/wsgi.py</code></td>
+      <td>WSGI Server의 Application Entry Point</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apiserver/asgi.py</code></td>
+      <td>ASGI Server의 Application Entry Point</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">api/views.py</code></td>
+      <td>HTTP 요청 처리와 Response 생성</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">api/urls.py</code></td>
+      <td><code class="language-plaintext highlighter-rouge">api</code> Application 내부 URL Routing</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="5-project-설정">5. Project 설정</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">apiserver/settings.py</code>에서 표준 Library의 <code class="language-plaintext highlighter-rouge">os</code>를 Import합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+</code></pre></div></div>
+
+<p>배포 환경에서 Secret Key를 Source Code에 고정하지 않도록 환경 변수에서 읽습니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">SECRET_KEY</span> <span class="o">=</span> <span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">[</span><span class="s">"DJANGO_SECRET_KEY"</span><span class="p">]</span>
+</code></pre></div></div>
+
+<p>허용할 Host도 환경 변수로 주입합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">ALLOWED_HOSTS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">host</span><span class="p">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s">"DJANGO_ALLOWED_HOSTS"</span><span class="p">,</span>
+        <span class="s">"127.0.0.1,localhost"</span><span class="p">,</span>
+    <span class="p">).</span><span class="n">split</span><span class="p">(</span><span class="s">","</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">host</span><span class="p">.</span><span class="n">strip</span><span class="p">()</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">ALLOWED_HOSTS = ["*"]</code>는 모든 Host Header를 허용하므로 운영 기본값으로 사용하지 않습니다. ALB Domain, Service Domain과 Health Check 경로에 실제로 필요한 Host만 지정합니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">INSTALLED_APPS</code>에는 Django REST Framework와 생성한 Application을 등록합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">INSTALLED_APPS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s">"django.contrib.admin"</span><span class="p">,</span>
+    <span class="s">"django.contrib.auth"</span><span class="p">,</span>
+    <span class="s">"django.contrib.contenttypes"</span><span class="p">,</span>
+    <span class="s">"django.contrib.sessions"</span><span class="p">,</span>
+    <span class="s">"django.contrib.messages"</span><span class="p">,</span>
+    <span class="s">"django.contrib.staticfiles"</span><span class="p">,</span>
+    <span class="s">"rest_framework"</span><span class="p">,</span>
+    <span class="s">"api"</span><span class="p">,</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p>Time Zone을 설정합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">TIME_ZONE</span> <span class="o">=</span> <span class="s">"Asia/Seoul"</span>
+<span class="n">USE_TZ</span> <span class="o">=</span> <span class="bp">True</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">USE_TZ = True</code>이면 Django는 내부 DateTime을 UTC 기준으로 다루고 표시 단계에서 설정한 Time Zone으로 변환합니다.</p>
+
+<h2 id="6-local-환경-변수-설정">6. Local 환경 변수 설정</h2>
+
+<hr />
+
+<p>Local Shell에서 개발용 값을 설정합니다. <code class="language-plaintext highlighter-rouge">&lt;LOCAL_DEVELOPMENT_SECRET&gt;</code>에는 실제 운영 Secret과 다른 충분히 긴 임의 값을 사용합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">export </span><span class="nv">DJANGO_SECRET_KEY</span><span class="o">=</span><span class="s1">'&lt;LOCAL_DEVELOPMENT_SECRET&gt;'</span>
+<span class="nb">export </span><span class="nv">DJANGO_ALLOWED_HOSTS</span><span class="o">=</span><span class="s1">'127.0.0.1,localhost'</span>
+</code></pre></div></div>
+
+<p>운영 환경에서는 ECS Task Definition의 평문 Environment Variable에 Secret을 직접 입력하지 않고 AWS Secrets Manager 또는 Systems Manager Parameter Store를 이용해 주입합니다. 실제 값과 <code class="language-plaintext highlighter-rouge">.env</code> File은 Git에 Commit하지 않습니다.</p>
+
+<p>환경 변수 이름만 확인하고 값은 출력하지 않습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">test</span> <span class="nt">-n</span> <span class="s2">"</span><span class="nv">$DJANGO_SECRET_KEY</span><span class="s2">"</span> <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s1">'DJANGO_SECRET_KEY is set'</span>
+</code></pre></div></div>
+
+<h2 id="7-rest-api-view-작성">7. REST API View 작성</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">api/views.py</code>에 GET 요청을 처리하는 View를 작성합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">rest_framework</span> <span class="kn">import</span> <span class="n">status</span>
+<span class="kn">from</span> <span class="nn">rest_framework.decorators</span> <span class="kn">import</span> <span class="n">api_view</span>
+<span class="kn">from</span> <span class="nn">rest_framework.response</span> <span class="kn">import</span> <span class="n">Response</span>
+
+
+<span class="o">@</span><span class="n">api_view</span><span class="p">([</span><span class="s">"GET"</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s">"result"</span><span class="p">:</span> <span class="s">"success"</span><span class="p">,</span>
+        <span class="s">"data"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s">"id"</span><span class="p">:</span> <span class="s">"user-001"</span><span class="p">,</span> <span class="s">"name"</span><span class="p">:</span> <span class="s">"Example User"</span><span class="p">},</span>
+            <span class="p">{</span><span class="s">"id"</span><span class="p">:</span> <span class="s">"user-002"</span><span class="p">,</span> <span class="s">"name"</span><span class="p">:</span> <span class="s">"Sample User"</span><span class="p">},</span>
+        <span class="p">],</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">Response</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="n">status</span><span class="p">.</span><span class="n">HTTP_200_OK</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">@api_view(["GET"])</code>는 허용할 HTTP Method를 제한하고 Django REST Framework가 Request와 Response를 처리하게 합니다. 다른 Method로 요청하면 <code class="language-plaintext highlighter-rouge">405 Method Not Allowed</code>가 반환됩니다.</p>
+
+<h2 id="8-application-url-구성">8. Application URL 구성</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">api/urls.py</code>를 새로 생성합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">django.urls</span> <span class="kn">import</span> <span class="n">path</span>
+
+<span class="kn">from</span> <span class="nn">.views</span> <span class="kn">import</span> <span class="n">index</span>
+
+
+<span class="n">app_name</span> <span class="o">=</span> <span class="s">"api"</span>
+
+<span class="n">urlpatterns</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">path</span><span class="p">(</span><span class="s">""</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s">"index"</span><span class="p">),</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p>Project의 <code class="language-plaintext highlighter-rouge">apiserver/urls.py</code>에서 <code class="language-plaintext highlighter-rouge">api</code> URL을 포함합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">django.contrib</span> <span class="kn">import</span> <span class="n">admin</span>
+<span class="kn">from</span> <span class="nn">django.urls</span> <span class="kn">import</span> <span class="n">include</span><span class="p">,</span> <span class="n">path</span>
+
+
+<span class="n">urlpatterns</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">path</span><span class="p">(</span><span class="s">"admin/"</span><span class="p">,</span> <span class="n">admin</span><span class="p">.</span><span class="n">site</span><span class="p">.</span><span class="n">urls</span><span class="p">),</span>
+    <span class="n">path</span><span class="p">(</span><span class="s">"api/"</span><span class="p">,</span> <span class="n">include</span><span class="p">(</span><span class="s">"api.urls"</span><span class="p">)),</span>
+<span class="p">]</span>
+</code></pre></div></div>
+
+<p>Routing 흐름은 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>GET /api/
+  ↓ apiserver/urls.py
+include("api.urls")
+  ↓ api/urls.py
+index View
+  ↓
+JSON Response
+</code></pre></div></div>
+
+<h2 id="9-database-초기화와-설정-점검">9. Database 초기화와 설정 점검</h2>
+
+<hr />
+
+<p>Django 기본 Application이 사용하는 Database Table을 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py migrate
+</code></pre></div></div>
+
+<p>Project 설정과 URL 구성을 점검합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py check
+</code></pre></div></div>
+
+<p>Migration 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py showmigrations
+</code></pre></div></div>
+
+<p>기본 설정은 Local SQLite File을 사용합니다. Container를 교체하면 Container 내부의 SQLite File도 사라질 수 있으므로 운영 ECS 환경에서는 RDS 같은 외부 Database와 Network·Credential 구성을 별도로 준비합니다.</p>
+
+<h2 id="10-api-test-작성">10. API Test 작성</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">api/tests.py</code>에 Endpoint의 Status Code와 JSON 구조를 검증하는 Test를 작성합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">django.test</span> <span class="kn">import</span> <span class="n">TestCase</span>
+<span class="kn">from</span> <span class="nn">django.urls</span> <span class="kn">import</span> <span class="n">reverse</span>
+
+
+<span class="k">class</span> <span class="nc">IndexApiTest</span><span class="p">(</span><span class="n">TestCase</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">test_index_returns_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="n">reverse</span><span class="p">(</span><span class="s">"api:index"</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="p">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">response</span><span class="p">.</span><span class="n">status_code</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="n">response</span><span class="p">.</span><span class="n">json</span><span class="p">()[</span><span class="s">"result"</span><span class="p">],</span> <span class="s">"success"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">assertEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">response</span><span class="p">.</span><span class="n">json</span><span class="p">()[</span><span class="s">"data"</span><span class="p">]),</span> <span class="mi">2</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Test를 실행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py <span class="nb">test</span>
+</code></pre></div></div>
+
+<p>Test가 통과해야 Build Pipeline이 다음 단계로 진행하도록 CI에 연결할 수 있습니다.</p>
+
+<h2 id="11-개발-server-실행과-검증">11. 개발 Server 실행과 검증</h2>
+
+<hr />
+
+<p>Django 개발 Server를 Local Loopback Address에서 실행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python manage.py runserver 127.0.0.1:8000
+</code></pre></div></div>
+
+<p>다른 Terminal에서 API를 호출합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-i</span> http://127.0.0.1:8000/api/
+</code></pre></div></div>
+
+<p>예상 Body는 다음과 같습니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"result"</span><span class="p">:</span><span class="w"> </span><span class="s2">"success"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user-001"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Example User"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user-002"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Sample User"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>지원하지 않는 Method가 거부되는지도 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-i</span> <span class="nt">-X</span> POST http://127.0.0.1:8000/api/
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">runserver</code>는 개발용이며 Production Traffic을 처리하도록 설계되지 않았습니다. Container 배포에서는 Gunicorn 같은 Production WSGI Server 또는 요구 사항에 맞는 ASGI Server를 사용합니다.</p>
+
+<h2 id="12-의존성-고정">12. 의존성 고정</h2>
+
+<hr />
+
+<p>현재 가상환경의 Package Version을 <code class="language-plaintext highlighter-rouge">requirements.txt</code>로 저장합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> pip freeze <span class="o">&gt;</span> requirements.txt
+</code></pre></div></div>
+
+<p>생성된 File을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sed</span> <span class="nt">-n</span> <span class="s1">'1,120p'</span> requirements.txt
+</code></pre></div></div>
+
+<p>다른 환경에서 동일한 의존성을 설치할 때 사용합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python <span class="nt">-m</span> pip <span class="nb">install</span> <span class="nt">-r</span> requirements.txt
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">pip freeze</code>는 직접 설치하지 않은 하위 의존성도 모두 기록합니다. 운영 Project에서는 Dependabot 같은 도구로 취약점과 Update를 관리하고 변경 후 Test를 수행합니다.</p>
+
+<h2 id="13-container-배포-전-점검">13. Container 배포 전 점검</h2>
+
+<hr />
+
+<p>Application을 Image로 만들기 전에 다음 항목을 확인합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>점검 항목</th>
+      <th>확인 방법</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>설정 오류</td>
+      <td><code class="language-plaintext highlighter-rouge">python manage.py check</code></td>
+    </tr>
+    <tr>
+      <td>Unit Test</td>
+      <td><code class="language-plaintext highlighter-rouge">python manage.py test</code></td>
+    </tr>
+    <tr>
+      <td>의존성 고정</td>
+      <td><code class="language-plaintext highlighter-rouge">requirements.txt</code> 생성·재설치 확인</td>
+    </tr>
+    <tr>
+      <td>Secret 분리</td>
+      <td>실제 Secret이 Source와 Git History에 없는지 검사</td>
+    </tr>
+    <tr>
+      <td>Host 제한</td>
+      <td>운영 Domain과 Health Check Host만 허용</td>
+    </tr>
+    <tr>
+      <td>Database</td>
+      <td>Container 외부 Database와 Migration 전략 준비</td>
+    </tr>
+    <tr>
+      <td>Static File</td>
+      <td><code class="language-plaintext highlighter-rouge">collectstatic</code>과 S3·CloudFront 사용 여부 결정</td>
+    </tr>
+    <tr>
+      <td>Process Server</td>
+      <td><code class="language-plaintext highlighter-rouge">runserver</code> 대신 Production WSGI·ASGI Server 선택</td>
+    </tr>
+    <tr>
+      <td>Health Check</td>
+      <td>Container와 Load Balancer가 호출할 Endpoint 정의</td>
+    </tr>
+    <tr>
+      <td>Log</td>
+      <td>Standard Output·Error로 출력해 중앙 수집 준비</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>현재 단계의 요청 흐름은 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Local Client
+  ↓ GET /api/
+Django Development Server
+  ↓ URL Resolver
+DRF Function View
+  ↓
+JSON Response
+</code></pre></div></div>
+
+<p>후속 Container 배포에서는 <code class="language-plaintext highlighter-rouge">Dockerfile → Image Build → ECR Push → ECS Task Definition → ECS Service</code> 흐름으로 확장합니다. 이 글에는 아직 Dockerfile, ECR Repository와 ECS Resource를 생성하는 절차를 포함하지 않습니다.</p>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Django Project는 전체 설정과 Root URL을 관리하고 Application은 실제 기능을 분리합니다.</p>
+    </li>
+    <li>
+      <p><code class="language-plaintext highlighter-rouge">SECRET_KEY</code>와 허용 Host는 환경 변수로 주입하고 실제 값을 Repository에 저장하지 않습니다.</p>
+    </li>
+    <li>
+      <p>REST Endpoint는 Application URL을 Project URL에 포함해 연결합니다.</p>
+    </li>
+    <li>
+      <p><code class="language-plaintext highlighter-rouge">check</code>, Test와 Local HTTP 호출을 통과한 Application을 다음 단계에서 Container Image로 만듭니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.djangoproject.com/en/5.2/intro/tutorial01/">Django 5.2 첫 Application 작성</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/">Django 배포 점검 목록</a></p>
+  </li>
+  <li>
+    <p><a href="https://www.django-rest-framework.org/#installation">Django REST Framework 설치</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.python.org/3/library/venv.html">Python venv</a></p>
+  </li>
+</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[Python 가상환경에서 Django Project와 REST API Application을 만들고 설정·URL·검증 절차를 Container 배포 전 단계까지 구성합니다]]></summary></entry><entry><title type="html">DynamoDB·ElastiCache와 Amazon DocumentDB</title><link href="https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb/" rel="alternate" type="text/html" title="DynamoDB·ElastiCache와 Amazon DocumentDB" /><published>2026-09-30T00:00:00+09:00</published><updated>2026-09-30T00:00:00+09:00</updated><id>https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb</id><content type="html" xml:base="https://hyn128.site/cloud-08-aws-dynamodb-elasticache-documentdb/"><![CDATA[<h2 id="요약">요약</h2>
 
 <hr />
 
@@ -1574,7 +3322,9 @@ Private S3 Bucket
   <li>
     <p><a href="https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/getting-started-secure-static-website-cloudformation-template.html">CloudFront와 Private S3를 이용한 정적 Website</a></p>
   </li>
-</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다]]></summary></entry><entry><title type="html">EC2 Snapshot·AMI와 Auto Scaling 실습</title><link href="https://hyn128.site/cloud-06-aws-ec2-image-auto-scaling/" rel="alternate" type="text/html" title="EC2 Snapshot·AMI와 Auto Scaling 실습" /><published>2026-09-29T00:00:00+09:00</published><updated>2026-09-29T00:00:00+09:00</updated><id>https://hyn128.site/cloud-06-aws-ec2-image-auto-scaling</id><content type="html" xml:base="https://hyn128.site/cloud-06-aws-ec2-image-auto-scaling/"><![CDATA[<h2 id="요약">요약</h2>
+</ul>
+
+<p>다음 글인 <a href="/cloud-11-aws-s3-cloudfront-github-actions/">S3·CloudFront 정적 Website와 GitHub Actions 배포</a>에서는 Private S3 Origin, CloudFront와 GitHub Actions OIDC를 연결해 정적 Website를 배포합니다.</p>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[AWS Storage Gateway와 S3 Lifecycle을 이용한 Backup 구조를 비교하고 Private S3 Bucket에 Spring Boot Application이 File을 안전하게 업로드하는 방법을 정리합니다]]></summary></entry><entry><title type="html">EC2 Snapshot·AMI와 Auto Scaling 실습</title><link href="https://hyn128.site/cloud-06-aws-ec2-image-auto-scaling/" rel="alternate" type="text/html" title="EC2 Snapshot·AMI와 Auto Scaling 실습" /><published>2026-09-29T00:00:00+09:00</published><updated>2026-09-29T00:00:00+09:00</updated><id>https://hyn128.site/cloud-06-aws-ec2-image-auto-scaling</id><content type="html" xml:base="https://hyn128.site/cloud-06-aws-ec2-image-auto-scaling/"><![CDATA[<h2 id="요약">요약</h2>
 
 <hr />
 
@@ -4401,1132 +6151,4 @@ Launch Template + AMI
   <li>
     <p><a href="https://aws.amazon.com/elasticloadbalancing/pricing/">Elastic Load Balancing 요금</a></p>
   </li>
-</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[EC2 Instance 생성과 SSH 접속, Security Group, Elastic IP, ALB와 Auto Scaling Group을 연결해 여러 Availability Zone에 분산된 고가용성 구조를 구성합니다]]></summary></entry><entry><title type="html">Ubuntu에서 계정별 명령 로그를 Slack WebHook으로 기록하기</title><link href="https://hyn128.site/project-1-orbit-command-logging/" rel="alternate" type="text/html" title="Ubuntu에서 계정별 명령 로그를 Slack WebHook으로 기록하기" /><published>2026-09-24T00:00:00+09:00</published><updated>2026-09-24T00:00:00+09:00</updated><id>https://hyn128.site/project-1-orbit-command-logging</id><content type="html" xml:base="https://hyn128.site/project-1-orbit-command-logging/"><![CDATA[<h2 id="요약">요약</h2>
-<blockquote>
-  <p>여러 사용자가 함께 사용하는 Production·Development Ubuntu 서버의 작업 이력을 추적하기 위해 <code class="language-plaintext highlighter-rouge">auditd</code>와 Slack Webhook을 연동한 명령 로깅 시스템을 구축했습니다. 일반 사용자의 프로그램 실행과 <code class="language-plaintext highlighter-rouge">sudo</code> 사용 내역을 수집해 서버별, 사용자와 권한별 Slack 채널로 전송하고, Webhook 보호와 <code class="language-plaintext highlighter-rouge">systemd</code>를 이용한 상시 실행 과정까지 정리합니다.</p>
-</blockquote>
-
-<hr />
-<h2 id="1-아이디어">1. 아이디어</h2>
-
-<blockquote>
-  <p>교육장에서 받은 서버와 홈서버를 각각 Production, Development 서버로 두기로 했습니다.
-이 과정에서 팀원은 모두 개인의 계정을 갖고, <code class="language-plaintext highlighter-rouge">sudo</code> 를 포함한 명령을 사용하게 되는데 추후 트러블 슈팅 또는 본인의 작업 내역을 확인하기 위한 기록이 필요하다고 느껴 로깅 시스템 구축의 필요성을 느꼈습니다.</p>
-</blockquote>
-
-<p>먼저 저희가 협업 과정에서 활용할 구조는 다음과 같습니다.</p>
-<ol>
-  <li>Slack - 팀원별 소통 및 웹훅 애플리케이션 관리</li>
-  <li>Jira/Github - 프로젝트 및 이슈 관리</li>
-  <li>DevServer - Ubuntu Server에서 가용 최대 리소스로 개발 및 테스트를 위한 서버로 활용
-    <ul>
-      <li>libvirt와 KVM으로 Orbit 호스트 VM 생성해 사용</li>
-      <li>VM 내에서는 각 사용자별 디렉토리 내에서 작업 및 테스트</li>
-    </ul>
-  </li>
-</ol>
-
-<p>이 구조에서 각 팀원들의 명령이 <code class="language-plaintext highlighter-rouge">sudo</code>로 사용될 수 있어야하고, 다른 사용자 환경에도 영향을 미칠 수 있다고 생각했습니다.</p>
-
-<p>또한 개발 및 테스트 과정에서 문제를 해결한 과정 또는 공유할 내용을 그때마다 기록하기에는 어려울 수 있으므로, 대신 명령 시퀀스를 타임라인으로 볼 수 있는 기록이 필요하다고 생각했습니다.</p>
-
-<h2 id="2-slack에-log-수집-채널-및-log-애플리케이션-생성">2. Slack에 Log 수집 채널 및 Log 애플리케이션 생성</h2>
-
-<p>먼저 Slack에 각 서버별, 명령 권한(사용자) 별 로그 수집 채널을 생성해주었습니다.</p>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/25.webp" alt="" /></p>
-
-<p>이후 <a href="https://api.slack.com/apps">Slack API</a> 에서 Application을 생성하고 아래와 같이 진행했습니다.</p>
-<ol>
-  <li>Create New App → Blank App → Continue</li>
-  <li>App Name: Orbit Log</li>
-  <li>사용할 워크스페이스 선택</li>
-  <li>Create APP</li>
-</ol>
-
-<h2 id="3-webhook-생성">3. Webhook 생성</h2>
-
-<p>앱이 생성되고 앱 설정 화면으로 넘어가면 왼쪽 메뉴에서 <code class="language-plaintext highlighter-rouge">Features → Incomming Webhooks</code>로 진입합니다.</p>
-
-<p>이후 같은 페이지에서 <code class="language-plaintext highlighter-rouge">Add New Webhook to Workspace</code>를 선택해 훅을 수신할 채널을 전부 생성해줍니다.</p>
-
-<p>저희 환경에서는 최종적으로 아래와 같은 구조가 구성됐습니다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Orbit Log (Slack App)
-│
-├─ webhook → #prod-orbit
-├─ webhook → #prod-sudo
-├─ webhook → #prod-hyn128
-├─ webhook → #prod-jyvnee
-├─ webhook → #prod-sungahbak
-├─ webhook → #prod-xoruddl
-│
-├─ webhook → #dev-orbit
-├─ webhook → #dev-sudo
-├─ webhook → #dev-hyn128
-├─ webhook → #dev-jyvnee
-├─ webhook → #dev-sungahbak
-├─ webhook → #dev-xoruddl
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/07.webp" alt="" /></p>
-
-<blockquote>
-  <p>생성된 Webhook은 공개 될 경우 URL 만으로도 아주 쉽게 해당 채널로 데이터를 보낼 수 있으므로 공개에 주의합니다.</p>
-</blockquote>
-
-<p>생성된 Webhook은 <code class="language-plaintext highlighter-rouge">curl</code>을 이용해 아래처럼 테스트 해볼 수 있습니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-X</span> POST <span class="se">\</span>
-  <span class="nt">-H</span> <span class="s1">'Content-type: application/json'</span> <span class="se">\</span>
-  <span class="nt">--data</span> <span class="s1">'{"text":"[DEV] Ubuntu sudo log test"}'</span> <span class="se">\</span>
-  <span class="s1">'여기에_WEBHOOK_URL'</span>
-</code></pre></div></div>
-
-<h2 id="4-ubuntu에-webhook-설정-파일-구축-및-패키지-설치">4. Ubuntu에 Webhook 설정 파일 구축 및 패키지 설치</h2>
-
-<p>Production 서버와 Development 서버 모두 과정은 비슷하므로, Dev 서버를 기준으로 작성합니다.</p>
-
-<p>개발 서버 기준으로 다시 정리하면 목표는 아래와 같습니다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>orbit 명령      → #dev-1-orbit (관리용 계정)
-sudo 전체       → #dev-2-sudo
-hyn128 명령     → #dev-hyn128
-jyvnee 명령     → #dev-jyvnee
-sungahbak 명령  → #dev-sungahbak
-xoruddl 명령    → #dev-xoruddl
-</code></pre></div></div>
-
-<h3 id="1-디렉토리-구성">1) 디렉토리 구성</h3>
-
-<p>먼저 스크립트를 담을 디렉토리를 <code class="language-plaintext highlighter-rouge">-p</code> 옵션으로 일괄 생성하고, 해당 디렉토리로 이동합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">mkdir</span> <span class="nt">-p</span> ~/slack-log/scripts
-<span class="nb">cd</span> ~/slack-log
-</code></pre></div></div>
-
-<p>사용하게 될 구조는 다음과 같습니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/home/orbit/slack-log/       <span class="c"># Slack 명령 모니터링 관련 파일 관리</span>
-├── webhook.env              <span class="c"># 사용자별 Slack Webhook URL 및 환경변수 저장</span>
-└── scripts/
-    └── command-monitor.sh   <span class="c"># Audit 로그 감시, 사용자별 명령 분기 및 Slack 전송</span>
-</code></pre></div></div>
-
-<blockquote>
-  <p><strong>root가 아닌 사용자 디렉토리에 구성하는 이유</strong></p>
-
-  <p>/root에 스크립트를 두면 수정과 실행 시마다 root 권한이 필요하고, 일반 사용자의 접근도 제한됩니다. 따라서 현재 협업 환경에서는 root 권한이 반드시 필요한 파일이 아니었고, 사용자의 홈 디렉토리에서 관리하여 필요한 작업에만 <code class="language-plaintext highlighter-rouge">sudo</code>를 사용하는 방식이 권한 관리와 유지보수 측면에서 적절하다고 판단했습니다.</p>
-</blockquote>
-
-<h3 id="2-webhook-설정">2) Webhook 설정</h3>
-
-<p>각 채널별 웹훅을 담을 환경변수 파일을 먼저 생성합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>nano webhook.env
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/11.webp" alt="" /></p>
-
-<p>이후 다음처럼 권한을 설정합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">chmod </span>600 ~/slack-log/webhook.env
-</code></pre></div></div>
-
-<p><code class="language-plaintext highlighter-rouge">webhook.env</code>는 <code class="language-plaintext highlighter-rouge">Slack Webhook URL</code> 같은 비밀 값이 들어가므로 <code class="language-plaintext highlighter-rouge">600</code>으로 설정했습니다.</p>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/13.webp" alt="" /></p>
-
-<p><code class="language-plaintext highlighter-rouge">600</code>의 상세 권한은 아래와 같습니다.</p>
-<ul>
-  <li>소유자(owner) : 6 = 읽기(r) + 쓰기(w)</li>
-  <li>그룹(group)   : 0 = 권한 없음</li>
-  <li>기타(others) : 0 = 권한 없음</li>
-</ul>
-
-<blockquote>
-  <p>orbit       → 읽기/수정 가능
-다른 사용자 → 읽기 불가능</p>
-</blockquote>
-
-<h3 id="3-auditd-설치">3) auditd 설치</h3>
-
-<p>다음으로 사용자별 명령 실행 내역을 수집하기 Linux의 감사 패키지인 <code class="language-plaintext highlighter-rouge">auditd</code>를 설치합니다.</p>
-
-<p>먼저 패키지 목록을 갱신한 후 필요한 패키지를 설치합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>apt update
-<span class="nb">sudo </span>apt <span class="nb">install</span> <span class="nt">-y</span> auditd audispd-plugins curl
-</code></pre></div></div>
-
-<p>각 패키지의 역할은 다음과 같습니다.</p>
-
-<ul>
-  <li><code class="language-plaintext highlighter-rouge">auditd</code> : Linux Audit 데몬으로, 명령 실행 등의 시스템 이벤트를 감사 로그로 기록</li>
-  <li><code class="language-plaintext highlighter-rouge">audispd-plugins</code> : Audit 이벤트를 다른 프로그램이나 외부 시스템과 연동하기 위한 플러그인 제공</li>
-  <li><code class="language-plaintext highlighter-rouge">curl</code> : 수집한 로그를 Slack Webhook으로 전송하기 위한 HTTP 요청 도구</li>
-</ul>
-
-<p>설치가 완료되면 <code class="language-plaintext highlighter-rouge">auditd</code>를 활성화하고 바로 실행합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl <span class="nb">enable</span> <span class="nt">--now</span> auditd
-</code></pre></div></div>
-
-<p>여기서 <code class="language-plaintext highlighter-rouge">enable</code>은 서버가 재부팅된 이후에도 <code class="language-plaintext highlighter-rouge">auditd</code>가 자동으로 실행되도록 설정하며, <code class="language-plaintext highlighter-rouge">--now</code>는 서비스 활성화와 동시에 현재 세션에서도 바로 실행하도록 합니다.</p>
-
-<p>마지막으로 정상적으로 실행되고 있는지 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl status auditd
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/15.webp" alt="" />
-사진과 같이 <code class="language-plaintext highlighter-rouge">active (running)</code> 로 정상적으로 동작하고 있는 것을 확인할 수 있습니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Active: active (running)
-</code></pre></div></div>
-
-<blockquote>
-  <p><strong>Shell History 대신 auditd를 사용하는 이유</strong></p>
-
-  <p><code class="language-plaintext highlighter-rouge">history</code>는 각 사용자의 Shell 환경에 종속되며 사용자가 직접 기록을 수정하거나 삭제할 수 있습니다. 반면 <code class="language-plaintext highlighter-rouge">auditd</code>는 Linux Audit 시스템을 통해 시스템 이벤트를 수집하므로, 여러 사용자가 함께 사용하는 서버에서 명령 실행 내역을 감사하기 위한 용도로 더 적합하다고 판단했습니다.</p>
-</blockquote>
-
-<h2 id="5-sudo-명령-audit-규칙-설정">5. sudo 명령 Audit 규칙 설정</h2>
-
-<p><code class="language-plaintext highlighter-rouge">auditd</code> 설치가 완료되었으므로 이제 <code class="language-plaintext highlighter-rouge">sudo</code> 명령 실행을 감지할 수 있도록 Audit 규칙을 설정합니다.</p>
-
-<h3 id="1-audit-규칙-파일-생성"><strong>1) Audit 규칙 파일 생성</strong></h3>
-
-<p><code class="language-plaintext highlighter-rouge">/etc/audit/rules.d/</code> 디렉토리에 사용자 명령 실행을 감시하기 위한 Audit 규칙 파일을 생성합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>nano /etc/audit/rules.d/command-monitor.rules
-</code></pre></div></div>
-
-<p>파일에 다음 내용을 추가합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nt">-a</span> always,exit <span class="nt">-F</span> <span class="nb">arch</span><span class="o">=</span>b64 <span class="nt">-S</span> execve <span class="nt">-F</span> auid&gt;<span class="o">=</span>1000 <span class="nt">-F</span> auid!<span class="o">=</span><span class="nb">unset</span> <span class="nt">-k</span> user_command
-<span class="nt">-a</span> always,exit <span class="nt">-F</span> <span class="nb">arch</span><span class="o">=</span>b32 <span class="nt">-S</span> execve <span class="nt">-F</span> auid&gt;<span class="o">=</span>1000 <span class="nt">-F</span> auid!<span class="o">=</span><span class="nb">unset</span> <span class="nt">-k</span> user_command
-</code></pre></div></div>
-
-<p>각 옵션의 의미는 다음과 같습니다.</p>
-
-<ul>
-  <li><code class="language-plaintext highlighter-rouge">-a always,exit</code> : 시스템 콜이 종료될 때 항상 Audit 이벤트를 기록</li>
-  <li><code class="language-plaintext highlighter-rouge">-F arch=b64</code>, <code class="language-plaintext highlighter-rouge">-F arch=b32</code> : 각각 64비트와 32비트 시스템 콜을 감시</li>
-  <li><code class="language-plaintext highlighter-rouge">-S execve</code> : 프로그램 실행에 사용되는 <code class="language-plaintext highlighter-rouge">execve</code> 시스템 콜을 감시</li>
-  <li><code class="language-plaintext highlighter-rouge">-F auid&gt;=1000</code> : 일반 사용자 계정에서 발생한 이벤트만 대상으로 지정</li>
-  <li><code class="language-plaintext highlighter-rouge">-F auid!=unset</code> : 로그인 사용자를 식별할 수 없는 이벤트를 제외</li>
-  <li><code class="language-plaintext highlighter-rouge">-k user_command</code> : 기록된 이벤트에 <code class="language-plaintext highlighter-rouge">user_command</code>라는 검색용 키를 부여</li>
-</ul>
-
-<p>즉, 일반 사용자가 실행한 프로그램의 <code class="language-plaintext highlighter-rouge">execve</code> 이벤트를 Audit 로그에 기록하고, 이후 <code class="language-plaintext highlighter-rouge">user_command</code> 키를 이용해 해당 로그를 조회할 수 있도록 설정합니다.
-<img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/31.webp" alt="" /></p>
-
-<p><code class="language-plaintext highlighter-rouge">/etc/audit/rules.d/</code>는 <code class="language-plaintext highlighter-rouge">auditd</code>의 영구 Audit 규칙을 관리하는 디렉토리입니다. 이곳에 규칙 파일을 작성하면 재부팅 이후에도 규칙을 다시 적용할 수 있습니다.</p>
-
-<h3 id="2-audit-규칙-적용"><strong>2) Audit 규칙 적용</strong></h3>
-
-<p>작성한 규칙을 현재 시스템에 적용합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>augenrules <span class="nt">--load</span>
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/19.webp" alt="" />
-<code class="language-plaintext highlighter-rouge">augenrules</code>는 <code class="language-plaintext highlighter-rouge">/etc/audit/rules.d/</code>에 작성된 규칙들을 읽어 Audit 시스템에 적용합니다.</p>
-
-<p>적용된 규칙은 다음 명령으로 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>auditctl <span class="nt">-l</span> | <span class="nb">grep </span>user_command
-</code></pre></div></div>
-
-<p>앞에서 작성한 <code class="language-plaintext highlighter-rouge">user_command</code> 규칙이 출력된다면 정상적으로 적용된 것입니다.</p>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/33.webp" alt="" /></p>
-
-<h3 id="3-sudo-실행-및-audit-로그-확인"><strong>3) sudo 실행 및 Audit 로그 확인</strong></h3>
-
-<p>실제로 <code class="language-plaintext highlighter-rouge">sudo</code> 명령을 실행하여 Audit 이벤트가 기록되는지 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo whoami</span>
-</code></pre></div></div>
-
-<p>정상적으로 실행되면 다음과 같이 출력됩니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>root
-</code></pre></div></div>
-
-<p>이후 <code class="language-plaintext highlighter-rouge">sudo_command</code> 키를 기준으로 최근 Audit 로그를 조회합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>ausearch <span class="nt">-k</span> user_command <span class="nt">-i</span> <span class="nt">--start</span> recent
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/23.webp" alt="" /></p>
-
-<p>여기서 <code class="language-plaintext highlighter-rouge">-k user_command</code>는 앞에서 설정한 키를 가진 이벤트만 조회하고, <code class="language-plaintext highlighter-rouge">-i</code>는 UID 등의 값을 사람이 읽기 쉬운 형태로 변환하여 출력합니다.</p>
-
-<p>현재 단계에서는 Audit 로그가 정상적으로 수집되는지 확인하는 것이 목적입니다. 이후 수집된 원본 로그에서 필요한 정보를 추출하여 Slack으로 전송하도록 구성합니다.</p>
-
-<p>최종적으로 Slack에 전달할 정보는 다음 5개로 정했습니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>User    : 명령을 실행한 사용자
-Time    : 명령 실행 시간
-Command : 실행한 명령
-PWD     : 명령을 실행한 디렉토리
-Run as  : sudo를 통해 명령을 실행한 대상 사용자
-</code></pre></div></div>
-
-<p><code class="language-plaintext highlighter-rouge">TTY</code>, PID, UID/GID 등의 정보도 Audit 로그에 포함될 수 있지만, Slack에서는 명령 실행 내역과 트러블 슈팅에 필요한 정보만 추출하여 전달하도록 구성합니다.</p>
-
-<h2 id="6-사용자별-명령-slack-전송-스크립트-작성">6. 사용자별 명령 Slack 전송 스크립트 작성</h2>
-
-<p>앞에서 설정한 <code class="language-plaintext highlighter-rouge">user_command</code> Audit 로그를 실시간으로 감시하고, 실행한 사용자에 따라 각 Slack 채널로 로그를 전송하도록 스크립트를 작성합니다.</p>
-
-<p>로그는 다음과 같이 분기하도록 구성했습니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>일반 명령
-└─ 해당 사용자 채널
-
-sudo 명령
-├─ 해당 사용자 채널
-└─ sudo 전용 채널
-</code></pre></div></div>
-
-<p>또한 Slack에서 로그를 쉽게 구분할 수 있도록 일반 명령과 <code class="language-plaintext highlighter-rouge">sudo</code> 명령의 Attachment 색상을 다르게 설정하고, 주요 항목은 굵게 표시하도록 구성했습니다.</p>
-
-<p>스크립트 파일을 생성합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>nano ~/slack-log/scripts/command-monitor.sh
-</code></pre></div></div>
-
-<p>다음 내용을 작성합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">#!/bin/bash</span>
-
-<span class="nb">set</span> <span class="nt">-u</span>
-
-<span class="nb">source</span> /home/orbit/slack-log/webhook.env
-
-<span class="nv">AUDIT_LOG</span><span class="o">=</span><span class="s2">"/var/log/audit/audit.log"</span>
-
-send_slack<span class="o">()</span> <span class="o">{</span>
-    <span class="nb">local </span><span class="nv">webhook</span><span class="o">=</span><span class="s2">"</span><span class="nv">$1</span><span class="s2">"</span>
-    <span class="nb">local type</span><span class="o">=</span><span class="s2">"</span><span class="nv">$2</span><span class="s2">"</span>
-    <span class="nb">local </span><span class="nv">user</span><span class="o">=</span><span class="s2">"</span><span class="nv">$3</span><span class="s2">"</span>
-    <span class="nb">local time</span><span class="o">=</span><span class="s2">"</span><span class="nv">$4</span><span class="s2">"</span>
-    <span class="nb">local command</span><span class="o">=</span><span class="s2">"</span><span class="nv">$5</span><span class="s2">"</span>
-    <span class="nb">local </span><span class="nv">pwd_value</span><span class="o">=</span><span class="s2">"</span><span class="nv">$6</span><span class="s2">"</span>
-    <span class="nb">local </span><span class="nv">run_as</span><span class="o">=</span><span class="s2">"</span><span class="nv">$7</span><span class="s2">"</span>
-
-    <span class="o">[</span> <span class="nt">-z</span> <span class="s2">"</span><span class="nv">$webhook</span><span class="s2">"</span> <span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="k">return
-
-    </span><span class="nb">local </span>payload
-
-    <span class="nv">payload</span><span class="o">=</span><span class="si">$(</span>python3 - <span class="se">\</span>
-        <span class="s2">"</span><span class="nv">$type</span><span class="s2">"</span> <span class="se">\</span>
-        <span class="s2">"</span><span class="nv">$user</span><span class="s2">"</span> <span class="se">\</span>
-        <span class="s2">"</span><span class="nv">$time</span><span class="s2">"</span> <span class="se">\</span>
-        <span class="s2">"</span><span class="nv">$command</span><span class="s2">"</span> <span class="se">\</span>
-        <span class="s2">"</span><span class="nv">$pwd_value</span><span class="s2">"</span> <span class="se">\</span>
-        <span class="s2">"</span><span class="nv">$run_as</span><span class="s2">"</span> <span class="o">&lt;&lt;</span><span class="sh">'</span><span class="no">PY</span><span class="sh">'
-import json
-import sys
-
-type_, user, time, command, pwd, run_as = sys.argv[1:]
-
-if type_ == "SUDO":
-    color = "#E01E5A"
-    title = "SUDO Command"
-else:
-    color = "#2EB67D"
-    title = "Command"
-
-payload = {
-    "attachments": [
-        {
-            "color": color,
-            "mrkdwn_in": ["text"],
-            "text": (
-                f"*{title}*</span><span class="se">\n\n</span><span class="sh">"
-                f"*User*</span><span class="se">\n</span><span class="sh">`{user}`</span><span class="se">\n\n</span><span class="sh">"
-                f"*Run as*</span><span class="se">\n</span><span class="sh">`{run_as}`</span><span class="se">\n\n</span><span class="sh">"
-                f"*Time*</span><span class="se">\n</span><span class="sh">{time}</span><span class="se">\n\n</span><span class="sh">"
-                f"*PWD*</span><span class="se">\n</span><span class="sh">`{pwd}`</span><span class="se">\n\n</span><span class="sh">"
-                f"*Command*</span><span class="se">\n</span><span class="sh">```{command}```"
-            )
-        }
-    ]
-}
-
-print(json.dumps(payload))
-</span><span class="no">PY
-</span><span class="si">)</span>
-
-    curl <span class="nt">-fsS</span> <span class="se">\</span>
-        <span class="nt">-H</span> <span class="s1">'Content-Type: application/json'</span> <span class="se">\</span>
-        <span class="nt">--data</span> <span class="s2">"</span><span class="nv">$payload</span><span class="s2">"</span> <span class="se">\</span>
-        <span class="s2">"</span><span class="nv">$webhook</span><span class="s2">"</span> <span class="se">\</span>
-        <span class="o">&gt;</span>/dev/null 2&gt;&amp;1
-<span class="o">}</span>
-
-get_user_webhook<span class="o">()</span> <span class="o">{</span>
-    <span class="k">case</span> <span class="s2">"</span><span class="nv">$1</span><span class="s2">"</span> <span class="k">in
-        </span>orbit<span class="p">)</span>
-            <span class="nb">echo</span> <span class="s2">"</span><span class="nv">$DEV_ORBIT_WEBHOOK</span><span class="s2">"</span>
-            <span class="p">;;</span>
-        hyn128<span class="p">)</span>
-            <span class="nb">echo</span> <span class="s2">"</span><span class="nv">$DEV_HYN128_WEBHOOK</span><span class="s2">"</span>
-            <span class="p">;;</span>
-        jyvnee<span class="p">)</span>
-            <span class="nb">echo</span> <span class="s2">"</span><span class="nv">$DEV_JYVNEE_WEBHOOK</span><span class="s2">"</span>
-            <span class="p">;;</span>
-        sungahbak<span class="p">)</span>
-            <span class="nb">echo</span> <span class="s2">"</span><span class="nv">$DEV_SUNGAHBAK_WEBHOOK</span><span class="s2">"</span>
-            <span class="p">;;</span>
-        xoruddl<span class="p">)</span>
-            <span class="nb">echo</span> <span class="s2">"</span><span class="nv">$DEV_XORUDDL_WEBHOOK</span><span class="s2">"</span>
-            <span class="p">;;</span>
-        <span class="k">*</span><span class="p">)</span>
-            <span class="nb">echo</span> <span class="s2">""</span>
-            <span class="p">;;</span>
-    <span class="k">esac</span>
-<span class="o">}</span>
-
-<span class="nb">tail</span> <span class="nt">-Fn0</span> <span class="s2">"</span><span class="nv">$AUDIT_LOG</span><span class="s2">"</span> | <span class="k">while </span><span class="nv">IFS</span><span class="o">=</span> <span class="nb">read</span> <span class="nt">-r</span> line<span class="p">;</span> <span class="k">do</span>
-
-    <span class="c"># user_command SYSCALL 이벤트만 처리</span>
-    <span class="o">[[</span> <span class="s2">"</span><span class="nv">$line</span><span class="s2">"</span> <span class="o">!=</span> <span class="nb">type</span><span class="o">=</span>SYSCALL<span class="k">*</span> <span class="o">]]</span> <span class="o">&amp;&amp;</span> <span class="k">continue</span>
-    <span class="o">[[</span> <span class="s2">"</span><span class="nv">$line</span><span class="s2">"</span> <span class="o">!=</span> <span class="k">*</span><span class="s1">'key="user_command"'</span><span class="k">*</span> <span class="o">]]</span> <span class="o">&amp;&amp;</span> <span class="k">continue</span>
-
-    <span class="c"># Audit Event ID 추출</span>
-    <span class="nv">EVENT_ID</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$line</span><span class="s2">"</span> |
-        <span class="nb">sed</span> <span class="nt">-n</span> <span class="s1">'s/.*msg=audit([^:]*:\([0-9]\+\)).*/\1/p'</span><span class="si">)</span>
-
-    <span class="o">[</span> <span class="nt">-z</span> <span class="s2">"</span><span class="nv">$EVENT_ID</span><span class="s2">"</span> <span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="k">continue</span>
-
-    <span class="c"># 현재 읽은 SYSCALL 로그 사용</span>
-    <span class="nv">SYSCALL_LINE</span><span class="o">=</span><span class="s2">"</span><span class="nv">$line</span><span class="s2">"</span>
-
-    <span class="c"># 실제 로그인 사용자</span>
-    <span class="nv">USER_NAME</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$SYSCALL_LINE</span><span class="s2">"</span> |
-        <span class="nb">sed</span> <span class="nt">-n</span> <span class="s1">'s/.*AUID="\([^"]*\)".*/\1/p'</span><span class="si">)</span>
-
-    <span class="c"># 실행 파일</span>
-    <span class="nv">EXE</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$SYSCALL_LINE</span><span class="s2">"</span> |
-        <span class="nb">sed</span> <span class="nt">-n</span> <span class="s1">'s/.*exe="\([^"]*\)".*/\1/p'</span><span class="si">)</span>
-
-    <span class="o">[</span> <span class="nt">-z</span> <span class="s2">"</span><span class="nv">$USER_NAME</span><span class="s2">"</span> <span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="k">continue</span>
-
-    <span class="c"># 사용자별 Webhook 선택</span>
-    <span class="nv">USER_WEBHOOK</span><span class="o">=</span><span class="si">$(</span>get_user_webhook <span class="s2">"</span><span class="nv">$USER_NAME</span><span class="s2">"</span><span class="si">)</span>
-
-    <span class="o">[</span> <span class="nt">-z</span> <span class="s2">"</span><span class="nv">$USER_WEBHOOK</span><span class="s2">"</span> <span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="k">continue</span>
-
-    <span class="c"># EXECVE와 CWD 이벤트가 기록될 시간 확보</span>
-    <span class="nb">sleep </span>0.2
-
-    <span class="nv">EVENT</span><span class="o">=</span><span class="si">$(</span>ausearch <span class="nt">-a</span> <span class="s2">"</span><span class="nv">$EVENT_ID</span><span class="s2">"</span> <span class="nt">-i</span> <span class="nt">--just-one</span> 2&gt;/dev/null<span class="si">)</span>
-
-    <span class="o">[</span> <span class="nt">-z</span> <span class="s2">"</span><span class="nv">$EVENT</span><span class="s2">"</span> <span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="k">continue
-
-    </span><span class="nv">EXECVE_LINE</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$EVENT</span><span class="s2">"</span> |
-        <span class="nb">grep</span> <span class="s1">'^type=EXECVE'</span> |
-        <span class="nb">head</span> <span class="nt">-1</span><span class="si">)</span>
-
-    <span class="nv">CWD_LINE</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$EVENT</span><span class="s2">"</span> |
-        <span class="nb">grep</span> <span class="s1">'^type=CWD'</span> |
-        <span class="nb">head</span> <span class="nt">-1</span><span class="si">)</span>
-
-    <span class="c"># 명령 실행 위치</span>
-    <span class="nv">PWD_VALUE</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$CWD_LINE</span><span class="s2">"</span> |
-        <span class="nb">sed</span> <span class="nt">-n</span> <span class="s1">'s/.*cwd=\([^ ]*\).*/\1/p'</span><span class="si">)</span>
-
-    <span class="o">[</span> <span class="nt">-z</span> <span class="s2">"</span><span class="nv">$PWD_VALUE</span><span class="s2">"</span> <span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="nv">PWD_VALUE</span><span class="o">=</span><span class="s2">"unknown"</span>
-
-    <span class="c"># EXECVE 인자를 하나의 명령으로 조합</span>
-    <span class="nv">COMMAND</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$EXECVE_LINE</span><span class="s2">"</span> |
-        <span class="nb">grep</span> <span class="nt">-oE</span> <span class="s1">'a[0-9]+=[^ ]+'</span> |
-        <span class="nb">sed</span> <span class="nt">-E</span> <span class="s1">'s/^a[0-9]+=//'</span> |
-        <span class="nb">paste</span> <span class="nt">-sd</span> <span class="s1">' '</span> -<span class="si">)</span>
-
-    <span class="o">[</span> <span class="nt">-z</span> <span class="s2">"</span><span class="nv">$COMMAND</span><span class="s2">"</span> <span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="k">continue
-
-    </span><span class="nv">TIME</span><span class="o">=</span><span class="si">$(</span><span class="nb">date</span> <span class="s1">'+%Y-%m-%d %H:%M:%S'</span><span class="si">)</span>
-
-    <span class="c"># sudo 명령 처리</span>
-    <span class="k">if</span> <span class="o">[</span> <span class="s2">"</span><span class="nv">$EXE</span><span class="s2">"</span> <span class="o">=</span> <span class="s2">"/usr/bin/sudo"</span> <span class="o">]</span><span class="p">;</span> <span class="k">then
-
-        </span><span class="nv">SUDO_COMMAND</span><span class="o">=</span><span class="s2">"</span><span class="k">${</span><span class="nv">COMMAND</span><span class="p">#sudo</span><span class="k">}</span><span class="s2">"</span>
-        <span class="nv">SUDO_COMMAND</span><span class="o">=</span><span class="s2">"</span><span class="k">${</span><span class="nv">SUDO_COMMAND</span><span class="p"># </span><span class="k">}</span><span class="s2">"</span>
-
-        <span class="nv">RUN_AS</span><span class="o">=</span><span class="s2">"root"</span>
-
-        <span class="c"># sudo -u user command 처리</span>
-        <span class="k">if</span> <span class="o">[[</span> <span class="s2">"</span><span class="nv">$SUDO_COMMAND</span><span class="s2">"</span> <span class="o">==</span> <span class="s2">"-u "</span><span class="k">*</span> <span class="o">]]</span><span class="p">;</span> <span class="k">then
-
-            </span><span class="nv">RUN_AS</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$SUDO_COMMAND</span><span class="s2">"</span> |
-                <span class="nb">awk</span> <span class="s1">'{print $2}'</span><span class="si">)</span>
-
-            <span class="nv">SUDO_COMMAND</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$SUDO_COMMAND</span><span class="s2">"</span> |
-                <span class="nb">cut</span> <span class="nt">-d</span><span class="s1">' '</span> <span class="nt">-f3-</span><span class="si">)</span>
-        <span class="k">fi</span>
-
-        <span class="c"># 사용자 개인 채널</span>
-        send_slack <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$USER_WEBHOOK</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"SUDO"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$USER_NAME</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$TIME</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$SUDO_COMMAND</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$PWD_VALUE</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$RUN_AS</span><span class="s2">"</span>
-
-        <span class="c"># sudo 공통 채널</span>
-        send_slack <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$DEV_ALL_SUDO_WEBHOOK</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"SUDO"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$USER_NAME</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$TIME</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$SUDO_COMMAND</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$PWD_VALUE</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$RUN_AS</span><span class="s2">"</span>
-
-    <span class="k">else</span>
-
-        <span class="c"># sudo 내부에서 실행된 root 명령의 중복 전송 방지</span>
-        <span class="nv">EUID_NAME</span><span class="o">=</span><span class="si">$(</span><span class="nb">printf</span> <span class="s1">'%s\n'</span> <span class="s2">"</span><span class="nv">$SYSCALL_LINE</span><span class="s2">"</span> |
-            <span class="nb">sed</span> <span class="nt">-n</span> <span class="s1">'s/.*EUID="\([^"]*\)".*/\1/p'</span><span class="si">)</span>
-
-        <span class="k">if</span> <span class="o">[</span> <span class="s2">"</span><span class="nv">$EUID_NAME</span><span class="s2">"</span> <span class="o">=</span> <span class="s2">"root"</span> <span class="o">]</span><span class="p">;</span> <span class="k">then
-            continue
-        fi
-
-        </span>send_slack <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$USER_WEBHOOK</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"COMMAND"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$USER_NAME</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$TIME</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$COMMAND</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$PWD_VALUE</span><span class="s2">"</span> <span class="se">\</span>
-            <span class="s2">"</span><span class="nv">$USER_NAME</span><span class="s2">"</span>
-
-    <span class="k">fi
-
-done</span>
-</code></pre></div></div>
-
-<p>스크립트에서는 Audit 로그의 <code class="language-plaintext highlighter-rouge">SYSCALL</code>, <code class="language-plaintext highlighter-rouge">EXECVE</code>, <code class="language-plaintext highlighter-rouge">CWD</code> 이벤트를 이용해 다음 정보를 추출합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>User    : 명령을 실행한 로그인 사용자
-Run as  : 실제 명령을 실행하는 사용자
-Time    : 명령 실행 시간
-PWD     : 명령을 실행한 디렉토리
-Command : 실행한 명령과 인자
-</code></pre></div></div>
-
-<p>Slack 메시지는 일반 명령과 <code class="language-plaintext highlighter-rouge">sudo</code> 명령을 쉽게 구분할 수 있도록 다음과 같이 표시합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>일반 명령 → 초록색 Attachment
-sudo 명령 → 빨간색 Attachment
-</code></pre></div></div>
-
-<p>일반 명령은 해당 사용자의 개인 채널에만 전송됩니다.</p>
-
-<p>예를 들어 <code class="language-plaintext highlighter-rouge">hyn128</code> 사용자가 다음 명령을 실행하면,</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">ls</span> <span class="nt">-al</span>
-</code></pre></div></div>
-
-<p><code class="language-plaintext highlighter-rouge">#dev-hyn128</code> 채널에 다음 정보가 표시됩니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Command
-
-User
-hyn128
-
-Run as
-hyn128
-
-Time
-2026-09-24 22:10:00
-
-PWD
-/home/hyn128
-
-Command
-ls --color=auto -al
-</code></pre></div></div>
-
-<p>반면 다음과 같이 <code class="language-plaintext highlighter-rouge">sudo</code>를 사용하면,</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo whoami</span>
-</code></pre></div></div>
-
-<p>동일한 로그가 <code class="language-plaintext highlighter-rouge">#dev-hyn128</code>과 <code class="language-plaintext highlighter-rouge">#dev-all-sudo</code>에 전송됩니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>SUDO Command
-
-User
-hyn128
-
-Run as
-root
-
-Time
-2026-09-24 22:11:00
-
-PWD
-/home/hyn128
-
-Command
-whoami
-</code></pre></div></div>
-
-<h3 id="1-실행-권한-설정"><strong>1) 실행 권한 설정</strong></h3>
-
-<p>작성한 스크립트에 실행 권한을 추가합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">chmod</span> +x ~/slack-log/scripts/command-monitor.sh
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/35.webp" alt="" /></p>
-
-<h2 id="7-모니터링-스크립트-systemd-서비스-등록">7. 모니터링 스크립트 systemd 서비스 등록</h2>
-
-<p><code class="language-plaintext highlighter-rouge">command-monitor.sh</code>를 터미널에서 직접 실행하면 해당 터미널을 계속 점유하며, SSH 연결이 종료되거나 서버가 재부팅되었을 때 모니터링도 중단됩니다.</p>
-
-<p>따라서 스크립트를 <code class="language-plaintext highlighter-rouge">systemd</code> 서비스로 등록하여 백그라운드에서 계속 실행되도록 구성합니다.</p>
-
-<p>서비스 파일을 생성합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>nano /etc/systemd/system/command-monitor.service
-</code></pre></div></div>
-
-<p>다음 내용을 작성합니다.</p>
-
-<div class="language-ini highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">[Unit]</span>
-<span class="py">Description</span><span class="p">=</span><span class="s">Orbit Slack Command Monitor</span>
-<span class="py">After</span><span class="p">=</span><span class="s">auditd.service network-online.target</span>
-
-<span class="nn">[Service]</span>
-<span class="py">Type</span><span class="p">=</span><span class="s">simple</span>
-<span class="py">User</span><span class="p">=</span><span class="s">root</span>
-<span class="py">ExecStart</span><span class="p">=</span><span class="s">/home/orbit/slack-log/scripts/command-monitor.sh</span>
-<span class="py">Restart</span><span class="p">=</span><span class="s">always</span>
-<span class="py">RestartSec</span><span class="p">=</span><span class="s">3</span>
-
-<span class="nn">[Install]</span>
-<span class="py">WantedBy</span><span class="p">=</span><span class="s">multi-user.target</span>
-</code></pre></div></div>
-
-<p>서비스 설정을 적용합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl daemon-reload
-<span class="nb">sudo </span>systemctl <span class="nb">enable</span> <span class="nt">--now</span> command-monitor.service
-</code></pre></div></div>
-
-<p>서비스 상태를 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl status command-monitor.service
-</code></pre></div></div>
-
-<p>정상적으로 실행되고 있다면 다음과 같이 표시됩니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Active: active (running)
-</code></pre></div></div>
-
-<p>스크립트를 수정한 이후에는 서비스를 다시 시작하여 변경 사항을 적용합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl restart command-monitor.service
-</code></pre></div></div>
-
-<h2 id="8-동작-테스트">8. 동작 테스트</h2>
-
-<p>다른 사용자 계정으로 접속하여 일반 명령을 실행합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">ls</span> <span class="nt">-al</span>
-</code></pre></div></div>
-
-<p>해당 사용자의 개인 Slack 채널에 일반 명령 로그가 전송되는지 확인합니다.</p>
-
-<p>이후 <code class="language-plaintext highlighter-rouge">sudo</code> 명령을 실행합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo whoami</span>
-</code></pre></div></div>
-
-<p>정상적으로 동작한다면 다음과 같이 분기됩니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ls -al
-└─ #dev-hyn128
-
-sudo whoami
-├─ #dev-hyn128
-└─ #dev-all-sudo
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-24-project-1-orbit-command-logging/37.webp" alt="" /></p>
-
-<p>이를 통해 사용자별 일반 명령과 <code class="language-plaintext highlighter-rouge">sudo</code> 명령을 Slack에서 실시간으로 확인할 수 있으며, 서버 재부팅 이후에도 <code class="language-plaintext highlighter-rouge">command-monitor.service</code>가 자동으로 실행되어 모니터링을 계속 수행합니다.</p>]]></content><author><name></name></author><category term="Project" /><category term="Orbit" /><category term="Auditd" /><category term="Webhook" /><summary type="html"><![CDATA[Develop 서버와 Production서버에서 sudo와 사용자별 로그를 Slack으로 기록하고 열람 가능하도록 하도록 구축하는 방법]]></summary></entry><entry><title type="html">systemctl을 이용한 virtual machine 자동 부팅</title><link href="https://hyn128.site/project-2-orbit-systemctl-vagrant/" rel="alternate" type="text/html" title="systemctl을 이용한 virtual machine 자동 부팅" /><published>2026-09-24T00:00:00+09:00</published><updated>2026-09-24T00:00:00+09:00</updated><id>https://hyn128.site/project-2-orbit-systemctl-vagrant</id><content type="html" xml:base="https://hyn128.site/project-2-orbit-systemctl-vagrant/"><![CDATA[<h2 id="1-아이디어">1. 아이디어</h2>
-
-<blockquote>
-  <p>현재 홈서버를 WOL로 원격 부팅 후, SSH에 접속하여 Dev 서버의 Virtual Machine을 Host 서버에서 띄워주는 방식을 사용중이었습니다. 따라서 매번 Dev 서버를 띄우기 위해 반복 되는 수작업이 많아 Systemctl을 이용해 호스트 부팅 시 백그라운드 서비스를 실행할 필요를 느꼈습니다.</p>
-</blockquote>
-
-<h3 id="dev-server-vm-구동-과정">Dev Server VM 구동 과정</h3>
-
-<h4 id="변경-전">변경 전</h4>
-
-<ol>
-  <li>홈 네트워크 VPN 접속</li>
-  <li>호스트 서버로 WOL 매직 패킷 전송</li>
-  <li>부팅 대기 및 호스트 서버 SSH 접속</li>
-  <li>Dev VM의 <code class="language-plaintext highlighter-rouge">Vagrantfile</code> 이 위치한 디렉토리로 이동</li>
-  <li><code class="language-plaintext highlighter-rouge">vagrant up</code> 명령 수행</li>
-  <li>ping 또는 ssh로 실행 확인</li>
-</ol>
-
-<h4 id="변경-후">변경 후</h4>
-
-<ol>
-  <li>홈 네트워크 VPN 접속</li>
-  <li>호스트 서버로 WOL 매직 패킷 전송</li>
-  <li>부팅 후 자동 <code class="language-plaintext highlighter-rouge">vagrant up</code> 수행</li>
-  <li><del>Slack으로의 서버 부팅 알림 전송(Prometheus/Grafana 구축 후 예정)</del></li>
-</ol>
-
-<h2 id="2-서비스-파일-작성-및-등록">2. 서비스 파일 작성 및 등록</h2>
-
-<h3 id="1-서비스-파일-생성">1) 서비스 파일 생성</h3>
-
-<p>우분투에서 사용자 지정 프로그램을 백그라운드 서비스(데몬)로 등록하고, <code class="language-plaintext highlighter-rouge">systemctl</code> 로 관리하려면</p>
-
-<p><code class="language-plaintext highlighter-rouge">/etc/systemd/system/</code> 경로에 <code class="language-plaintext highlighter-rouge">.service</code> 파일을 작성해야 합니다.</p>
-
-<p>먼저 데몬을 실행할 호스트 서버에 접속해 새 서비스 파일을 생성합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>nano /etc/systemd/system/orbit-lab-vagrant.service
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-25-project-2-orbit-systemctl-vagrant/02.webp" alt="" /></p>
-
-<h3 id="2-서비스-파일-작성">2) 서비스 파일 작성</h3>
-
-<p>파일 안에 아래와 같이 systemd 데몬 내용을 작성합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">[</span>Unit]
-<span class="nv">Description</span><span class="o">=</span>Orbit Lab Launch Service
-<span class="nv">After</span><span class="o">=</span>network-online.target libvirtd.service
-<span class="nv">Wants</span><span class="o">=</span>network-online.target
-<span class="nv">Requires</span><span class="o">=</span>libvirtd.service
-
-<span class="o">[</span>Service]
-<span class="nv">Type</span><span class="o">=</span>oneshot
-<span class="nv">User</span><span class="o">=</span>hyn
-<span class="nv">WorkingDirectory</span><span class="o">=</span>/home/hyn/orbit-dev
-<span class="nv">ExecStart</span><span class="o">=</span>/usr/bin/vagrant up
-<span class="nv">ExecStop</span><span class="o">=</span>/usr/bin/vagrant halt
-<span class="nv">RemainAfterExit</span><span class="o">=</span><span class="nb">yes</span>
-
-<span class="o">[</span>Install]
-<span class="nv">WantedBy</span><span class="o">=</span>multi-user.target
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-25-project-2-orbit-systemctl-vagrant/08.webp" alt="" /></p>
-
-<p>아래는 작성한 파일의 세부 내용입니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th><strong>항목</strong></th>
-      <th><strong>설정값</strong></th>
-      <th><strong>설명</strong></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[Unit]</code></td>
-      <td>-</td>
-      <td>서비스의 기본 정보 및 다른 Unit과의 관계를 정의하는 영역</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">Description</code></td>
-      <td><code class="language-plaintext highlighter-rouge">Orbit Lab Launch Service</code></td>
-      <td>서비스의 설명을 지정. <code class="language-plaintext highlighter-rouge">systemctl status</code> 등에서 표시됨</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[Service]</code></td>
-      <td>-</td>
-      <td>서비스가 어떤 방식으로 실행되고 종료되는지 정의하는 영역</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">Type</code></td>
-      <td><code class="language-plaintext highlighter-rouge">oneshot</code></td>
-      <td>명령을 한 번 실행하고 완료될 때까지 기다리는 방식. <code class="language-plaintext highlighter-rouge">vagrant up</code>처럼 실행 후 명령 자체는 종료되는 작업에 적합</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">User</code></td>
-      <td><code class="language-plaintext highlighter-rouge">hyn</code></td>
-      <td>서비스를 <code class="language-plaintext highlighter-rouge">hyn</code> 사용자 권한으로 실행</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">WorkingDirectory</code></td>
-      <td><code class="language-plaintext highlighter-rouge">/home/hyn/orbit-dev</code></td>
-      <td>명령을 실행할 작업 디렉터리. 해당 디렉터리의 <code class="language-plaintext highlighter-rouge">Vagrantfile</code>을 기준으로 Vagrant가 동작</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">ExecStart</code></td>
-      <td><code class="language-plaintext highlighter-rouge">/usr/bin/vagrant up</code></td>
-      <td>서비스 시작 시 실행할 명령. Vagrant VM을 시작</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">ExecStop</code></td>
-      <td><code class="language-plaintext highlighter-rouge">/usr/bin/vagrant halt</code></td>
-      <td>서비스 중지 시 실행할 명령. Vagrant VM을 정상 종료</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">RemainAfterExit</code></td>
-      <td><code class="language-plaintext highlighter-rouge">yes</code></td>
-      <td><code class="language-plaintext highlighter-rouge">vagrant up</code> 명령이 종료된 이후에도 systemd에서 서비스를 <code class="language-plaintext highlighter-rouge">active (exited)</code> 상태로 유지</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[Install]</code></td>
-      <td>-</td>
-      <td><code class="language-plaintext highlighter-rouge">systemctl enable</code> 실행 시 서비스를 어떤 target에 등록할지 정의하는 영역</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">WantedBy</code></td>
-      <td><code class="language-plaintext highlighter-rouge">multi-user.target</code></td>
-      <td>일반적인 다중 사용자 부팅 단계에서 서비스를 자동으로 시작하도록 등록. <code class="language-plaintext highlighter-rouge">systemctl enable</code>을 가능하게 함</td>
-    </tr>
-  </tbody>
-</table>
-
-<h2 id="3-서비스-시작">3. 서비스 시작</h2>
-
-<p>먼저 생성된 파일(데몬)을 아래 명렁을 통해 불러옵니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl daemon-reload
-</code></pre></div></div>
-
-<p>작성된 서비스를 부팅 시 자동 시작하도록 등롱합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl <span class="nb">enable </span>orbit-lab-vagrant.service
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-25-project-2-orbit-systemctl-vagrant/10.webp" alt="" /></p>
-
-<p>등록된 서비스를 즉시 재시작합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>systemctl start orbit-lab-vagrant.service
-</code></pre></div></div>
-
-<p><img src="../../assets/post/2026-09-25-project-2-orbit-systemctl-vagrant/12.webp" alt="" /></p>
-
-<p>이 외의 주요 systemctl 명령은 다음과 같습니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># 상태 확인</span>
-<span class="nb">sudo </span>systemctl status orbit-lab-vagrant.service
-
-<span class="c"># 중지</span>
-<span class="nb">sudo </span>systemctl stop orbit-lab-vagrant.service
-
-<span class="c"># 재시작</span>
-suto systemctl restart orbit-lab-vagrant.service
-
-<span class="c"># 자동 시작 해제</span>
-<span class="nb">sudo </span>systemctl disable orbit-lab-vagrant.service
-</code></pre></div></div>
-
-<h2 id="4-재부팅-후-vm-접속-확인">4. 재부팅 후 VM 접속 확인</h2>
-
-<p>작성된 서비스가 부팅 후 systemctl로 정상실행이 되었고 그 과정에서 문제가 없었다면, VM에 접속이 가능해야 합니다.</p>
-
-<p>따라서 <code class="language-plaintext highlighter-rouge">sudo reboot</code> 으로 호스트를 재시작, VM으로 접속을 시도해 아래와 같은 부팅이 정상적으로 완료된 화면을 확인할 수 있었습니다.</p>
-
-<p><img src="../../assets/post/2026-09-25-project-2-orbit-systemctl-vagrant/14.webp" alt="" /></p>]]></content><author><name></name></author><category term="Project" /><category term="Orbit" /><category term="Systemd" /><category term="Systemctl" /><summary type="html"><![CDATA[호스트 서버가 부팅될 때 VM 노드를 시스템 데몬으로 자동 실행하는 방법]]></summary></entry><entry><title type="html">Client Isolation으로 인한 단말 간 통신 실패</title><link href="https://hyn128.site/notes-11-troubleshooting-client-isolation/" rel="alternate" type="text/html" title="Client Isolation으로 인한 단말 간 통신 실패" /><published>2026-09-23T00:00:00+09:00</published><updated>2026-09-23T00:00:00+09:00</updated><id>https://hyn128.site/notes-11-troubleshooting-client-isolation</id><content type="html" xml:base="https://hyn128.site/notes-11-troubleshooting-client-isolation/"><![CDATA[<hr />
-
-<h2 id="요약">요약</h2>
-<blockquote>
-  <p>Ubuntu Server 구축 후 동일한 Wi-Fi에 연결된 MacBook에서 서버로 SSH 접속 및 Ping이 되지 않는 문제가 발생했다.</p>
-
-  <p>서버에서 외부 네트워크 연결은 정상적으로 이루어졌지만, 동일한 Wi-Fi에 연결된 MacBook에서 Ubuntu서버로, 심지어 반대로도 SSH 접속 및 Ping이 불가능했다.</p>
-
-  <p>처음에는 이전 기수에서 사용하던 고정 IP 설정을 그대로 참고하면서 네트워크 설정 문제라고 판단했다. 확인 결과 기존 환경과 현재 환경의 네트워크 구성 및 서브넷이 달랐으며, 이를 현재 환경에 맞게 수정했다.</p>
-
-  <p>하지만 네트워크 설정을 정상화한 이후에도 단말 간 통신은 불가능했다. 추가 확인 결과 강의실 Wi-Fi에 적용된 <strong>Client Isolation</strong>으로 인해 동일 Wi-Fi에 연결된 클라이언트 간 직접 통신이 차단되고 있음을 확인했다.</p>
-  <h4 id="더-짧은-요약">더 짧은 요약</h4>
-  <p><strong>SSH 접속 실패</strong><br />
-→ 네트워크 설정 문제를 의심<br />
-→ 이전 기수에서 사용하던 네트워크 환경과 다른 것을 인지<br />
-→ 서브넷 설정을 현재 환경에 맞게 수정 → 여전히 실패<br />
-→ 조사 결과 WiFi Client Isolation이 원인임을 확인<br />
-→ 우리의 권한으로는 해결 불가능 → 우회를 해보자</p>
-</blockquote>
-
-<h4 id="해결-방법">해결 방법</h4>
-
-<p>찾아보니 우회의 방법이 존재함 → TailScale 등의 VPN 활용(이미 다른 팀의 서버에 이전 기수가 설치한 내용이 발견됨)</p>
-
-<p>AP에 대한 관리 권한이 없어 Client Isolation 자체를 해제할 수는 없으므로, 현재 환경에서는 필요한 내부 포트를 모두 강사님을 통해 개방시키거나, 최소한의 포트를 유지한 채로 <strong>Tailscale과 같은 VPN/Overlay Network를 통한 우회가 필요하다.</strong></p>
-
-<h2 id="1-문제-상황">1. 문제 상황</h2>
-
-<blockquote>
-  <p>기존 Ubuntu Desktop 서버를 Ubuntu Server로 재설치한 뒤 Wi-Fi 네트워크를 설정했다.<br />
-서버에서 외부 네트워크 연결은 정상적으로 이루어졌지만, 동일한 Wi-Fi에 연결된 MacBook에서 서버로 SSH 접속 및 Ping이 불가능했다.</p>
-</blockquote>
-
-<p>AutoEver Cloud Scool의 지난 기수에서 사용하던 서버를 받게 되었는데, 포맷이 되지 않은 상태였다.</p>
-
-<p>Ubuntu Desktop이 설치된 서버에 Ubuntu Server를 설치하기 전, 기존의 <code class="language-plaintext highlighter-rouge">netplan.yaml</code> 에 DHCP가 아닌 고정 IP로 할당이 되어있는 것으로 보아 추후 할당 가능한 IP를 확인하고 네트워크 설정하는 과정이 줄어들 것이라 판단해 백업했다.</p>
-
-<p><img src="../../assets/post/2026-09-22-notes-11-troubleshooting-client-isolation/02.webp" alt="" /></p>
-
-<p>이후 Ubuntu Server 를 설치했고, 해당 설정을 참고하여 네트워크를 구성했지만, 다른 노트북에서 서버로 SSH 접속이 되지 않았다.</p>
-
-<p>또한 SSH뿐만 아니라 서버 IP를 대상으로 한 Ping에도 응답이 없었다.</p>
-
-<p>반면 서버 자체에서는 외부 네트워크 연결이 가능했다.</p>
-
-<p>즉 문제 상황은 다음과 같았다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Server → Internet     정상
-MacBook → Internet    정상
-
-MacBook → Server Ping 실패
-MacBook → Server SSH  실패
-</code></pre></div></div>
-
-<p>단순한 인터넷 연결 문제가 아니라 <strong>동일 네트워크에 연결된 단말 간 통신에서 문제가 발생하고 있는 상황</strong>이었다.</p>
-
-<hr />
-
-<h2 id="2-기존-환경과-현재-환경-비교"><strong>2. 기존 환경과 현재 환경 비교</strong></h2>
-
-<p>문제를 확인하는 과정에서 이전 기수의 네트워크 환경과 현재 환경에 차이가 있다는 것을 확인했다.</p>
-
-<p>기존 설정에서는 서버가 <strong>유선 LAN</strong>을 사용하고 있었지만, 현재 서버는 <strong>Wi-Fi</strong>를 통해 네트워크에 연결하고 있었다.</p>
-
-<p>현재 서버의 유선 LAN 카드 상태가 확실하지 않았고 강의실 바닥의 LAN 포트가 Wi-Fi AP와 동일한 네트워크를 사용하는지도 확인되지 않았기 때문에, 우선 Wi-Fi를 기준으로 문제를 분석하기로 했다.</p>
-
-<p>현재 Netplan 파일을 확인했다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cd</span> /etc/netplan
-<span class="nb">ls</span>
-</code></pre></div></div>
-
-<p>확인된 파일:</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>00-installer-config.yaml
-</code></pre></div></div>
-
-<p>설정을 변경하기 전 기존 파일을 백업했다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo cp </span>00-installer-config.yaml ~/.backup-netplan.yaml
-</code></pre></div></div>
-
-<h2><img src="../../assets/post/2026-09-22-notes-11-troubleshooting-client-isolation/06.webp" alt="" /></h2>
-
-<h2 id="3-네트워크-설정-확인"><strong>3. 네트워크 설정 확인</strong></h2>
-
-<p>현재 서버의 IP를 확인했다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">hostname</span> <span class="nt">-I</span>
-</code></pre></div></div>
-
-<p>Netplan 설정도 확인했다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>nano /etc/netplan/00-installer-config.yaml
-</code></pre></div></div>
-
-<p>처음에는 이전 설정을 참고하여 서버에 다음과 같이 Static IP를 설정했다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Server
-192.168.200.3/24
-</code></pre></div></div>
-
-<p>하지만 MacBook의 네트워크 설정을 확인한 결과 다음과 같은 주소를 사용하고 있었다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>MacBook
-192.168.201.x/22
-</code></pre></div></div>
-
-<p><code class="language-plaintext highlighter-rouge">/24</code>와 <code class="language-plaintext highlighter-rouge">/22</code>는 서로 다른 서브넷 범위를 의미한다.</p>
-
-<p><code class="language-plaintext highlighter-rouge">192.168.200.3/24</code>의 네트워크 범위는:</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>192.168.200.0 ~ 192.168.200.255
-</code></pre></div></div>
-
-<p>반면 <code class="language-plaintext highlighter-rouge">192.168.201.x/22</code>가 포함되는 네트워크는 아래와 같았다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>192.168.200.0/22
-
-192.168.200.x
-192.168.201.x
-192.168.202.x
-192.168.203.x
-</code></pre></div></div>
-
-<p>이 내용을 확인하고 나니, 지난 기수가 사용하던 강의실과 현재 사용중인 강의실이 다르다는 것이 떠올랐다. 교육장에는 강의실마다 AP를 나눠서 사용하고 있었고, 이로인해 이전 기수와 서브넷이 달랐던 것이다.
-따라서 이전 기수에서 사용하던 <code class="language-plaintext highlighter-rouge">/24</code> 설정을 현재 네트워크에 그대로 적용하는 것은 적절하지 않았다.</p>
-
-<hr />
-
-<h2 id="4-dhcp를-통한-실제-네트워크-설정-확인"><strong>4. DHCP를 통한 실제 네트워크 설정 확인</strong></h2>
-
-<p>Static IP를 임의로 지정하기보다 현재 강의실 네트워크의 DHCP 서버가 어떤 설정을 제공하는지 먼저 확인하기로 했다.</p>
-
-<p>Netplan을 DHCP 기반으로 변경했다.</p>
-
-<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">network</span><span class="pi">:</span>
-  <span class="na">version</span><span class="pi">:</span> <span class="m">2</span>
-  <span class="na">wifis</span><span class="pi">:</span>
-    <span class="na">wlo1</span><span class="pi">:</span>
-      <span class="na">access-points</span><span class="pi">:</span>
-        <span class="s2">"</span><span class="s">RAPA_Classroom-5"</span><span class="err">:</span>
-          <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">********"</span>
-      <span class="na">dhcp4</span><span class="pi">:</span> <span class="no">true</span>
-</code></pre></div></div>
-
-<p>기존에 직접 지정했던 다음 설정은 제거했다.</p>
-
-<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">addresses</span><span class="pi">:</span>
-<span class="na">routes</span><span class="pi">:</span>
-<span class="na">nameservers</span><span class="pi">:</span>
-</code></pre></div></div>
-
-<p>설정을 검증하고 적용했다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>netplan generate
-<span class="nb">sudo </span>netplan try
-</code></pre></div></div>
-
-<p>이후 실제 할당된 IP와 라우팅 정보를 확인했다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ip <span class="nt">-4</span> addr show wlo1
-ip route
-</code></pre></div></div>
-
-<p>이를 통해 현재 강의실 네트워크에서 사용하는 IP 대역과 서브넷 정보를 확인할 수 있었다.</p>
-
-<p>하지만 네트워크 설정을 현재 환경에 맞게 수정한 이후에도 MacBook에서 서버로 Ping과 SSH가 되지 않았다.</p>
-
-<p>따라서 <strong>서브넷 설정만의 문제는 아니라고 판단했다.</strong></p>
-
-<hr />
-
-<h2 id="5-ssh-및-방화벽-확인"><strong>5. SSH 및 방화벽 확인</strong></h2>
-
-<p>SSH 서비스 및 방화벽 문제도 확인했다.</p>
-
-<p>UFW 상태를 확인했다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>ufw status
-</code></pre></div></div>
-
-<p>SSH에 사용되는 TCP 22번 포트가 허용되어 있었다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>22/tcp    ALLOW
-</code></pre></div></div>
-
-<p>따라서 SSH 접속 실패의 직접적인 원인이 UFW에서 TCP 22번 포트를 차단했기 때문은 아니었다.</p>
-
-<p>또한 SSH뿐만 아니라 Ping을 통한 단말 간 기본 통신 자체가 실패하고 있었기 때문에 문제 범위를 SSH 애플리케이션 계층보다 아래의 네트워크 계층으로 좁힐 수 있었다.</p>
-
-<hr />
-
-<h2 id="6-동일-wi-fi-단말-간-통신-확인"><strong>6. 동일 Wi-Fi 단말 간 통신 확인</strong></h2>
-
-<p>서버와 MacBook은 모두 동일한 Wi-Fi에 연결되어 있었으며 각각 인터넷 연결도 정상적이었다.</p>
-
-<p>구조상 다음과 같은 상태였다.</p>
-
-<p><img src="../../assets/post/2026-09-22-notes-11-troubleshooting-client-isolation/04.webp" alt="" /></p>
-
-<p>각 장비에서 AP 및 외부 네트워크로의 통신은 가능하지만 두 클라이언트 사이의 직접 통신은 불가능했다.</p>
-
-<p>즉 다음과 같은 특징을 보였다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Server  → Gateway    정상
-MacBook → Gateway    정상
-
-Server  → Internet   정상
-MacBook → Internet   정상
-
-MacBook → Server     실패
-Server  → MacBook    실패
-</code></pre></div></div>
-
-<p>이 시점에서 개별 서버의 IP, SSH 또는 방화벽 설정보다는 <strong>AP에서 클라이언트 간 통신을 제한하고 있을 가능성</strong>을 의심했다.</p>
-
-<hr />
-
-<h2 id="7-원인--client-isolation"><strong>7. 원인 — Client Isolation</strong></h2>
-
-<p>조사 결과 현재 Wi-Fi 환경에서 <strong>Client Isolation(AP Isolation)</strong>으로 인해 무선 클라이언트 간 직접 통신이 제한되고 있는 것으로 판단했다.</p>
-
-<p>Client Isolation은 동일한 AP에 연결된 클라이언트가 서로 직접 통신하지 못하도록 격리하는 기능이다.</p>
-
-<p>따라서 동일한 SSID를 사용하고 동일한 IP 서브넷에 속하더라도 다음과 같은 통신이 제한될 수 있다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>MacBook ──X── Ubuntu Server
-</code></pre></div></div>
-
-<p>반면 AP를 통해 외부로 나가는 트래픽은 정상적으로 처리될 수 있다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>MacBook ──→ AP ──→ Internet
-Server  ──→ AP ──→ Internet
-</code></pre></div></div>
-
-<p>이 때문에 서버와 MacBook 모두 인터넷 연결에는 문제가 없었지만, MacBook에서 서버로 직접 접근하는 Ping과 SSH는 실패했다.</p>
-
-<hr />
-
-<h2 id="8-해결-여부-및-우회-방법"><strong>8. 해결 여부 및 우회 방법</strong></h2>
-
-<p>이번 문제는 서버 자체의 설정을 변경하여 해결할 수 있는 문제가 아니었다.</p>
-
-<p>Client Isolation은 AP 측에서 적용되는 정책이므로 이를 직접 해제하려면 해당 네트워크 장비에 대한 관리 권한이 필요하다.</p>
-
-<p>현재는 AP에 대한 관리 권한이 없기 때문에 <strong>Client Isolation 자체는 해결할 수 없는 상태</strong>다.</p>
-
-<p>다만 네트워크를 우회하는 방법은 존재한다.</p>
-
-<p>서버를 확인하는 과정에서 다른 팀의 서버에 이전 기수가 설치한 <strong>Tailscale</strong> 관련 구성이 발견되었다. 이는 이전 환경에서도 동일하거나 유사한 네트워크 제약을 우회하기 위해 사용했을 가능성이 있다.</p>
-
-<p>Tailscale과 같은 Overlay Network를 사용하면 각 장비에 별도의 가상 네트워크 인터페이스와 IP를 구성하여 물리적인 로컬 네트워크의 직접 통신에 의존하지 않고 장비 간 연결을 구성할 수 있다.</p>
-
-<p>구조는 다음과 같다.</p>
-
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Ubuntu Server
-     │
-     │ Tailscale Network
-     │
-  MacBook
-</code></pre></div></div>
-
-<p>따라서 현재 환경에서는 다음과 같은 방법을 고려할 수 있다.</p>
-
-<ul>
-  <li>Tailscale 등의 Overlay Network 사용</li>
-  <li>Client Isolation이 적용되지 않은 별도 네트워크 사용</li>
-  <li>유선 LAN을 통한 별도 네트워크 구성</li>
-  <li>관리 가능한 별도의 AP/공유기 구성</li>
-</ul>
-
-<hr />
-
-<h2 id="9-결론"><strong>9. 결론</strong></h2>
-
-<p>초기에는 SSH 접속 실패를 서버의 SSH, UFW 또는 Static IP 설정 문제로 판단했다.</p>
-
-<p>네트워크 설정을 확인하는 과정에서 이전 기수의 <code class="language-plaintext highlighter-rouge">/24</code> 기반 설정과 현재 강의실의 <code class="language-plaintext highlighter-rouge">/22</code> 기반 네트워크 환경이 다르다는 것을 확인했고, DHCP를 사용하여 현재 환경에 맞는 네트워크 설정을 다시 구성했다.</p>
-
-<p>그러나 설정 정상화 이후에도 동일 Wi-Fi에 연결된 단말 간 Ping 및 SSH가 실패했다.</p>
-
-<p>각 단말에서 게이트웨이와 외부 네트워크로의 통신은 정상인 반면 클라이언트 간 직접 통신만 실패한다는 점을 통해 문제 범위를 AP 정책으로 좁혔으며, 최종적으로 <strong>Wi-Fi Client Isolation에 의한 단말 간 통신 제한이 원인인 것으로 판단했다.</strong></p>
-
-<h2 id="10-해야-할-것">10. 해야 할 것</h2>
-
-<p>TailScale이 조직으로도 사용이 가능한지, 다른 Overlay Network 또는 VPN으로 구축이 가능한지 찾아보기</p>]]></content><author><name></name></author><category term="TroubleShooting" /><category term="TechBites" /><summary type="html"><![CDATA[서버 네트워크 환경 구축 과정에서 맞이한 통신 실패의 원인 추척과 해결 방안]]></summary></entry></feed>
+</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[EC2 Instance 생성과 SSH 접속, Security Group, Elastic IP, ALB와 Auto Scaling Group을 연결해 여러 Availability Zone에 분산된 고가용성 구조를 구성합니다]]></summary></entry></feed>
