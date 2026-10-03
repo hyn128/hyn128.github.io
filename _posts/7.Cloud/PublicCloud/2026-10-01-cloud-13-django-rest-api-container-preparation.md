@@ -2,6 +2,7 @@
 title: Django REST API 생성과 Container 배포 준비
 description: Python 가상환경에서 Django Project와 REST API Application을 만들고 설정·URL·검증 절차를 Container 배포 전 단계까지 구성합니다
 date: 2026-10-01
+updated_at: 2026-10-02
 series: Cloud
 tags:
   - Cloud
@@ -447,3 +448,5 @@ JSON Response
 - [Django REST Framework 설치](https://www.django-rest-framework.org/#installation)
 
 - [Python venv](https://docs.python.org/3/library/venv.html)
+
+다음 글에서는 [Nginx로 이해하는 ECS Task·Service와 ALB]({% post_url 2026-10-02-cloud-14-aws-ecs-fargate-nginx-service %})에서 ECS의 실행 구조와 Service 배포 흐름을 구성합니다.
