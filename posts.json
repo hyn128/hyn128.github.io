@@ -4,6 +4,36 @@
       
       
       {
+        "title": "Django Image를 ECR와 ECS에 배포하는 GitHub Actions Pipeline",
+        "url": "/cloud-15-django-ecr-ecs-github-actions/",
+        "description": "Django REST API를 Gunicorn Container Image로 만들고 ECR에 저장한 뒤 GitHub OIDC와 최소 IAM 권한으로 ECS Service에 자동 배포합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 2일",
+        "reading_time_label": "9분 읽기",
+        "search": "django image를 ecr와 ecs에 배포하는 github actions pipeline django rest api를 gunicorn container image로 만들고 ecr에 저장한 뒤 github oidc와 최소 iam 권한으로 ecs service에 자동 배포합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "Nginx로 이해하는 ECS Task·Service와 ALB",
+        "url": "/cloud-14-aws-ecs-fargate-nginx-service/",
+        "description": "ECS의 Cluster·Capacity·Task Definition·Task·Service 관계를 구분하고 Fargate에서 Nginx를 단독 Task와 ALB 기반 Service로 배포한 뒤 배포 전략과 Auto Scaling을 확인합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 2일",
+        "reading_time_label": "7분 읽기",
+        "search": "nginx로 이해하는 ecs task·service와 alb ecs의 cluster·capacity·task definition·task·service 관계를 구분하고 fargate에서 nginx를 단독 task와 alb 기반 service로 배포한 뒤 배포 전략과 auto scaling을 확인합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
         "title": "Django REST API 생성과 Container 배포 준비",
         "url": "/cloud-13-django-rest-api-container-preparation/",
         "description": "Python 가상환경에서 Django Project와 REST API Application을 만들고 설정·URL·검증 절차를 Container 배포 전 단계까지 구성합니다",
@@ -12,7 +42,7 @@
         "series_key": "cloud",
         "series_title": "Cloud",
         "date_label": "2026년 10월 1일",
-        "reading_time_label": "5분 읽기",
+        "reading_time_label": "6분 읽기",
         "search": "django rest api 생성과 container 배포 준비 python 가상환경에서 django project와 rest api application을 만들고 설정·url·검증 절차를 container 배포 전 단계까지 구성합니다 cloud aws autoeversw cloud"
       },
     

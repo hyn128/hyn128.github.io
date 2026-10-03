@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>Nginx로 이해하는 ECS Task·Service와 ALB | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="ECS의 Cluster·Capacity·Task Definition·Task·Service 관계를 구분하고 Fargate에서 Nginx를 단독 Task와 ALB 기반 Service로 배포한 뒤 배포 전략과 Auto Scaling을 확인합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-14-aws-ecs-fargate-nginx-service/">
+<meta property="og:title" content="Nginx로 이해하는 ECS Task·Service와 ALB | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="ECS의 Cluster·Capacity·Task Definition·Task·Service 관계를 구분하고 Fargate에서 Nginx를 단독 Task와 ALB 기반 Service로 배포한 뒤 배포 전략과 Auto Scaling을 확인합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-14-aws-ecs-fargate-nginx-service/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Nginx로 이해하는 ECS Task·Service와 ALB | renamed.log">
+<meta name="twitter:description" content="ECS의 Cluster·Capacity·Task Definition·Task·Service 관계를 구분하고 Fargate에서 Nginx를 단독 Task와 ALB 기반 Service로 배포한 뒤 배포 전략과 Auto Scaling을 확인합니다">
+
+  <meta property="article:published_time" content="2026-10-02T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791030845" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791030845" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791030845">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791030845" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791030845">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "Nginx로 이해하는 ECS Task·Service와 ALB | renamed.log",
+    "description": "ECS의 Cluster·Capacity·Task Definition·Task·Service 관계를 구분하고 Fargate에서 Nginx를 단독 Task와 ALB 기반 Service로 배포한 뒤 배포 전략과 Auto Scaling을 확인합니다",
+    "url": "https://hyn128.site/cloud-14-aws-ecs-fargate-nginx-service/",
+    "datePublished": "2026-10-02T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">Nginx로 이해하는 ECS Task·Service와 ALB</h1>
+    
+      <p class="post-head__description">ECS의 Cluster·Capacity·Task Definition·Task·Service 관계를 구분하고 Fargate에서 Nginx를 단독 Task와 ALB 기반 Service로 배포한 뒤 배포 전략과 Auto Scaling을 확인합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 2일 · 7분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Amazon ECS는 Container를 어떤 환경에서 어떤 설정으로 몇 개 실행할지 관리합니다. Nginx를 Fargate Task로 먼저 실행해 Task의 수명과 Network를 확인한 뒤, ECS Service와 Application Load Balancer를 연결해 장애 복구·배포·확장이 가능한 구조로 전환합니다.</p>
+</blockquote>
+
+<h2 id="1-ecs-실행-구조">1. ECS 실행 구조</h2>
+
+<hr />
+
+<p>ECS Resource는 다음 관계로 동작합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ECS Cluster
+├── Capacity Provider
+│   └── Container를 실행할 Compute 환경
+├── Task Definition
+│   └── Container Image, CPU, Memory, Port와 실행 권한 정의
+└── ECS Service
+    ├── 지정한 수의 Task 유지
+    ├── Load Balancer와 연결
+    ├── 새 Task Definition Revision 배포
+    └── Service Auto Scaling
+</code></pre></div></div>
+
+<p>Task Definition은 실행 설정을 담은 Template이며, Task는 그 Template을 이용해 실제로 실행한 단위입니다. Kubernetes의 Pod나 Docker Compose와 목적이 일부 비슷하지만 Resource Model과 동작이 동일하지 않으므로 같은 개념으로 취급하지 않습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>역할</th>
+      <th>수명과 변경 방식</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Cluster</td>
+      <td>Task와 Service를 논리적으로 묶는 경계</td>
+      <td>Capacity Provider와 Service를 포함합니다.</td>
+    </tr>
+    <tr>
+      <td>Capacity Provider</td>
+      <td>Task를 실행할 Compute Capacity 연결</td>
+      <td>Fargate, Fargate Spot, EC2 Auto Scaling Group 등을 연결합니다.</td>
+    </tr>
+    <tr>
+      <td>Task Definition</td>
+      <td>하나 이상의 Container 실행 설정</td>
+      <td>수정 대신 새 Revision을 등록합니다.</td>
+    </tr>
+    <tr>
+      <td>Task</td>
+      <td>Task Definition Revision의 실행 Instance</td>
+      <td>종료되면 같은 Task를 다시 시작하지 않습니다.</td>
+    </tr>
+    <tr>
+      <td>Service</td>
+      <td>원하는 Task 수를 유지하는 Controller</td>
+      <td>실패한 Task를 교체하고 배포와 Auto Scaling을 수행합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="2-capacity-선택">2. Capacity 선택</h2>
+
+<hr />
+
+<p>현재 ECS에서 선택할 수 있는 대표적인 Capacity 방식은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>방식</th>
+      <th>Compute 관리 주체</th>
+      <th>적합한 경우</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>AWS Fargate</td>
+      <td>AWS</td>
+      <td>EC2 Instance 운영 없이 Task 단위 CPU·Memory를 지정할 때 사용합니다.</td>
+    </tr>
+    <tr>
+      <td>Fargate Spot</td>
+      <td>AWS</td>
+      <td>중단을 허용할 수 있는 비용 민감형 Workload에 사용합니다.</td>
+    </tr>
+    <tr>
+      <td>EC2 Auto Scaling Group Capacity Provider</td>
+      <td>사용자</td>
+      <td>Instance Type, AMI, Storage와 Host 구성을 직접 제어해야 할 때 사용합니다.</td>
+    </tr>
+    <tr>
+      <td>Amazon ECS Managed Instances</td>
+      <td>AWS</td>
+      <td>EC2 기능을 이용하면서 Provisioning·Scaling·Patch 관리 부담을 줄일 때 사용합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>자체 관리형 EC2 Capacity는 Fargate의 사양을 변경하는 방식이 아닙니다. 사용자가 만든 EC2 Auto Scaling Group을 Capacity Provider로 연결하고 Instance Capacity를 직접 관리하는 방식입니다.</p>
+
+<p>이 글에서는 Host 관리가 필요 없는 Fargate를 사용합니다.</p>
+
+<h2 id="3-배포-전-준비">3. 배포 전 준비</h2>
+
+<hr />
+
+<p>다음 Resource가 필요합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>예제 값</th>
+      <th>목적</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ECS Cluster</td>
+      <td><code class="language-plaintext highlighter-rouge">web-cluster</code></td>
+      <td>Task와 Service의 논리적 경계</td>
+    </tr>
+    <tr>
+      <td>VPC</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;VPC_ID&gt;</code></td>
+      <td>ALB와 Task가 통신할 Network</td>
+    </tr>
+    <tr>
+      <td>Public Subnet</td>
+      <td>두 개 이상의 가용 영역</td>
+      <td>Internet-facing ALB 배치</td>
+    </tr>
+    <tr>
+      <td>Private Subnet</td>
+      <td>두 개 이상의 가용 영역</td>
+      <td>Service Task 배치</td>
+    </tr>
+    <tr>
+      <td>ALB Security Group</td>
+      <td><code class="language-plaintext highlighter-rouge">alb-sg</code></td>
+      <td>Client의 HTTP·HTTPS 요청 허용</td>
+    </tr>
+    <tr>
+      <td>Task Security Group</td>
+      <td><code class="language-plaintext highlighter-rouge">nginx-task-sg</code></td>
+      <td>ALB에서 오는 Nginx Traffic만 허용</td>
+    </tr>
+    <tr>
+      <td>Task Execution Role</td>
+      <td><code class="language-plaintext highlighter-rouge">ecsTaskExecutionRole</code></td>
+      <td>ECR Image Pull과 CloudWatch Logs 전송</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>학습 환경에서 Public Subnet에 Task를 두고 Public IP를 부여할 수 있습니다. 운영 구조에서는 ALB만 Public Subnet에 두고 Task는 Private Subnet에 배치하는 방식이 일반적입니다. Private Subnet의 Task가 Public ECR나 외부 Package Repository에 접근해야 한다면 NAT Gateway 또는 필요한 VPC Endpoint를 구성합니다.</p>
+
+<h2 id="4-cluster-생성">4. Cluster 생성</h2>
+
+<hr />
+
+<p>AWS Console의 <strong>Amazon ECS → Clusters → Create cluster</strong>에서 Cluster 이름을 <code class="language-plaintext highlighter-rouge">web-cluster</code>로 지정합니다. Fargate Task만 사용할 때 EC2 Instance를 미리 생성할 필요는 없습니다.</p>
+
+<p>AWS CLI에서는 다음과 같이 생성할 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs create-cluster <span class="se">\</span>
+  <span class="nt">--cluster-name</span> web-cluster
+</code></pre></div></div>
+
+<p>Cluster가 <code class="language-plaintext highlighter-rouge">ACTIVE</code> 상태인지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs describe-clusters <span class="se">\</span>
+  <span class="nt">--clusters</span> web-cluster <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'clusters[0].{name:clusterName,status:status}'</span>
+</code></pre></div></div>
+
+<h2 id="5-nginx-task-definition-등록">5. Nginx Task Definition 등록</h2>
+
+<hr />
+
+<p>Task Definition은 Nginx Container의 Image, Port, Resource와 Log Driver를 정의합니다. 다음 내용을 <code class="language-plaintext highlighter-rouge">nginx-task-definition.json</code>으로 저장합니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"family"</span><span class="p">:</span><span class="w"> </span><span class="s2">"nginx-web"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"requiresCompatibilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"FARGATE"</span><span class="p">],</span><span class="w">
+  </span><span class="nl">"networkMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"awsvpc"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"cpu"</span><span class="p">:</span><span class="w"> </span><span class="s2">"256"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"memory"</span><span class="p">:</span><span class="w"> </span><span class="s2">"512"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"executionRoleArn"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arn:aws:iam::&lt;AWS_ACCOUNT_ID&gt;:role/ecsTaskExecutionRole"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"containerDefinitions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"nginx"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"image"</span><span class="p">:</span><span class="w"> </span><span class="s2">"public.ecr.aws/docker/library/nginx:stable-alpine"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"essential"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"portMappings"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"containerPort"</span><span class="p">:</span><span class="w"> </span><span class="mi">80</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"protocol"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tcp"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"logConfiguration"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"logDriver"</span><span class="p">:</span><span class="w"> </span><span class="s2">"awslogs"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"options"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"awslogs-group"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/ecs/nginx-web"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"awslogs-region"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ap-northeast-2"</span><span class="p">,</span><span class="w">
+          </span><span class="nl">"awslogs-stream-prefix"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ecs"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+      </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>주요 속성의 역할은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>속성</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">family</code></td>
+      <td>Task Definition Revision을 묶는 이름입니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">requiresCompatibilities</code></td>
+      <td>Fargate에서 실행할 수 있는 정의인지 검증합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">networkMode: awsvpc</code></td>
+      <td>각 Task에 Elastic Network Interface와 Private IP를 할당합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">cpu</code>, <code class="language-plaintext highlighter-rouge">memory</code></td>
+      <td>Task 전체에 예약할 Resource 조합입니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">executionRoleArn</code></td>
+      <td>ECS Agent가 Image와 Log Service에 접근할 때 사용합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">essential</code></td>
+      <td>이 Container가 중지되면 Task도 중지하도록 지정합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Log Group을 먼저 만들고 Task Definition을 등록합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws logs create-log-group <span class="se">\</span>
+  <span class="nt">--log-group-name</span> /ecs/nginx-web
+
+aws ecs register-task-definition <span class="se">\</span>
+  <span class="nt">--cli-input-json</span> file://nginx-task-definition.json
+</code></pre></div></div>
+
+<p>등록한 Revision을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs describe-task-definition <span class="se">\</span>
+  <span class="nt">--task-definition</span> nginx-web <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'taskDefinition.{family:family,revision:revision,status:status}'</span>
+</code></pre></div></div>
+
+<h2 id="6-단독-task-실행">6. 단독 Task 실행</h2>
+
+<hr />
+
+<p>단독 Task는 Batch 작업이나 일회성 검증에 적합합니다. 종료된 Task를 ECS Service가 자동으로 교체하지 않는다는 점을 확인하기 위해 먼저 이 방식으로 Nginx를 실행합니다.</p>
+
+<p>Security Group의 Inbound Rule은 실습 Client의 Public IP에서 오는 TCP 80만 허용합니다. <code class="language-plaintext highlighter-rouge">0.0.0.0/0</code>으로 관리 Port까지 함께 개방하지 않습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Type: HTTP
+Protocol: TCP
+Port: 80
+Source: &lt;CLIENT_PUBLIC_IP&gt;/32
+</code></pre></div></div>
+
+<p>Public Subnet에서 다음 명령을 실행합니다. Placeholder는 실제 Resource ID로 교체합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs run-task <span class="se">\</span>
+  <span class="nt">--cluster</span> web-cluster <span class="se">\</span>
+  <span class="nt">--launch-type</span> FARGATE <span class="se">\</span>
+  <span class="nt">--task-definition</span> nginx-web <span class="se">\</span>
+  <span class="nt">--network-configuration</span> <span class="s1">'awsvpcConfiguration={subnets=[&lt;PUBLIC_SUBNET_ID&gt;],securityGroups=[&lt;TASK_SECURITY_GROUP_ID&gt;],assignPublicIp=ENABLED}'</span>
+</code></pre></div></div>
+
+<p>Task가 <code class="language-plaintext highlighter-rouge">RUNNING</code>인지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs list-tasks <span class="se">\</span>
+  <span class="nt">--cluster</span> web-cluster <span class="se">\</span>
+  <span class="nt">--family</span> nginx-web <span class="se">\</span>
+  <span class="nt">--desired-status</span> RUNNING
+</code></pre></div></div>
+
+<p>Console에서 Task의 Public IP를 확인한 뒤 Nginx 응답을 검증합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl <span class="nt">-I</span> http://&lt;TASK_PUBLIC_IP&gt;/
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">HTTP/1.1 200 OK</code>가 반환되면 Network와 Container Port가 연결된 상태입니다. Task를 중지하면 이 Public IP는 더 이상 사용할 수 없으며 새 Task에도 같은 주소가 보장되지 않습니다.</p>
+
+<h2 id="7-alb-기반-service-구성">7. ALB 기반 Service 구성</h2>
+
+<hr />
+
+<p>지속적으로 제공할 Application은 단독 Task 대신 Service로 실행합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Internet Client
+  ↓ TCP 80 또는 443
+Application Load Balancer
+  ↓ ALB Listener와 Rule
+IP Target Group
+  ↓ TCP 80
+Fargate Task 1 · Fargate Task 2
+</code></pre></div></div>
+
+<p>Fargate의 <code class="language-plaintext highlighter-rouge">awsvpc</code> Network Mode에서는 각 Task가 IP를 가지므로 Target Group의 Target Type을 <code class="language-plaintext highlighter-rouge">ip</code>로 생성합니다.</p>
+
+<p>Security Group은 호출 방향에 맞춰 분리합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Security Group</th>
+      <th>Inbound Rule</th>
+      <th>Source</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">alb-sg</code></td>
+      <td>TCP 80·443</td>
+      <td>필요한 Client 대역 또는 Internet</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">nginx-task-sg</code></td>
+      <td>TCP 80</td>
+      <td><code class="language-plaintext highlighter-rouge">alb-sg</code>의 Security Group ID</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Task Security Group의 Source를 ALB Security Group으로 지정하면 ALB를 통과하지 않은 직접 요청을 차단할 수 있습니다.</p>
+
+<p>Target Group의 Health Check는 다음과 같이 설정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>값</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Protocol</td>
+      <td>HTTP</td>
+    </tr>
+    <tr>
+      <td>Path</td>
+      <td><code class="language-plaintext highlighter-rouge">/</code></td>
+    </tr>
+    <tr>
+      <td>Port</td>
+      <td>Traffic port</td>
+    </tr>
+    <tr>
+      <td>Success code</td>
+      <td><code class="language-plaintext highlighter-rouge">200</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>ECS Console의 <strong>Cluster → Services → Create</strong>에서 다음 값을 지정합니다.</p>
+
+<ol>
+  <li>
+    <p>Compute option은 <code class="language-plaintext highlighter-rouge">Launch type</code>, Launch type은 <code class="language-plaintext highlighter-rouge">FARGATE</code>를 선택합니다.</p>
+  </li>
+  <li>
+    <p>Task Definition Family는 <code class="language-plaintext highlighter-rouge">nginx-web</code>, Revision은 최신 Revision을 선택합니다.</p>
+  </li>
+  <li>
+    <p>Service 이름은 <code class="language-plaintext highlighter-rouge">nginx-service</code>, Desired tasks는 <code class="language-plaintext highlighter-rouge">2</code>로 지정합니다.</p>
+  </li>
+  <li>
+    <p>두 개 이상의 Private Subnet과 <code class="language-plaintext highlighter-rouge">nginx-task-sg</code>를 선택합니다.</p>
+  </li>
+  <li>
+    <p>Application Load Balancer, Listener, <code class="language-plaintext highlighter-rouge">ip</code> Target Group과 Container Port 80을 연결합니다.</p>
+  </li>
+</ol>
+
+<p>Service가 안정화됐는지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs describe-services <span class="se">\</span>
+  <span class="nt">--cluster</span> web-cluster <span class="se">\</span>
+  <span class="nt">--services</span> nginx-service <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'services[0].{desired:desiredCount,running:runningCount,pending:pendingCount,events:events[0:3]}'</span>
+</code></pre></div></div>
+
+<p>Target Health와 ALB 응답도 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws elbv2 describe-target-health <span class="se">\</span>
+  <span class="nt">--target-group-arn</span> &lt;TARGET_GROUP_ARN&gt;
+
+curl <span class="nt">-I</span> http://&lt;ALB_DNS_NAME&gt;/
+</code></pre></div></div>
+
+<h2 id="8-task-definition-revision과-service-배포">8. Task Definition Revision과 Service 배포</h2>
+
+<hr />
+
+<p>Task Definition은 기존 Revision을 덮어쓰지 않습니다. Image나 설정을 바꾼 JSON을 등록하면 새 Revision이 생성됩니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs register-task-definition <span class="se">\</span>
+  <span class="nt">--cli-input-json</span> file://nginx-task-definition.json
+</code></pre></div></div>
+
+<p>Service가 새 Revision을 사용하도록 갱신합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs update-service <span class="se">\</span>
+  <span class="nt">--cluster</span> web-cluster <span class="se">\</span>
+  <span class="nt">--service</span> nginx-service <span class="se">\</span>
+  <span class="nt">--task-definition</span> nginx-web:&lt;NEW_REVISION&gt;
+</code></pre></div></div>
+
+<p>진행 중인 Deployment를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs describe-services <span class="se">\</span>
+  <span class="nt">--cluster</span> web-cluster <span class="se">\</span>
+  <span class="nt">--services</span> nginx-service <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'services[0].deployments[*].{status:status,taskDefinition:taskDefinition,desired:desiredCount,running:runningCount,failed:failedTasks}'</span>
+</code></pre></div></div>
+
+<p>현재 ECS Service의 Deployment Strategy는 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Strategy</th>
+      <th>동작</th>
+      <th>용도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Rolling</td>
+      <td>기존 Task를 새 Task로 점진적으로 교체합니다.</td>
+      <td>기본적인 무중단 배포</td>
+    </tr>
+    <tr>
+      <td>Blue/Green</td>
+      <td>새 Revision의 Green 환경을 검증한 뒤 Traffic을 전환합니다.</td>
+      <td>명확한 전환과 빠른 Rollback</td>
+    </tr>
+    <tr>
+      <td>Linear</td>
+      <td>일정 비율씩 Traffic을 이동합니다.</td>
+      <td>단계적 위험 제어</td>
+    </tr>
+    <tr>
+      <td>Canary</td>
+      <td>일부 Traffic으로 먼저 검증한 뒤 나머지를 전환합니다.</td>
+      <td>실제 Traffic 기반 사전 검증</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Blue/Green은 새 Task Definition Revision으로 Green Task Set을 만들고 Health Check를 통과한 뒤 Traffic을 전환합니다. 전환 중에는 Blue와 Green을 함께 실행할 Capacity가 필요합니다. 기존 CodeDeploy 기반 Blue/Green도 지원되지만, 새 Service 구성에서는 ECS Deployment Controller가 제공하는 Native Blue/Green·Linear·Canary 기능을 우선 검토합니다.</p>
+
+<h2 id="9-service-auto-scaling">9. Service Auto Scaling</h2>
+
+<hr />
+
+<p>Service Auto Scaling은 Metric에 따라 Desired Count를 변경합니다. Task 내부의 Process 수를 바꾸는 기능이 아닙니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>의미</th>
+      <th>주의 사항</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">ECSServiceAverageCPUUtilization</code></td>
+      <td>Service Task의 평균 CPU 사용률</td>
+      <td>CPU가 병목인 Workload에 사용합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">ECSServiceAverageMemoryUtilization</code></td>
+      <td>Service Task의 평균 Memory 사용률</td>
+      <td>Memory 사용량이 부하와 비례하는지 확인합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">ALBRequestCountPerTarget</code></td>
+      <td>Target 하나당 요청 수</td>
+      <td>ECS Blue/Green Target Tracking에는 사용할 수 없습니다.</td>
+    </tr>
+    <tr>
+      <td>Custom Metric</td>
+      <td>Application Queue나 처리량</td>
+      <td>CloudWatch에 Metric을 별도로 발행해야 합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Target Tracking Policy에서는 최소·최대 Task 수와 Target 값을 지정합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Minimum tasks: 2
+Maximum tasks: 6
+Target metric: Average CPU utilization 60%
+Scale-out cooldown: 60 seconds
+Scale-in cooldown: 180 seconds
+</code></pre></div></div>
+
+<p>Scale-out Cooldown은 확장 직후 추가 확장 판단에 새 Capacity가 반영될 시간을 줍니다. Scale-in Cooldown은 축소 직후 너무 빠르게 다시 축소하지 않도록 합니다. 배포 중에는 Scale-out이 가능하지만 Service Auto Scaling의 Scale-in은 일시 중단됩니다.</p>
+
+<p>여러 Target Tracking Policy를 함께 사용하면 어느 하나라도 확장을 요구할 때 Scale-out하며, 모든 Policy가 축소에 동의할 때 Scale-in합니다.</p>
+
+<h2 id="10-장애와-배포-상태-점검">10. 장애와 배포 상태 점검</h2>
+
+<hr />
+
+<p>Service 상태만 보지 않고 Event, 중지된 Task 이유, Target Health와 Log를 함께 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws ecs describe-services <span class="se">\</span>
+  <span class="nt">--cluster</span> web-cluster <span class="se">\</span>
+  <span class="nt">--services</span> nginx-service <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'services[0].events[0:10]'</span>
+
+aws ecs list-tasks <span class="se">\</span>
+  <span class="nt">--cluster</span> web-cluster <span class="se">\</span>
+  <span class="nt">--service-name</span> nginx-service <span class="se">\</span>
+  <span class="nt">--desired-status</span> STOPPED
+
+aws logs <span class="nb">tail</span> /ecs/nginx-web <span class="se">\</span>
+  <span class="nt">--since</span> 10m
+</code></pre></div></div>
+
+<p>대표적인 실패 원인은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>증상</th>
+      <th>확인할 항목</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Task가 <code class="language-plaintext highlighter-rouge">PENDING</code>에 머묾</td>
+      <td>Subnet의 IP 여유, Fargate CPU·Memory 조합, Service Quota</td>
+    </tr>
+    <tr>
+      <td>Image Pull 실패</td>
+      <td>Execution Role, Image URI, NAT Gateway 또는 ECR VPC Endpoint</td>
+    </tr>
+    <tr>
+      <td>Target이 <code class="language-plaintext highlighter-rouge">unhealthy</code></td>
+      <td>Health Check Path, Container Port, Task Security Group</td>
+    </tr>
+    <tr>
+      <td>ALB 응답 없음</td>
+      <td>Listener Rule, ALB Security Group, Target Group 상태</td>
+    </tr>
+    <tr>
+      <td>새 Revision이 Rollback됨</td>
+      <td>Container Log, Health Check Grace Period, Deployment Circuit Breaker</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="11-resource-정리">11. Resource 정리</h2>
+
+<hr />
+
+<p>비용이 계속 발생하지 않도록 실습 Resource의 의존 순서에 맞춰 정리합니다.</p>
+
+<ol>
+  <li>
+    <p>ECS Service의 Desired Count를 0으로 변경하거나 Service를 삭제합니다.</p>
+  </li>
+  <li>
+    <p>단독 실행한 Task가 남아 있으면 중지합니다.</p>
+  </li>
+  <li>
+    <p>ALB Listener, Target Group과 ALB를 삭제합니다.</p>
+  </li>
+  <li>
+    <p>사용하지 않는 Log Group, Security Group과 ECS Cluster를 삭제합니다.</p>
+  </li>
+  <li>
+    <p>NAT Gateway를 실습용으로 만들었다면 Elastic IP와 함께 삭제 여부를 확인합니다.</p>
+  </li>
+</ol>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Task Definition은 실행 Template이고 Task는 그 Revision으로 생성된 실행 단위입니다.</p>
+    </li>
+    <li>
+      <p>단독 Task는 종료돼도 자동 교체되지 않지만 Service는 Desired Count를 유지합니다.</p>
+    </li>
+    <li>
+      <p>Fargate Task는 <code class="language-plaintext highlighter-rouge">awsvpc</code> Network Mode에서 IP를 가지므로 ALB Target Group은 <code class="language-plaintext highlighter-rouge">ip</code> Type을 사용합니다.</p>
+    </li>
+    <li>
+      <p>새 Application Version은 새 Task Definition Revision으로 등록하고 Service Deployment로 교체합니다.</p>
+    </li>
+    <li>
+      <p>Service Auto Scaling은 Metric, 최소·최대 Task 수와 Cooldown을 함께 설계합니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/capacity-launch-type-comparison.html">Amazon ECS Capacity option 비교</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html">Amazon ECS Task Definition</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_service-options.html">Amazon ECS Service Deployment Strategy</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/blue-green-deployment-implementation.html">Amazon ECS Blue/Green Deployment</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-auto-scaling.html">Amazon ECS Service Auto Scaling</a></p>
+  </li>
+</ul>
+
+<p>다음 글에서는 <a href="/cloud-15-django-ecr-ecs-github-actions/">Django Image를 ECR와 ECS에 배포하는 GitHub Actions Pipeline</a>을 구성합니다.</p>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-13-django-rest-api-container-preparation/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">Django REST API 생성과 Container 배포 준비</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-15-django-ecr-ecs-github-actions/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">Django Image를 ECR와 ECS에 배포하는 GitHub Actions Pipeline</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791030845"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791030845"></script>
+  </body>
+</html>
