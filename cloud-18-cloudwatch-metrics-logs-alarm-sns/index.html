@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>CloudWatch Metric·Logs·Alarm과 SNS 알림 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="CloudWatch의 Metric, Logs, Dashboard와 Alarm 상태를 구분하고 EC2 Detailed Monitoring, SNS Email 알림과 CPU 부하 검증 절차를 구성합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-18-cloudwatch-metrics-logs-alarm-sns/">
+<meta property="og:title" content="CloudWatch Metric·Logs·Alarm과 SNS 알림 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="CloudWatch의 Metric, Logs, Dashboard와 Alarm 상태를 구분하고 EC2 Detailed Monitoring, SNS Email 알림과 CPU 부하 검증 절차를 구성합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-18-cloudwatch-metrics-logs-alarm-sns/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="CloudWatch Metric·Logs·Alarm과 SNS 알림 | renamed.log">
+<meta name="twitter:description" content="CloudWatch의 Metric, Logs, Dashboard와 Alarm 상태를 구분하고 EC2 Detailed Monitoring, SNS Email 알림과 CPU 부하 검증 절차를 구성합니다">
+
+  <meta property="article:published_time" content="2026-10-06T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791293185" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791293185" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791293185">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791293185" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791293185">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "CloudWatch Metric·Logs·Alarm과 SNS 알림 | renamed.log",
+    "description": "CloudWatch의 Metric, Logs, Dashboard와 Alarm 상태를 구분하고 EC2 Detailed Monitoring, SNS Email 알림과 CPU 부하 검증 절차를 구성합니다",
+    "url": "https://hyn128.site/cloud-18-cloudwatch-metrics-logs-alarm-sns/",
+    "datePublished": "2026-10-06T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">CloudWatch Metric·Logs·Alarm과 SNS 알림</h1>
+    
+      <p class="post-head__description">CloudWatch의 Metric, Logs, Dashboard와 Alarm 상태를 구분하고 EC2 Detailed Monitoring, SNS Email 알림과 CPU 부하 검증 절차를 구성합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 6일 · 6분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Amazon CloudWatch는 AWS Resource와 Application의 Metric, Log와 Alarm을 수집·조회하는 Monitoring Service입니다. EC2 CPU Metric을 기준으로 Alarm을 만들고 Amazon SNS Email 구독으로 상태 변경을 알립니다. Metric, Log와 Event의 차이를 먼저 구분한 뒤 Alarm 생성, CPU 부하 발생, 상태 확인과 Resource 정리 순서로 실습합니다.</p>
+</blockquote>
+
+<h2 id="1-cloudwatch에서-다루는-데이터">1. CloudWatch에서 다루는 데이터</h2>
+
+<hr />
+
+<p>CloudWatch의 Metric과 Log는 다른 데이터입니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>내용</th>
+      <th>예시</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Metric</td>
+      <td>시간에 따른 수치 데이터</td>
+      <td>EC2 <code class="language-plaintext highlighter-rouge">CPUUtilization</code>, EBS <code class="language-plaintext highlighter-rouge">VolumeReadOps</code></td>
+    </tr>
+    <tr>
+      <td>Logs</td>
+      <td>Application과 System이 남긴 Text Event</td>
+      <td>Web Access Log, Container Standard Output</td>
+    </tr>
+    <tr>
+      <td>Alarm</td>
+      <td>Metric이나 Metric Math 결과를 임계값과 비교한 상태</td>
+      <td>평균 CPU가 70%를 초과하면 <code class="language-plaintext highlighter-rouge">ALARM</code></td>
+    </tr>
+    <tr>
+      <td>Dashboard</td>
+      <td>Metric과 Log Widget을 한 화면에 배치</td>
+      <td>EC2·EBS 운영 현황</td>
+    </tr>
+    <tr>
+      <td>Event</td>
+      <td>AWS Resource 상태 변화나 일정</td>
+      <td>Instance 상태 변경, 매일 정해진 시간 실행</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>CloudWatch는 Log를 자동으로 Metric Graph로 바꾸지 않습니다. AWS Service가 발행한 Metric을 Graph로 표시하거나, Log에서 Metric Filter를 만들어 필요한 수치를 별도로 발행합니다.</p>
+
+<p>CloudWatch Events 기능은 Amazon EventBridge로 확장됐습니다. 기존 Events API는 호환되지만 새로운 Event Pattern과 Schedule Rule은 EventBridge Console에서 관리합니다.</p>
+
+<h2 id="2-cloudwatch-metrics">2. CloudWatch Metrics</h2>
+
+<hr />
+
+<p>Metric은 다음 요소로 식별됩니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>요소</th>
+      <th>역할</th>
+      <th>EC2 예제</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Namespace</td>
+      <td>Metric을 묶는 범위</td>
+      <td><code class="language-plaintext highlighter-rouge">AWS/EC2</code></td>
+    </tr>
+    <tr>
+      <td>Metric Name</td>
+      <td>측정 항목</td>
+      <td><code class="language-plaintext highlighter-rouge">CPUUtilization</code></td>
+    </tr>
+    <tr>
+      <td>Dimension</td>
+      <td>Resource 식별 조건</td>
+      <td><code class="language-plaintext highlighter-rouge">InstanceId=&lt;EC2_INSTANCE_ID&gt;</code></td>
+    </tr>
+    <tr>
+      <td>Statistic</td>
+      <td>기간 내 집계 방식</td>
+      <td><code class="language-plaintext highlighter-rouge">Average</code>, <code class="language-plaintext highlighter-rouge">Maximum</code>, <code class="language-plaintext highlighter-rouge">Sum</code></td>
+    </tr>
+    <tr>
+      <td>Period</td>
+      <td>한 Data Point가 집계하는 시간</td>
+      <td>60초, 300초</td>
+    </tr>
+    <tr>
+      <td>Unit</td>
+      <td>값의 단위</td>
+      <td><code class="language-plaintext highlighter-rouge">Percent</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">Average CPUUtilization</code>과 <code class="language-plaintext highlighter-rouge">Maximum CPUUtilization</code>은 같은 원본 Metric을 서로 다르게 해석합니다. Alarm 목적에 맞는 Statistic과 Period를 선택합니다.</p>
+
+<h2 id="3-ec2-기본-monitoring과-상세-monitoring">3. EC2 기본 Monitoring과 상세 Monitoring</h2>
+
+<hr />
+
+<p>EC2 Monitoring 주기는 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>EC2 Metric 주기</th>
+      <th>비용</th>
+      <th>용도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Basic Monitoring</td>
+      <td>5분</td>
+      <td>추가 비용 없음</td>
+      <td>장기 추세와 완만한 변화 확인</td>
+    </tr>
+    <tr>
+      <td>Detailed Monitoring</td>
+      <td>1분</td>
+      <td>추가 비용 발생</td>
+      <td>짧은 Spike와 빠른 Alarm 판단</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Monitoring 주기는 AWS Service마다 다릅니다. EC2의 5분·1분 구분을 모든 Service에 동일하게 적용하지 않습니다.</p>
+
+<p>EC2 기본 Metric에는 CPU와 Network Traffic이 포함되지만 File System 사용률이나 Memory 사용률은 포함되지 않습니다. OS 내부 값은 CloudWatch Agent 같은 수집기를 설치해 Custom Metric으로 보내야 합니다. EBS Volume의 I/O는 <code class="language-plaintext highlighter-rouge">AWS/EBS</code> Namespace에서 확인합니다.</p>
+
+<p>현재 EC2 Instance에 Detailed Monitoring이 적용됐는지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws ec2 describe-instances <span class="se">\</span>
+  <span class="nt">--instance-ids</span> &lt;EC2_INSTANCE_ID&gt; <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'Reservations[0].Instances[0].Monitoring.State'</span> <span class="se">\</span>
+  <span class="nt">--output</span> text
+</code></pre></div></div>
+
+<p>1분 주기 CPU Alarm을 검증할 때 Detailed Monitoring을 활성화합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws ec2 monitor-instances <span class="se">\</span>
+  <span class="nt">--instance-ids</span> &lt;EC2_INSTANCE_ID&gt;
+</code></pre></div></div>
+
+<p>실습 후 필요하지 않으면 추가 비용을 막기 위해 해제합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws ec2 unmonitor-instances <span class="se">\</span>
+  <span class="nt">--instance-ids</span> &lt;EC2_INSTANCE_ID&gt;
+</code></pre></div></div>
+
+<h2 id="4-cloudwatch-logs">4. CloudWatch Logs</h2>
+
+<hr />
+
+<p>CloudWatch Logs는 다음 계층으로 데이터를 관리합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Log Group
+└── Log Stream
+    └── Log Event
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>계층</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Log Group</td>
+      <td>같은 Retention과 접근 정책을 적용할 Log 묶음</td>
+    </tr>
+    <tr>
+      <td>Log Stream</td>
+      <td>하나의 Instance, Container 또는 Process가 보내는 Log 흐름</td>
+    </tr>
+    <tr>
+      <td>Log Event</td>
+      <td>Timestamp와 Message로 구성된 개별 기록</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Log Group에는 Retention을 설정합니다. 기간을 지정하지 않으면 Log가 계속 보관돼 Storage 비용이 증가할 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws logs put-retention-policy <span class="se">\</span>
+  <span class="nt">--log-group-name</span> /example/application <span class="se">\</span>
+  <span class="nt">--retention-in-days</span> 30
+</code></pre></div></div>
+
+<p>CloudWatch Logs Insights에서는 필요한 Field를 선택하고 조건을 적용해 Log를 조회합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>fields @timestamp, @message, @logStream
+| filter @message like /ERROR/
+| sort @timestamp desc
+| limit 50
+</code></pre></div></div>
+
+<p>Log Group의 일정 기간을 S3로 Export할 수 있습니다. 지속적인 Archive가 필요하면 반복 Export Task보다 Subscription을 이용해 전달하는 구성을 검토합니다.</p>
+
+<h2 id="5-dashboard">5. Dashboard</h2>
+
+<hr />
+
+<p>Dashboard는 여러 Metric과 Log Query를 한 화면에 배치합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Operations Dashboard
+├── EC2 CPUUtilization
+├── EC2 NetworkIn·NetworkOut
+├── EBS Read·Write Operations
+├── Alarm Status
+└── Application ERROR Log Query
+</code></pre></div></div>
+
+<p>Widget마다 Region, Namespace, Dimension과 Period를 확인합니다. 서로 다른 Period와 Statistic을 한 Graph에 섞으면 값의 의미를 잘못 해석할 수 있습니다.</p>
+
+<p>자동 Dashboard는 Service Resource를 빠르게 확인할 때 사용합니다. 운영 Dashboard에는 Service Level과 장애 판단에 필요한 Metric만 배치합니다.</p>
+
+<h2 id="6-alarm-상태">6. Alarm 상태</h2>
+
+<hr />
+
+<p>CloudWatch Alarm은 세 상태 중 하나입니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>상태</th>
+      <th>의미</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">OK</code></td>
+      <td>평가한 Data Point가 Alarm 조건을 충족하지 않습니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">ALARM</code></td>
+      <td>설정한 수의 Data Point가 임계 조건을 충족합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">INSUFFICIENT_DATA</code></td>
+      <td>생성 직후이거나 평가할 Data Point가 부족합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">INSUFFICIENT_DATA</code>는 항상 장애를 뜻하지 않습니다. Metric 발행 주기, Dimension, Period와 Missing Data 처리 방식을 확인해야 합니다.</p>
+
+<p>Alarm은 상태가 바뀔 때 SNS 알림, EC2 Action이나 Auto Scaling Action을 실행할 수 있습니다. Alarm 자체가 원인을 분석하거나 Instance 성능을 임의로 낮추지는 않습니다.</p>
+
+<h2 id="7-실습-resource-준비">7. 실습 Resource 준비</h2>
+
+<hr />
+
+<p>다음 Resource를 준비합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>예제</th>
+      <th>목적</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>EC2 Instance</td>
+      <td>Ubuntu, <code class="language-plaintext highlighter-rouge">&lt;EC2_INSTANCE_ID&gt;</code></td>
+      <td>CPU 부하 발생 대상</td>
+    </tr>
+    <tr>
+      <td>SNS Topic</td>
+      <td><code class="language-plaintext highlighter-rouge">ec2-cpu-alarm-topic</code></td>
+      <td>Alarm 상태 변경 전달</td>
+    </tr>
+    <tr>
+      <td>Email Endpoint</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;ALERT_EMAIL&gt;</code></td>
+      <td>알림 수신과 구독 확인</td>
+    </tr>
+    <tr>
+      <td>CloudWatch Alarm</td>
+      <td><code class="language-plaintext highlighter-rouge">ec2-high-cpu</code></td>
+      <td>CPU 임계값 평가</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>EC2 접속은 Session Manager를 우선 사용합니다. SSH가 필요한 환경에서는 Security Group의 Port 22를 관리 Client IP로 제한하고 Private Key를 Repository에 저장하지 않습니다.</p>
+
+<h2 id="8-sns-topic과-email-구독">8. SNS Topic과 Email 구독</h2>
+
+<hr />
+
+<p>SNS Topic을 생성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws sns create-topic <span class="se">\</span>
+  <span class="nt">--name</span> ec2-cpu-alarm-topic
+</code></pre></div></div>
+
+<p>출력된 Topic ARN은 다음 형식입니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>arn:aws:sns:&lt;AWS_REGION&gt;:&lt;AWS_ACCOUNT_ID&gt;:ec2-cpu-alarm-topic
+</code></pre></div></div>
+
+<p>Email 구독을 만듭니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws sns subscribe <span class="se">\</span>
+  <span class="nt">--topic-arn</span> &lt;SNS_TOPIC_ARN&gt; <span class="se">\</span>
+  <span class="nt">--protocol</span> email <span class="se">\</span>
+  <span class="nt">--notification-endpoint</span> <span class="s1">'&lt;ALERT_EMAIL&gt;'</span>
+</code></pre></div></div>
+
+<p>AWS가 보낸 Subscription Confirmation Email에서 Confirm Link를 눌러야 알림을 받을 수 있습니다. 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws sns list-subscriptions-by-topic <span class="se">\</span>
+  <span class="nt">--topic-arn</span> &lt;SNS_TOPIC_ARN&gt;
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">SubscriptionArn</code>이 <code class="language-plaintext highlighter-rouge">PendingConfirmation</code>이면 아직 확인되지 않은 상태입니다.</p>
+
+<h2 id="9-ec2-cpu-alarm-생성">9. EC2 CPU Alarm 생성</h2>
+
+<hr />
+
+<p>평균 CPU 사용률이 2분 연속 70%를 초과하면 <code class="language-plaintext highlighter-rouge">ALARM</code>이 되도록 설정합니다. 이 예제는 Detailed Monitoring이 활성화된 EC2 Instance를 전제로 합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws cloudwatch put-metric-alarm <span class="se">\</span>
+  <span class="nt">--alarm-name</span> ec2-high-cpu <span class="se">\</span>
+  <span class="nt">--alarm-description</span> <span class="s1">'Average CPU exceeds 70 percent for two minutes'</span> <span class="se">\</span>
+  <span class="nt">--namespace</span> AWS/EC2 <span class="se">\</span>
+  <span class="nt">--metric-name</span> CPUUtilization <span class="se">\</span>
+  <span class="nt">--dimensions</span> <span class="nv">Name</span><span class="o">=</span>InstanceId,Value<span class="o">=</span>&lt;EC2_INSTANCE_ID&gt; <span class="se">\</span>
+  <span class="nt">--statistic</span> Average <span class="se">\</span>
+  <span class="nt">--period</span> 60 <span class="se">\</span>
+  <span class="nt">--evaluation-periods</span> 2 <span class="se">\</span>
+  <span class="nt">--datapoints-to-alarm</span> 2 <span class="se">\</span>
+  <span class="nt">--threshold</span> 70 <span class="se">\</span>
+  <span class="nt">--comparison-operator</span> GreaterThanThreshold <span class="se">\</span>
+  <span class="nt">--treat-missing-data</span> missing <span class="se">\</span>
+  <span class="nt">--alarm-actions</span> &lt;SNS_TOPIC_ARN&gt; <span class="se">\</span>
+  <span class="nt">--ok-actions</span> &lt;SNS_TOPIC_ARN&gt;
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Option</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--period 60</code></td>
+      <td>60초 단위로 Metric을 집계합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--evaluation-periods 2</code></td>
+      <td>최근 두 구간을 평가합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--datapoints-to-alarm 2</code></td>
+      <td>두 Data Point가 모두 조건을 충족해야 Alarm이 됩니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--treat-missing-data missing</code></td>
+      <td>누락 값을 정상이나 장애로 임의 변환하지 않습니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--alarm-actions</code></td>
+      <td><code class="language-plaintext highlighter-rouge">ALARM</code> 전환 시 SNS Topic으로 알립니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--ok-actions</code></td>
+      <td>정상 복구 시에도 SNS Topic으로 알립니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>생성한 설정과 현재 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws cloudwatch describe-alarms <span class="se">\</span>
+  <span class="nt">--alarm-names</span> ec2-high-cpu <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'MetricAlarms[0].{state:StateValue,reason:StateReason,period:Period,evaluationPeriods:EvaluationPeriods,threshold:Threshold}'</span>
+</code></pre></div></div>
+
+<h2 id="10-cpu-부하-발생과-검증">10. CPU 부하 발생과 검증</h2>
+
+<hr />
+
+<p>Ubuntu EC2에 접속한 뒤 CPU 수를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [EC2]</span>
+<span class="nb">nproc</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">stress</code> Package를 설치합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [EC2]</span>
+<span class="nb">sudo </span>apt-get update
+<span class="nb">sudo </span>apt-get <span class="nb">install</span> <span class="nt">-y</span> stress
+</code></pre></div></div>
+
+<p>두 CPU Worker에 5분 동안 부하를 발생시킵니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [EC2]</span>
+stress <span class="nt">--cpu</span> 2 <span class="nt">--timeout</span> 300
+</code></pre></div></div>
+
+<p>다음 순서로 결과를 확인합니다.</p>
+
+<ol>
+  <li>
+    <p>CloudWatch의 EC2 <code class="language-plaintext highlighter-rouge">CPUUtilization</code> Graph가 상승하는지 확인합니다.</p>
+  </li>
+  <li>
+    <p>Alarm 상태가 <code class="language-plaintext highlighter-rouge">INSUFFICIENT_DATA</code> 또는 <code class="language-plaintext highlighter-rouge">OK</code>에서 <code class="language-plaintext highlighter-rouge">ALARM</code>으로 바뀌는지 확인합니다.</p>
+  </li>
+  <li>
+    <p>SNS Email이 도착했는지 확인합니다.</p>
+  </li>
+  <li>
+    <p>부하 종료 후 Alarm이 <code class="language-plaintext highlighter-rouge">OK</code>로 돌아오고 복구 Email이 오는지 확인합니다.</p>
+  </li>
+</ol>
+
+<p>Metric 수집, Alarm 평가와 SNS 전달에는 시간이 걸립니다. <code class="language-plaintext highlighter-rouge">stress</code> 실행 직후 상태가 바뀌지 않았다고 설정 실패로 단정하지 않습니다.</p>
+
+<h2 id="11-network와-ebs-metric-확인">11. Network와 EBS Metric 확인</h2>
+
+<hr />
+
+<p>File 전송으로 Network와 EBS I/O 변화를 확인할 수 있습니다. SSH가 허용된 실습 환경에서 다음 Placeholder를 실제 경로와 Host로 교체합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+scp <span class="se">\</span>
+  <span class="nt">-i</span> &lt;PRIVATE_KEY_PATH&gt; <span class="se">\</span>
+  &lt;LOCAL_LARGE_FILE&gt; <span class="se">\</span>
+  &lt;EC2_USER&gt;@&lt;EC2_PUBLIC_DNS&gt;:/tmp/
+</code></pre></div></div>
+
+<p>전송 전후에 다음 Metric을 확인합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Namespace</th>
+      <th>Metric</th>
+      <th>의미</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AWS/EC2</code></td>
+      <td><code class="language-plaintext highlighter-rouge">NetworkIn</code>, <code class="language-plaintext highlighter-rouge">NetworkOut</code></td>
+      <td>Instance Network Byte</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AWS/EBS</code></td>
+      <td><code class="language-plaintext highlighter-rouge">VolumeReadOps</code>, <code class="language-plaintext highlighter-rouge">VolumeWriteOps</code></td>
+      <td>EBS I/O Operation 수</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AWS/EBS</code></td>
+      <td><code class="language-plaintext highlighter-rouge">VolumeReadBytes</code>, <code class="language-plaintext highlighter-rouge">VolumeWriteBytes</code></td>
+      <td>EBS 전송 Byte</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>File System의 남은 용량은 기본 EC2 Metric이 아닙니다. EC2 내부에서 <code class="language-plaintext highlighter-rouge">df -h</code>로 확인하거나 CloudWatch Agent로 <code class="language-plaintext highlighter-rouge">disk_used_percent</code> Custom Metric을 발행합니다.</p>
+
+<h2 id="12-eventbridge와-schedule">12. EventBridge와 Schedule</h2>
+
+<hr />
+
+<p>AWS Resource Event나 일정에 반응하는 Rule은 EventBridge에서 생성합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>AWS Service Event 또는 Schedule
+  ↓ EventBridge Rule
+Target
+  ├── Lambda
+  ├── SNS
+  ├── SQS
+  └── Step Functions
+</code></pre></div></div>
+
+<p>Event Pattern은 Source, Detail Type과 세부 조건으로 필요한 Event만 선택합니다. Schedule은 Cron 또는 Rate 표현식으로 실행 시점을 정의합니다. CloudWatch Alarm의 Metric 평가와 EventBridge Rule의 Event Routing은 목적이 다릅니다.</p>
+
+<h2 id="13-resource-정리">13. Resource 정리</h2>
+
+<hr />
+
+<p>실습이 끝나면 Alarm, Subscription과 Topic을 정리합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws cloudwatch delete-alarms <span class="se">\</span>
+  <span class="nt">--alarm-names</span> ec2-high-cpu
+
+aws sns unsubscribe <span class="se">\</span>
+  <span class="nt">--subscription-arn</span> &lt;SNS_SUBSCRIPTION_ARN&gt;
+
+aws sns delete-topic <span class="se">\</span>
+  <span class="nt">--topic-arn</span> &lt;SNS_TOPIC_ARN&gt;
+</code></pre></div></div>
+
+<p>Detailed Monitoring을 유지하지 않을 경우 해제하고, 실습용 EC2 Instance도 중지 또는 종료합니다. Dashboard, Custom Metric, Log Storage, Alarm과 SNS 전송에는 항목별 비용이 발생할 수 있습니다.</p>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Metric은 수치 시계열이고 Logs는 개별 Text Event입니다.</p>
+    </li>
+    <li>
+      <p>EC2 Basic Monitoring은 5분, Detailed Monitoring은 1분 주기로 Metric을 발행합니다.</p>
+    </li>
+    <li>
+      <p>Memory와 File System 사용률은 기본 EC2 Metric이 아니므로 CloudWatch Agent가 필요합니다.</p>
+    </li>
+    <li>
+      <p>Alarm은 <code class="language-plaintext highlighter-rouge">OK</code>, <code class="language-plaintext highlighter-rouge">ALARM</code>, <code class="language-plaintext highlighter-rouge">INSUFFICIENT_DATA</code> 상태를 가지며 SNS로 상태 변경을 전달할 수 있습니다.</p>
+    </li>
+    <li>
+      <p>CloudWatch Events의 Event Routing 기능은 현재 Amazon EventBridge에서 관리합니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch-metrics-basic-detailed.html">CloudWatch Basic Monitoring과 Detailed Monitoring</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html">CloudWatch Alarm 상태</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AnalyzingLogData.html">CloudWatch Logs Insights Query</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/S3Export.html">CloudWatch Logs를 S3로 Export</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html">Amazon EventBridge</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-17-cloudformation-eksctl-cluster-nginx/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">CloudFormation Network와 eksctl로 EKS Cluster 구축</strong>
+          </span>
+        </a>
+      
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791293185"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791293185"></script>
+  </body>
+</html>

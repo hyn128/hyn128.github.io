@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>CloudFormation과 Amazon EKS 구조 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="CloudFormation의 Stack·Template 동작과 Terraform의 차이를 정리하고 Amazon EKS의 Control Plane, Data Plane, VPC CNI, IAM과 Load Balancer 연동 구조를 확인합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-16-cloudformation-amazon-eks-architecture/">
+<meta property="og:title" content="CloudFormation과 Amazon EKS 구조 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="CloudFormation의 Stack·Template 동작과 Terraform의 차이를 정리하고 Amazon EKS의 Control Plane, Data Plane, VPC CNI, IAM과 Load Balancer 연동 구조를 확인합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-16-cloudformation-amazon-eks-architecture/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="CloudFormation과 Amazon EKS 구조 | renamed.log">
+<meta name="twitter:description" content="CloudFormation의 Stack·Template 동작과 Terraform의 차이를 정리하고 Amazon EKS의 Control Plane, Data Plane, VPC CNI, IAM과 Load Balancer 연동 구조를 확인합니다">
+
+  <meta property="article:published_time" content="2026-10-05T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791293185" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791293185" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791293185">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791293185" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791293185">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "CloudFormation과 Amazon EKS 구조 | renamed.log",
+    "description": "CloudFormation의 Stack·Template 동작과 Terraform의 차이를 정리하고 Amazon EKS의 Control Plane, Data Plane, VPC CNI, IAM과 Load Balancer 연동 구조를 확인합니다",
+    "url": "https://hyn128.site/cloud-16-cloudformation-amazon-eks-architecture/",
+    "datePublished": "2026-10-05T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">CloudFormation과 Amazon EKS 구조</h1>
+    
+      <p class="post-head__description">CloudFormation의 Stack·Template 동작과 Terraform의 차이를 정리하고 Amazon EKS의 Control Plane, Data Plane, VPC CNI, IAM과 Load Balancer 연동 구조를 확인합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 5일 · 5분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>CloudFormation은 AWS Resource 구성을 Template으로 정의하고 Stack 단위로 생성·변경·삭제하는 AWS 전용 IaC Service입니다. Amazon EKS는 Kubernetes Control Plane을 AWS가 관리하며, 사용자는 EC2 Managed Node Group이나 Fargate 같은 Data Plane을 선택합니다. 이 글에서는 구축 명령을 실행하기 전에 두 Service의 역할과 EKS Network·인증·외부 노출 구조를 정리합니다.</p>
+</blockquote>
+
+<h2 id="1-cloudformation의-역할">1. CloudFormation의 역할</h2>
+
+<hr />
+
+<p>CloudFormation은 AWS Resource의 원하는 상태를 JSON 또는 YAML Template으로 정의합니다. Template을 실행하면 CloudFormation이 Resource를 만들고 Stack 단위로 상태를 추적합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>CloudFormation Template
+  ↓ Create stack
+CloudFormation Stack
+  ├── VPC
+  ├── Subnet
+  ├── Route Table
+  └── Internet Gateway
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>용어</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Template</td>
+      <td>생성할 Resource, Parameter, Mapping, Condition과 Output을 선언합니다.</td>
+    </tr>
+    <tr>
+      <td>Stack</td>
+      <td>Template으로 생성한 Resource 묶음과 현재 상태입니다.</td>
+    </tr>
+    <tr>
+      <td>Change Set</td>
+      <td>Stack 변경 전에 생성·수정·삭제될 Resource를 검토합니다.</td>
+    </tr>
+    <tr>
+      <td>Drift</td>
+      <td>실제 Resource 설정이 Stack Template과 달라진 상태입니다.</td>
+    </tr>
+    <tr>
+      <td>Output</td>
+      <td>생성된 VPC ID나 Subnet ID처럼 후속 작업에서 사용할 값을 반환합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Infrastructure를 Template으로 관리하면 같은 구성을 반복해서 만들 수 있고, Git에서 변경 이력을 검토할 수 있습니다. 수동 입력을 줄일 수 있지만 Template 오류, IAM 권한, Service Quota와 Region별 가용성까지 자동으로 해결되는 것은 아닙니다.</p>
+
+<h2 id="2-cloudformation과-terraform-비교">2. CloudFormation과 Terraform 비교</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>AWS CloudFormation</th>
+      <th>Terraform</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>제공사</td>
+      <td>AWS</td>
+      <td>HashiCorp</td>
+    </tr>
+    <tr>
+      <td>지원 범위</td>
+      <td>AWS Resource 중심</td>
+      <td>Provider를 통해 Cloud와 외부 Service 지원</td>
+    </tr>
+    <tr>
+      <td>선언 언어</td>
+      <td>JSON, YAML</td>
+      <td>HCL, JSON</td>
+    </tr>
+    <tr>
+      <td>상태 관리</td>
+      <td>AWS가 Stack 상태를 관리</td>
+      <td>사용자가 State Backend와 Locking을 구성</td>
+    </tr>
+    <tr>
+      <td>AWS 신규 기능 반영</td>
+      <td>AWS Resource Provider를 통해 제공</td>
+      <td>AWS Provider Version에 따라 반영</td>
+    </tr>
+    <tr>
+      <td>Module 생태계</td>
+      <td>Nested Stack, Module, Registry</td>
+      <td>Module Registry와 Provider 생태계</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>CloudFormation은 별도의 State File을 직접 운영하지 않습니다. Terraform은 State를 Local 또는 S3 같은 Remote Backend에 저장하므로 접근 통제와 동시 실행 방지 구성이 필요합니다.</p>
+
+<h2 id="3-s3-bucket-template-예제">3. S3 Bucket Template 예제</h2>
+
+<hr />
+
+<p>다음 Template은 Bucket 이름을 Parameter로 받고 S3 Bucket을 생성합니다. S3 Bucket 이름은 전 세계에서 고유해야 하므로 고정된 예제 이름을 그대로 사용하지 않습니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">AWSTemplateFormatVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2010-09-09"</span>
+<span class="na">Description</span><span class="pi">:</span> <span class="s">Create an S3 bucket for an IaC example</span>
+
+<span class="na">Parameters</span><span class="pi">:</span>
+  <span class="na">BucketName</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">String</span>
+    <span class="na">Description</span><span class="pi">:</span> <span class="s">Globally unique S3 bucket name</span>
+
+<span class="na">Resources</span><span class="pi">:</span>
+  <span class="na">MyS3Bucket</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::S3::Bucket</span>
+    <span class="na">DeletionPolicy</span><span class="pi">:</span> <span class="s">Retain</span>
+    <span class="na">UpdateReplacePolicy</span><span class="pi">:</span> <span class="s">Retain</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">BucketName</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">BucketName</span>
+      <span class="na">PublicAccessBlockConfiguration</span><span class="pi">:</span>
+        <span class="na">BlockPublicAcls</span><span class="pi">:</span> <span class="no">true</span>
+        <span class="na">IgnorePublicAcls</span><span class="pi">:</span> <span class="no">true</span>
+        <span class="na">BlockPublicPolicy</span><span class="pi">:</span> <span class="no">true</span>
+        <span class="na">RestrictPublicBuckets</span><span class="pi">:</span> <span class="no">true</span>
+
+<span class="na">Outputs</span><span class="pi">:</span>
+  <span class="na">BucketName</span><span class="pi">:</span>
+    <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">MyS3Bucket</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">DeletionPolicy: Retain</code>은 Stack을 삭제해도 Bucket을 보존합니다. 실습 Resource까지 함께 삭제하려면 Retain 정책과 Bucket 내부 Object 처리 방식을 먼저 결정합니다.</p>
+
+<p>Template의 기본 문법을 AWS API로 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>aws cloudformation validate-template <span class="se">\</span>
+  <span class="nt">--template-body</span> file://s3-bucket.yaml
+</code></pre></div></div>
+
+<p>검증이 성공해도 현재 IAM 권한, 이름 중복과 Service Quota 때문에 Stack 생성이 실패할 수 있습니다. 생성 전 Change Set과 Stack Event를 함께 확인합니다.</p>
+
+<h2 id="4-amazon-eks의-관리-경계">4. Amazon EKS의 관리 경계</h2>
+
+<hr />
+
+<blockquote>
+  <p>Amazon EKS는 Kubernetes API Server와 <code class="language-plaintext highlighter-rouge">etcd</code>를 포함한 Control Plane을 AWS가 운영하는 Managed Kubernetes Service입니다.</p>
+</blockquote>
+
+<p>AWS는 EKS를 re:Invent 2017에서 발표했고 서울 Region에는 2019년에 제공하기 시작했습니다.</p>
+
+<p>Kubernetes Cluster는 Control Plane과 Data Plane으로 나뉩니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Operator
+  ↓ kubectl 요청
+EKS Control Plane
+  ├── kube-apiserver
+  ├── etcd
+  ├── scheduler
+  └── controller manager
+        ↓ Pod 배치 결정과 상태 조정
+Data Plane
+  ├── Worker Node 1 → kubelet → Pod
+  └── Worker Node 2 → kubelet → Pod
+</code></pre></div></div>
+
+<p>Control Plane은 API 요청을 인증·인가하고 원하는 상태를 저장합니다. Scheduler가 Pod를 실행할 Node를 선택하면 해당 Worker Node의 kubelet이 Container Runtime을 통해 Container를 실행합니다. EKS가 Control Plane을 관리해도 Application 배포, Worker Capacity, Kubernetes Resource와 접근 권한은 사용자가 설계해야 합니다.</p>
+
+<h2 id="5-data-plane-선택">5. Data Plane 선택</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>방식</th>
+      <th>Node 관리</th>
+      <th>특징</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>EC2 Managed Node Group</td>
+      <td>EKS가 Node Group의 생성·교체·Update를 지원</td>
+      <td>EC2 Instance Type과 Node 설정을 제어할 수 있습니다.</td>
+    </tr>
+    <tr>
+      <td>Self-managed EC2 Node</td>
+      <td>사용자가 Auto Scaling Group과 Node 수명주기를 관리</td>
+      <td>Host 설정의 자유도가 높고 운영 범위도 넓습니다.</td>
+    </tr>
+    <tr>
+      <td>AWS Fargate</td>
+      <td>AWS가 Pod 실행 Host를 관리</td>
+      <td>Node 접속이 없고 지원 기능과 Pod 구성에 제약이 있습니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Managed Node Group에서도 Pod, DaemonSet, OS Image Update 시점과 Capacity 계획은 확인해야 합니다. Fargate는 Node 운영을 줄일 수 있지만 Host 접근, DaemonSet, Storage와 Network 요구 사항이 맞는지 먼저 검토합니다.</p>
+
+<h2 id="6-vpc와-pod-network">6. VPC와 Pod Network</h2>
+
+<hr />
+
+<p>일반적인 On-Premise Kubernetes는 Pod Network에 별도 CIDR을 두고 Overlay Network를 사용할 수 있습니다. EKS의 Amazon VPC CNI는 Pod에 VPC 주소를 할당해 VPC Resource와 직접 통신할 수 있게 합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>VPC CIDR
+├── Subnet A
+│   ├── Worker Node A
+│   └── Pod IP
+└── Subnet B
+    ├── Worker Node B
+    └── Pod IP
+</code></pre></div></div>
+
+<p>VPC 주소를 사용한다고 해서 모든 통신이 자동 허용되는 것은 아닙니다. Route Table, Security Group, Network ACL, Kubernetes NetworkPolicy와 Pod가 사용하는 IAM 권한을 각각 확인합니다.</p>
+
+<p>VPC와 Subnet의 범위는 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>범위</th>
+      <th>설계 기준</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Region</td>
+      <td>AWS의 지리적 영역</td>
+      <td>Cluster와 주 Resource를 배치합니다.</td>
+    </tr>
+    <tr>
+      <td>Availability Zone</td>
+      <td>Region 안의 독립된 위치</td>
+      <td>장애 분산을 위해 여러 AZ를 사용합니다.</td>
+    </tr>
+    <tr>
+      <td>VPC</td>
+      <td>Region 단위 Network</td>
+      <td>다른 VPC와 기본적으로 격리됩니다.</td>
+    </tr>
+    <tr>
+      <td>Subnet</td>
+      <td>하나의 Availability Zone</td>
+      <td>Public·Private Routing과 Workload 위치를 구분합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>여러 Availability Zone에 Node를 배치하려면 AZ별 Subnet이 필요합니다. Public Subnet은 Internet Gateway로 향하는 Route를 가지며, Private Subnet은 Internet Gateway로 직접 Route하지 않습니다.</p>
+
+<p>VPC는 하나의 Region에 속합니다. 다른 Region에 백업 환경을 만들려면 VPC와 관련 Resource를 해당 Region에 별도로 구성해야 합니다.</p>
+
+<h2 id="7-iam-인증과-kubernetes-인가">7. IAM 인증과 Kubernetes 인가</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">kubectl</code> 요청은 AWS IAM 인증과 Kubernetes 인가를 모두 통과해야 합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>AWS IAM Principal
+  ↓ 임시 Credential로 인증
+EKS Access Entry
+  ↓ EKS Access Policy 또는 Kubernetes Group 연결
+Kubernetes RBAC
+  ↓ 허용된 API 작업 수행
+Kubernetes Resource
+</code></pre></div></div>
+
+<p>새 Cluster에서는 IAM User와 장기 Access Key를 만드는 방식보다 IAM Identity Center나 AssumeRole 기반의 임시 Credential을 사용합니다. EKS Access Entry로 IAM Principal과 Cluster 권한을 연결하고 권한 범위를 Cluster 또는 Namespace 단위로 제한합니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">aws-auth</code> ConfigMap 기반 접근 관리는 Legacy 방식이며 EKS Cluster Access Management API로 대체되고 있습니다. 기존 Cluster를 즉시 변경하지는 않더라도 신규 Cluster에는 Access Entry 사용을 우선합니다.</p>
+
+<h2 id="8-elb-연동">8. ELB 연동</h2>
+
+<hr />
+
+<p>Cluster 외부에서 Pod로 접근하려면 Service, Ingress 또는 Gateway API Resource가 필요합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Kubernetes Resource</th>
+      <th>AWS 연동</th>
+      <th>용도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Service</code> Type <code class="language-plaintext highlighter-rouge">LoadBalancer</code></td>
+      <td>NLB 또는 Legacy CLB</td>
+      <td>TCP·UDP와 단순 Service 외부 노출</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Ingress</code></td>
+      <td>ALB</td>
+      <td>HTTP·HTTPS Host·Path Routing</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Gateway</code>·<code class="language-plaintext highlighter-rouge">Route</code></td>
+      <td>지원 Controller</td>
+      <td>역할을 분리한 표준 Routing 구성</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>AWS Load Balancer Controller는 Service와 Ingress Resource를 감시하고 AWS Load Balancer를 생성합니다. Legacy Service Controller도 동작할 수 있지만 Critical Bug Fix 중심으로 유지되므로 새 Cluster는 AWS Load Balancer Controller 또는 EKS Auto Mode의 Load Balancing 기능을 사용합니다.</p>
+
+<h2 id="9-eks-구축-도구">9. EKS 구축 도구</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>도구</th>
+      <th>역할</th>
+      <th>적합한 작업</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>AWS Console</td>
+      <td>Web UI에서 Resource 생성과 상태 확인</td>
+      <td>초기 학습과 상태 점검</td>
+    </tr>
+    <tr>
+      <td>AWS CLI</td>
+      <td>EKS·IAM·CloudFormation API 호출</td>
+      <td>Script와 반복 작업</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">eksctl</code></td>
+      <td>VPC, EKS Cluster와 Node Group 구성 자동화</td>
+      <td>학습 환경과 EKS 중심 구축</td>
+    </tr>
+    <tr>
+      <td>CloudFormation</td>
+      <td>AWS Resource를 Stack으로 선언</td>
+      <td>Network와 공통 기반 Resource 관리</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">eksctl create cluster</code>는 별도 VPC를 자동 생성할 수 있습니다. 기존 VPC의 Subnet을 전달하면 <code class="language-plaintext highlighter-rouge">eksctl</code>이 Route Table이나 NAT Gateway를 대신 구성하지 않으므로 사용자가 Subnet 요구 사항을 검증해야 합니다.</p>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>CloudFormation은 Template으로 AWS Resource를 정의하고 Stack 단위로 상태를 관리합니다.</p>
+    </li>
+    <li>
+      <p>EKS는 Kubernetes Control Plane을 관리하며 사용자는 Data Plane과 Workload 구성을 선택합니다.</p>
+    </li>
+    <li>
+      <p>Control Plane의 배치 결정은 Worker Node의 kubelet과 Container Runtime 실행으로 이어집니다.</p>
+    </li>
+    <li>
+      <p>Pod가 VPC 주소를 사용해도 Route, Security Group과 Kubernetes 정책을 별도로 확인해야 합니다.</p>
+    </li>
+    <li>
+      <p>사람의 Cluster 접근에는 장기 Access Key 대신 임시 Credential과 EKS Access Entry를 사용합니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-guide.html">CloudFormation Template 작성</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/best-practices/cluster-access-management.html">Amazon EKS Cluster Access Management</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/best-practices/load-balancing.html">Amazon EKS Load Balancing</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/eksctl/vpc-configuration.html">eksctl VPC 구성</a></p>
+  </li>
+</ul>
+
+<p>다음 글에서는 <a href="/cloud-17-cloudformation-eksctl-cluster-nginx/">CloudFormation Network와 eksctl로 EKS Cluster 구축</a>을 진행합니다.</p>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-15-django-ecr-ecs-github-actions/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">Django Image를 ECR와 ECS에 배포하는 GitHub Actions Pipeline</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-17-cloudformation-eksctl-cluster-nginx/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">CloudFormation Network와 eksctl로 EKS Cluster 구축</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791293185"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791293185"></script>
+  </body>
+</html>

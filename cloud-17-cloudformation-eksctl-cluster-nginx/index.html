@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>CloudFormation Network와 eksctl로 EKS Cluster 구축 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="CloudFormation으로 EKS 실습용 VPC와 Public Subnet을 만들고 eksctl로 Managed Node Group Cluster를 생성한 뒤 Nginx Pod, Port Forwarding과 LoadBalancer Service를 검증합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-17-cloudformation-eksctl-cluster-nginx/">
+<meta property="og:title" content="CloudFormation Network와 eksctl로 EKS Cluster 구축 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="CloudFormation으로 EKS 실습용 VPC와 Public Subnet을 만들고 eksctl로 Managed Node Group Cluster를 생성한 뒤 Nginx Pod, Port Forwarding과 LoadBalancer Service를 검증합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-17-cloudformation-eksctl-cluster-nginx/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="CloudFormation Network와 eksctl로 EKS Cluster 구축 | renamed.log">
+<meta name="twitter:description" content="CloudFormation으로 EKS 실습용 VPC와 Public Subnet을 만들고 eksctl로 Managed Node Group Cluster를 생성한 뒤 Nginx Pod, Port Forwarding과 LoadBalancer Service를 검증합니다">
+
+  <meta property="article:published_time" content="2026-10-05T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791293185" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791293185" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791293185">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791293185" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791293185">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "CloudFormation Network와 eksctl로 EKS Cluster 구축 | renamed.log",
+    "description": "CloudFormation으로 EKS 실습용 VPC와 Public Subnet을 만들고 eksctl로 Managed Node Group Cluster를 생성한 뒤 Nginx Pod, Port Forwarding과 LoadBalancer Service를 검증합니다",
+    "url": "https://hyn128.site/cloud-17-cloudformation-eksctl-cluster-nginx/",
+    "datePublished": "2026-10-05T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">CloudFormation Network와 eksctl로 EKS Cluster 구축</h1>
+    
+      <p class="post-head__description">CloudFormation으로 EKS 실습용 VPC와 Public Subnet을 만들고 eksctl로 Managed Node Group Cluster를 생성한 뒤 Nginx Pod, Port Forwarding과 LoadBalancer Service를 검증합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 5일 · 7분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>CloudFormation으로 VPC, 세 개의 Public Subnet, Internet Gateway와 Route Table을 먼저 생성합니다. Operator PC에서는 임시 AWS Credential을 사용하는 Profile로 <code class="language-plaintext highlighter-rouge">eksctl</code>을 실행해 EKS Control Plane과 Managed Node Group을 만들고, <code class="language-plaintext highlighter-rouge">kubectl</code>로 Nginx Pod를 배포합니다. 마지막에는 Load Balancer를 먼저 제거한 뒤 Cluster를 삭제해 외부 Resource와 비용이 남지 않게 합니다.</p>
+</blockquote>
+
+<h2 id="1-실습-구조와-실행-위치">1. 실습 구조와 실행 위치</h2>
+
+<hr />
+
+<p>이 실습은 다음 위치를 구분합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>표기</th>
+      <th>실행 위치</th>
+      <th>작업</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[OPERATOR]</code></td>
+      <td>Local PC 또는 관리용 VM</td>
+      <td>AWS CLI, <code class="language-plaintext highlighter-rouge">eksctl</code>, <code class="language-plaintext highlighter-rouge">kubectl</code> 실행</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code></td>
+      <td>AWS Management Console</td>
+      <td>CloudFormation Event와 생성 Resource 확인</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[EKS-CONTROL-PLANE]</code></td>
+      <td>AWS가 관리하는 EKS Control Plane</td>
+      <td>API 요청, Scheduling과 Cluster 상태 관리</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[WORKER]</code></td>
+      <td>EKS Managed Node Group의 EC2</td>
+      <td>kubelet이 Pod Container 실행</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[OPERATOR] eksctl create cluster
+  ↓ AWS API
+[EKS-CONTROL-PLANE] Cluster 생성
+  ↓ Managed Node Group 연결
+[WORKER] EC2 Node 등록
+  ↓ kubectl apply
+Pod 실행
+</code></pre></div></div>
+
+<p>Control Plane 명령을 Worker Node에 접속해 실행하지 않습니다. Operator가 Kubernetes API Server에 요청하고 Control Plane이 Node의 kubelet에 원하는 상태를 전달합니다.</p>
+
+<h2 id="2-인증-방식-결정">2. 인증 방식 결정</h2>
+
+<hr />
+
+<p>IAM User에 <code class="language-plaintext highlighter-rouge">IAMFullAccess</code>, <code class="language-plaintext highlighter-rouge">AmazonVPCFullAccess</code> 같은 광범위한 정책을 연결하고 장기 Access Key를 발급하는 방식은 사용하지 않습니다. 관리자는 IAM Identity Center 또는 AssumeRole로 수명이 짧은 Credential을 사용하고, Cluster 생성에 필요한 IAM Role을 별도로 설계합니다.</p>
+
+<p>IAM Identity Center를 사용하는 Profile을 구성합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws configure sso <span class="nt">--profile</span> eks-lab
+</code></pre></div></div>
+
+<p>인증 후 현재 Principal과 Region을 확인합니다. Account ID는 게시물이나 실행 화면에 노출하지 않습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws sts get-caller-identity <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab
+
+aws configure get region <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab
+</code></pre></div></div>
+
+<p>사람의 Cluster 접근은 EKS Access Entry로 관리합니다. 신규 Cluster에서 Legacy <code class="language-plaintext highlighter-rouge">aws-auth</code> ConfigMap을 직접 편집해 사용자 권한을 추가하지 않습니다.</p>
+
+<h2 id="3-cli-도구-준비">3. CLI 도구 준비</h2>
+
+<hr />
+
+<p>Operator PC에 다음 도구를 설치합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>도구</th>
+      <th>역할</th>
+      <th>확인 명령</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>AWS CLI v2</td>
+      <td>AWS API 호출과 Profile 인증</td>
+      <td><code class="language-plaintext highlighter-rouge">aws --version</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">eksctl</code></td>
+      <td>EKS Cluster와 Node Group 구성</td>
+      <td><code class="language-plaintext highlighter-rouge">eksctl version</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">kubectl</code></td>
+      <td>Kubernetes API 조작</td>
+      <td><code class="language-plaintext highlighter-rouge">kubectl version --client</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>운영체제별 설치 파일은 공식 문서에서 확인합니다.</p>
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html">AWS CLI v2 설치</a></p>
+  </li>
+  <li>
+    <p><a href="https://eksctl.io/installation/">eksctl 설치</a></p>
+  </li>
+  <li>
+    <p><a href="https://kubernetes.io/docs/tasks/tools/">kubectl 설치</a></p>
+  </li>
+</ul>
+
+<p><code class="language-plaintext highlighter-rouge">kubectl</code>은 EKS Cluster Version과 호환되는 Version을 사용합니다. 설치 후 명령 경로까지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+<span class="nb">command</span> <span class="nt">-v</span> aws
+<span class="nb">command</span> <span class="nt">-v</span> eksctl
+<span class="nb">command</span> <span class="nt">-v</span> kubectl
+</code></pre></div></div>
+
+<h2 id="4-실습용-vpc-template-작성">4. 실습용 VPC Template 작성</h2>
+
+<hr />
+
+<p>다음 Template을 <code class="language-plaintext highlighter-rouge">eks-base-network.yaml</code>로 저장합니다. 이 구성은 흐름 확인을 위해 Worker Subnet을 Public으로 만듭니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">AWSTemplateFormatVersion</span><span class="pi">:</span> <span class="s2">"</span><span class="s">2010-09-09"</span>
+<span class="na">Description</span><span class="pi">:</span> <span class="s">Public network for an EKS learning environment</span>
+
+<span class="na">Parameters</span><span class="pi">:</span>
+  <span class="na">ClusterName</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">String</span>
+    <span class="na">Default</span><span class="pi">:</span> <span class="s">eks-work-cluster</span>
+
+  <span class="na">VpcBlock</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">String</span>
+    <span class="na">Default</span><span class="pi">:</span> <span class="s">192.168.0.0/16</span>
+
+  <span class="na">WorkerSubnet1Block</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">String</span>
+    <span class="na">Default</span><span class="pi">:</span> <span class="s">192.168.0.0/24</span>
+
+  <span class="na">WorkerSubnet2Block</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">String</span>
+    <span class="na">Default</span><span class="pi">:</span> <span class="s">192.168.1.0/24</span>
+
+  <span class="na">WorkerSubnet3Block</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">String</span>
+    <span class="na">Default</span><span class="pi">:</span> <span class="s">192.168.2.0/24</span>
+
+<span class="na">Resources</span><span class="pi">:</span>
+  <span class="na">EksWorkVPC</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::VPC</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">CidrBlock</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">VpcBlock</span>
+      <span class="na">EnableDnsSupport</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">EnableDnsHostnames</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">Tags</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="s">Name</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Sub</span> <span class="s2">"</span><span class="s">${ClusterName}-vpc"</span>
+
+  <span class="na">WorkerSubnet1</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::Subnet</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">VpcId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">EksWorkVPC</span>
+      <span class="na">AvailabilityZone</span><span class="pi">:</span> <span class="s">ap-northeast-2a</span>
+      <span class="na">CidrBlock</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet1Block</span>
+      <span class="na">MapPublicIpOnLaunch</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">Tags</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="s">Name</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Sub</span> <span class="s2">"</span><span class="s">${ClusterName}-public-a"</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="s">kubernetes.io/role/elb</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1"</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="kt">!Sub</span> <span class="s2">"</span><span class="s">kubernetes.io/cluster/${ClusterName}"</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="s">shared</span>
+
+  <span class="na">WorkerSubnet2</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::Subnet</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">VpcId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">EksWorkVPC</span>
+      <span class="na">AvailabilityZone</span><span class="pi">:</span> <span class="s">ap-northeast-2b</span>
+      <span class="na">CidrBlock</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet2Block</span>
+      <span class="na">MapPublicIpOnLaunch</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">Tags</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="s">Name</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Sub</span> <span class="s2">"</span><span class="s">${ClusterName}-public-b"</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="s">kubernetes.io/role/elb</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1"</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="kt">!Sub</span> <span class="s2">"</span><span class="s">kubernetes.io/cluster/${ClusterName}"</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="s">shared</span>
+
+  <span class="na">WorkerSubnet3</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::Subnet</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">VpcId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">EksWorkVPC</span>
+      <span class="na">AvailabilityZone</span><span class="pi">:</span> <span class="s">ap-northeast-2c</span>
+      <span class="na">CidrBlock</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet3Block</span>
+      <span class="na">MapPublicIpOnLaunch</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">Tags</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="s">Name</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Sub</span> <span class="s2">"</span><span class="s">${ClusterName}-public-c"</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="s">kubernetes.io/role/elb</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="s2">"</span><span class="s">1"</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="kt">!Sub</span> <span class="s2">"</span><span class="s">kubernetes.io/cluster/${ClusterName}"</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="s">shared</span>
+
+  <span class="na">InternetGateway</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::InternetGateway</span>
+
+  <span class="na">VPCGatewayAttachment</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::VPCGatewayAttachment</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">VpcId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">EksWorkVPC</span>
+      <span class="na">InternetGatewayId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">InternetGateway</span>
+
+  <span class="na">WorkerSubnetRouteTable</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::RouteTable</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">VpcId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">EksWorkVPC</span>
+      <span class="na">Tags</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">Key</span><span class="pi">:</span> <span class="s">Name</span>
+          <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Sub</span> <span class="s2">"</span><span class="s">${ClusterName}-public-route-table"</span>
+
+  <span class="na">WorkerSubnetRoute</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::Route</span>
+    <span class="na">DependsOn</span><span class="pi">:</span> <span class="s">VPCGatewayAttachment</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">RouteTableId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnetRouteTable</span>
+      <span class="na">DestinationCidrBlock</span><span class="pi">:</span> <span class="s">0.0.0.0/0</span>
+      <span class="na">GatewayId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">InternetGateway</span>
+
+  <span class="na">WorkerSubnet1RouteTableAssociation</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::SubnetRouteTableAssociation</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">SubnetId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet1</span>
+      <span class="na">RouteTableId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnetRouteTable</span>
+
+  <span class="na">WorkerSubnet2RouteTableAssociation</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::SubnetRouteTableAssociation</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">SubnetId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet2</span>
+      <span class="na">RouteTableId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnetRouteTable</span>
+
+  <span class="na">WorkerSubnet3RouteTableAssociation</span><span class="pi">:</span>
+    <span class="na">Type</span><span class="pi">:</span> <span class="s">AWS::EC2::SubnetRouteTableAssociation</span>
+    <span class="na">Properties</span><span class="pi">:</span>
+      <span class="na">SubnetId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet3</span>
+      <span class="na">RouteTableId</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnetRouteTable</span>
+
+<span class="na">Outputs</span><span class="pi">:</span>
+  <span class="na">VPC</span><span class="pi">:</span>
+    <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">EksWorkVPC</span>
+
+  <span class="na">WorkerSubnets</span><span class="pi">:</span>
+    <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Join</span>
+      <span class="pi">-</span> <span class="s2">"</span><span class="s">,"</span>
+      <span class="pi">-</span> <span class="pi">-</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet1</span>
+        <span class="pi">-</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet2</span>
+        <span class="pi">-</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnet3</span>
+
+  <span class="na">RouteTable</span><span class="pi">:</span>
+    <span class="na">Value</span><span class="pi">:</span> <span class="kt">!Ref</span> <span class="s">WorkerSubnetRouteTable</span>
+</code></pre></div></div>
+
+<p>Public Worker Node는 Public IP를 가지므로 운영 기본 구조로 사용하지 않습니다. 운영 환경에서는 Worker Node를 Private Subnet에 배치하고 NAT Gateway 또는 VPC Endpoint로 필요한 AWS Service에 접근하게 합니다.</p>
+
+<h2 id="5-cloudformation-stack-생성">5. CloudFormation Stack 생성</h2>
+
+<hr />
+
+<p>Template 문법을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws cloudformation validate-template <span class="se">\</span>
+  <span class="nt">--template-body</span> file://eks-base-network.yaml <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2
+</code></pre></div></div>
+
+<p>Stack을 생성하고 완료될 때까지 기다립니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws cloudformation create-stack <span class="se">\</span>
+  <span class="nt">--stack-name</span> eks-work-base <span class="se">\</span>
+  <span class="nt">--template-body</span> file://eks-base-network.yaml <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2
+
+aws cloudformation <span class="nb">wait </span>stack-create-complete <span class="se">\</span>
+  <span class="nt">--stack-name</span> eks-work-base <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2
+</code></pre></div></div>
+
+<p>실패하면 Stack Event부터 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws cloudformation describe-stack-events <span class="se">\</span>
+  <span class="nt">--stack-name</span> eks-work-base <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2 <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'StackEvents[0:10].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]'</span> <span class="se">\</span>
+  <span class="nt">--output</span> table
+</code></pre></div></div>
+
+<p>생성한 Subnet ID를 Shell 변수로 받습니다. 화면이나 문서에는 실제 ID를 복사하지 않습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+<span class="nv">worker_subnets</span><span class="o">=</span><span class="si">$(</span>aws cloudformation describe-stacks <span class="se">\</span>
+  <span class="nt">--stack-name</span> eks-work-base <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2 <span class="se">\</span>
+  <span class="nt">--query</span> <span class="s1">'Stacks[0].Outputs[?OutputKey==`WorkerSubnets`].OutputValue'</span> <span class="se">\</span>
+  <span class="nt">--output</span> text<span class="si">)</span>
+
+<span class="nb">test</span> <span class="nt">-n</span> <span class="s2">"</span><span class="nv">$worker_subnets</span><span class="s2">"</span> <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s1">'Worker subnet output is set'</span>
+</code></pre></div></div>
+
+<h2 id="6-eks-cluster와-managed-node-group-생성">6. EKS Cluster와 Managed Node Group 생성</h2>
+
+<hr />
+
+<p>현재 EKS에서 지원하는 Kubernetes <code class="language-plaintext highlighter-rouge">1.36</code>과 Managed Node Group을 사용합니다. Version은 실행 시점의 EKS 지원 목록을 다시 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+eksctl create cluster <span class="se">\</span>
+  <span class="nt">--name</span> eks-work-cluster <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2 <span class="se">\</span>
+  <span class="nt">--version</span> 1.36 <span class="se">\</span>
+  <span class="nt">--vpc-public-subnets</span> <span class="s2">"</span><span class="nv">$worker_subnets</span><span class="s2">"</span> <span class="se">\</span>
+  <span class="nt">--nodegroup-name</span> eks-work-nodegroup <span class="se">\</span>
+  <span class="nt">--node-type</span> t3.medium <span class="se">\</span>
+  <span class="nt">--nodes</span> 2 <span class="se">\</span>
+  <span class="nt">--nodes-min</span> 2 <span class="se">\</span>
+  <span class="nt">--nodes-max</span> 5 <span class="se">\</span>
+  <span class="nt">--managed</span> <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Option</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--vpc-public-subnets</code></td>
+      <td>기존 VPC에서 사용할 Subnet을 전달합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--version</code></td>
+      <td>EKS Control Plane의 Kubernetes Version을 지정합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--managed</code></td>
+      <td>EKS Managed Node Group을 생성합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--nodes</code></td>
+      <td>최초 Desired Node 수입니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">--nodes-min</code>, <code class="language-plaintext highlighter-rouge">--nodes-max</code></td>
+      <td>Node Group의 최소·최대 Capacity입니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">t2.small</code>은 현재 Kubernetes System Pod를 함께 실행하는 실습에 CPU·Memory 여유가 적습니다. 예제는 <code class="language-plaintext highlighter-rouge">t3.medium</code>으로 변경했으며, 실제 Region의 지원 여부와 비용을 확인합니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">eksctl</code>은 Control Plane과 Node Group을 위한 CloudFormation Stack을 추가하고 kubeconfig Context를 갱신합니다. Node 수의 최소·최대값만 지정했다고 Pod 부하에 따라 자동으로 확장되는 것은 아닙니다. Cluster Autoscaler나 EKS Auto Mode 같은 Scaling 구성 요소가 별도로 필요합니다.</p>
+
+<h2 id="7-kubeconfig와-node-확인">7. kubeconfig와 Node 확인</h2>
+
+<hr />
+
+<p>현재 Context를 확인합니다.</p>
+
+<p>kubeconfig의 주요 영역은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>영역</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">clusters</code></td>
+      <td>Kubernetes API Server URL과 CA 정보</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">users</code></td>
+      <td>AWS CLI를 이용해 EKS 인증 Token을 얻는 실행 설정</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">contexts</code></td>
+      <td>Cluster와 User, 기본 Namespace의 조합</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">current-context</code></td>
+      <td><code class="language-plaintext highlighter-rouge">kubectl</code>이 현재 사용할 Context</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+kubectl config get-contexts
+kubectl config current-context
+</code></pre></div></div>
+
+<p>필요한 경우 Context를 명시적으로 선택합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+kubectl config use-context &lt;EKS_CONTEXT_NAME&gt;
+</code></pre></div></div>
+
+<p>Node 상태와 상세 정보를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+kubectl get nodes <span class="nt">-o</span> wide
+kubectl describe node &lt;NODE_NAME&gt;
+</code></pre></div></div>
+
+<p>Node가 <code class="language-plaintext highlighter-rouge">Ready</code>가 되면 kubelet이 Control Plane에 등록됐고 Pod를 받을 수 있는 상태입니다. <code class="language-plaintext highlighter-rouge">NotReady</code>이면 VPC CNI, kube-proxy, Node IAM Role과 Node Log를 점검합니다.</p>
+
+<h2 id="8-nginx-pod-배포">8. Nginx Pod 배포</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">nginx-pod.yaml</code>을 작성합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Pod</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">nginx-pod</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">app</span><span class="pi">:</span> <span class="s">nginx-app</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">containers</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">nginx-container</span>
+      <span class="na">image</span><span class="pi">:</span> <span class="s">nginx:stable-alpine</span>
+      <span class="na">ports</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">containerPort</span><span class="pi">:</span> <span class="m">80</span>
+</code></pre></div></div>
+
+<p>Pod를 생성하고 Scheduling 결과를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+kubectl apply <span class="nt">-f</span> nginx-pod.yaml
+kubectl get pod nginx-pod <span class="nt">-o</span> wide
+kubectl describe pod nginx-pod
+</code></pre></div></div>
+
+<p>Control Plane의 Scheduler가 Worker Node를 선택하면 해당 Node의 kubelet이 Nginx Image를 받고 Container를 실행합니다.</p>
+
+<h2 id="9-port-forwarding-검증">9. Port Forwarding 검증</h2>
+
+<hr />
+
+<p>Local Port 8080을 Pod의 Port 80에 연결합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+kubectl port-forward pod/nginx-pod 8080:80
+</code></pre></div></div>
+
+<p>이 Terminal은 연결을 유지합니다. 다른 Terminal에서 Nginx 응답을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+curl <span class="nt">-I</span> http://127.0.0.1:8080/
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">HTTP/1.1 200 OK</code>를 확인한 뒤 Port Forwarding Terminal에서 <code class="language-plaintext highlighter-rouge">Ctrl+C</code>로 종료합니다. Port Forwarding은 Local 점검용이며 외부 Service를 대신하지 않습니다.</p>
+
+<h2 id="10-loadbalancer-service">10. LoadBalancer Service</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">nginx-service.yaml</code>을 작성합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Service</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">nginx-service</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">type</span><span class="pi">:</span> <span class="s">LoadBalancer</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">app</span><span class="pi">:</span> <span class="s">nginx-app</span>
+  <span class="na">ports</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">http</span>
+      <span class="na">protocol</span><span class="pi">:</span> <span class="s">TCP</span>
+      <span class="na">port</span><span class="pi">:</span> <span class="m">80</span>
+      <span class="na">targetPort</span><span class="pi">:</span> <span class="m">80</span>
+</code></pre></div></div>
+
+<p>Service를 생성하고 외부 주소가 할당될 때까지 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+kubectl apply <span class="nt">-f</span> nginx-service.yaml
+kubectl get service nginx-service <span class="nt">--watch</span>
+</code></pre></div></div>
+
+<p>외부 주소가 할당되면 HTTP 응답을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+curl <span class="nt">-I</span> http://&lt;LOAD_BALANCER_DNS_NAME&gt;/
+</code></pre></div></div>
+
+<p>기본 Service Controller가 처리하는 Cluster에서는 Legacy CLB가 만들어질 수 있습니다. 이 Controller는 Critical Bug Fix 중심으로 유지됩니다. 새 환경에서는 AWS Load Balancer Controller가 만드는 NLB 또는 EKS Auto Mode의 Load Balancing 기능을 사용하고, Controller가 요구하는 <code class="language-plaintext highlighter-rouge">loadBalancerClass</code>와 Annotation을 별도로 적용합니다.</p>
+
+<h2 id="11-resource-삭제">11. Resource 삭제</h2>
+
+<hr />
+
+<p>EKS Control Plane은 Workload가 없어도 비용이 발생합니다. Load Balancer Resource부터 삭제합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+kubectl get service <span class="nt">--all-namespaces</span>
+kubectl get ingress <span class="nt">--all-namespaces</span>
+kubectl delete service nginx-service
+kubectl delete pod nginx-pod
+</code></pre></div></div>
+
+<p>Service의 <code class="language-plaintext highlighter-rouge">EXTERNAL-IP</code>와 AWS Load Balancer가 제거됐는지 확인한 뒤 Cluster를 삭제합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+eksctl delete cluster <span class="se">\</span>
+  <span class="nt">--name</span> eks-work-cluster <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2 <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">eksctl</code>이 만든 Stack이 모두 삭제된 뒤 기반 Network Stack을 삭제합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
+aws cloudformation delete-stack <span class="se">\</span>
+  <span class="nt">--stack-name</span> eks-work-base <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2
+
+aws cloudformation <span class="nb">wait </span>stack-delete-complete <span class="se">\</span>
+  <span class="nt">--stack-name</span> eks-work-base <span class="se">\</span>
+  <span class="nt">--profile</span> eks-lab <span class="se">\</span>
+  <span class="nt">--region</span> ap-northeast-2
+</code></pre></div></div>
+
+<p>Cluster를 먼저 삭제하면 Load Balancer와 Network Interface가 VPC에 남아 Network Stack 삭제가 실패할 수 있습니다.</p>
+
+<h2 id="12-rds-연결-전-확인">12. RDS 연결 전 확인</h2>
+
+<hr />
+
+<p>EKS Application이 RDS를 사용할 때 Database를 Worker와 같은 Public Subnet에 둘 필요는 없습니다. RDS는 Private Subnet Group에 배치하고 Database Security Group은 Application에서 오는 Database Port만 허용합니다.</p>
+
+<p>RDS는 Managed Service이므로 Database Host OS에 로그인하지 않습니다. 관리 작업이 필요하면 Public Bastion Host를 유일한 진입점으로 두기보다 AWS Systems Manager Session Manager를 우선 검토합니다. Database Credential은 Secrets Manager에 저장하고 Pod에는 EKS Pod Identity나 IRSA를 통해 필요한 조회 권한만 부여합니다.</p>
+
+<p>이 절에서는 Network와 접근 원칙만 정리하며 RDS Instance, Database User와 Spring Application 구성은 후속 범위로 남깁니다.</p>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Operator는 임시 AWS Credential로 CloudFormation, <code class="language-plaintext highlighter-rouge">eksctl</code>과 <code class="language-plaintext highlighter-rouge">kubectl</code>을 실행합니다.</p>
+    </li>
+    <li>
+      <p>CloudFormation Stack의 Output을 받아 실제 Subnet ID를 문서에 노출하지 않고 Cluster 생성에 전달합니다.</p>
+    </li>
+    <li>
+      <p><code class="language-plaintext highlighter-rouge">kubectl apply</code> 요청은 Control Plane을 거쳐 Worker Node의 kubelet과 Container 실행으로 이어집니다.</p>
+    </li>
+    <li>
+      <p>Port Forwarding은 Local 검증용이고 <code class="language-plaintext highlighter-rouge">LoadBalancer</code> Service는 AWS Load Balancer Resource를 생성합니다.</p>
+    </li>
+    <li>
+      <p>삭제할 때는 외부 Service와 Ingress, EKS Cluster, 기반 Network Stack 순서를 지킵니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/userguide/create-cluster.html">Amazon EKS Cluster 생성</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/eksctl/creating-and-managing-clusters.html">eksctl Cluster 생성과 관리</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html">Amazon EKS Kubernetes Version 수명주기</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/userguide/delete-cluster.html">Amazon EKS Cluster 삭제</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/eks/latest/best-practices/load-balancing.html">Amazon EKS Load Balancing</a></p>
+  </li>
+</ul>
+
+<p>다음 글에서는 <a href="/cloud-18-cloudwatch-metrics-logs-alarm-sns/">CloudWatch Metric·Logs·Alarm과 SNS 알림</a>을 구성합니다.</p>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-16-cloudformation-amazon-eks-architecture/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">CloudFormation과 Amazon EKS 구조</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-18-cloudwatch-metrics-logs-alarm-sns/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">CloudWatch Metric·Logs·Alarm과 SNS 알림</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791293185"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791293185"></script>
+  </body>
+</html>

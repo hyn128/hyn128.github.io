@@ -4,6 +4,51 @@
       
       
       {
+        "title": "CloudWatch Metric·Logs·Alarm과 SNS 알림",
+        "url": "/cloud-18-cloudwatch-metrics-logs-alarm-sns/",
+        "description": "CloudWatch의 Metric, Logs, Dashboard와 Alarm 상태를 구분하고 EC2 Detailed Monitoring, SNS Email 알림과 CPU 부하 검증 절차를 구성합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 6일",
+        "reading_time_label": "6분 읽기",
+        "search": "cloudwatch metric·logs·alarm과 sns 알림 cloudwatch의 metric, logs, dashboard와 alarm 상태를 구분하고 ec2 detailed monitoring, sns email 알림과 cpu 부하 검증 절차를 구성합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "CloudFormation Network와 eksctl로 EKS Cluster 구축",
+        "url": "/cloud-17-cloudformation-eksctl-cluster-nginx/",
+        "description": "CloudFormation으로 EKS 실습용 VPC와 Public Subnet을 만들고 eksctl로 Managed Node Group Cluster를 생성한 뒤 Nginx Pod, Port Forwarding과 LoadBalancer Service를 검증합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 5일",
+        "reading_time_label": "7분 읽기",
+        "search": "cloudformation network와 eksctl로 eks cluster 구축 cloudformation으로 eks 실습용 vpc와 public subnet을 만들고 eksctl로 managed node group cluster를 생성한 뒤 nginx pod, port forwarding과 loadbalancer service를 검증합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "CloudFormation과 Amazon EKS 구조",
+        "url": "/cloud-16-cloudformation-amazon-eks-architecture/",
+        "description": "CloudFormation의 Stack·Template 동작과 Terraform의 차이를 정리하고 Amazon EKS의 Control Plane, Data Plane, VPC CNI, IAM과 Load Balancer 연동 구조를 확인합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 5일",
+        "reading_time_label": "5분 읽기",
+        "search": "cloudformation과 amazon eks 구조 cloudformation의 stack·template 동작과 terraform의 차이를 정리하고 amazon eks의 control plane, data plane, vpc cni, iam과 load balancer 연동 구조를 확인합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
         "title": "Django Image를 ECR와 ECS에 배포하는 GitHub Actions Pipeline",
         "url": "/cloud-15-django-ecr-ecs-github-actions/",
         "description": "Django REST API를 Gunicorn Container Image로 만들고 ECR에 저장한 뒤 GitHub OIDC와 최소 IAM 권한으로 ECS Service에 자동 배포합니다",
