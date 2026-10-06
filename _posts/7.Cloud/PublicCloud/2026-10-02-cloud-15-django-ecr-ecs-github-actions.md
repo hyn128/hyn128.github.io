@@ -2,6 +2,7 @@
 title: Django Image를 ECR와 ECS에 배포하는 GitHub Actions Pipeline
 description: Django REST API를 Gunicorn Container Image로 만들고 ECR에 저장한 뒤 GitHub OIDC와 최소 IAM 권한으로 ECS Service에 자동 배포합니다
 date: 2026-10-02
+updated_at: 2026-10-05
 series: Cloud
 tags:
   - Cloud
@@ -594,3 +595,5 @@ CloudFront를 ALB 앞에 배치하거나 별도 CDN을 사용하는 구조는 Ca
 - [Amazon ECS RegisterTaskDefinition API](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_RegisterTaskDefinition.html)
 
 - [Django 5.2 Release Notes](https://docs.djangoproject.com/en/5.2/releases/5.2/)
+
+다음 글에서는 [CloudFormation과 Amazon EKS 구조]({% post_url 2026-10-05-cloud-16-cloudformation-amazon-eks-architecture %})를 통해 AWS에서 Kubernetes Control Plane과 Data Plane을 구성하는 방식을 확인합니다.
