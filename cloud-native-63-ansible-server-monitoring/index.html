@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>Ansible Facts와 Linux Server 점검 자동화 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="Ansible Facts로 여러 Managed Node의 System 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 File로 저장하는 Playbook을 구성합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-native-63-ansible-server-monitoring/">
+<meta property="og:title" content="Ansible Facts와 Linux Server 점검 자동화 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="Ansible Facts로 여러 Managed Node의 System 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 File로 저장하는 Playbook을 구성합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-native-63-ansible-server-monitoring/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Ansible Facts와 Linux Server 점검 자동화 | renamed.log">
+<meta name="twitter:description" content="Ansible Facts로 여러 Managed Node의 System 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 File로 저장하는 Playbook을 구성합니다">
+
+  <meta property="article:published_time" content="2026-10-09T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791623819" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791623819" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791623819">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791623819" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791623819">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "Ansible Facts와 Linux Server 점검 자동화 | renamed.log",
+    "description": "Ansible Facts로 여러 Managed Node의 System 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 File로 저장하는 Playbook을 구성합니다",
+    "url": "https://hyn128.site/cloud-native-63-ansible-server-monitoring/",
+    "datePublished": "2026-10-09T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">CloudNative</p>
+    
+    <h1 class="post-head__title">Ansible Facts와 Linux Server 점검 자동화</h1>
+    
+      <p class="post-head__description">Ansible Facts로 여러 Managed Node의 System 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 File로 저장하는 Playbook을 구성합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 9일 · 5분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=CloudNative">CloudNative</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+          <a class="tag-chip" href="/?tag=Ansible">Ansible</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Ansible Control Node에서 여러 Managed Node의 Facts를 수집해 OS, Kernel, CPU, Memory, Interface와 Mount 정보를 같은 형식으로 기록합니다. 추가로 <code class="language-plaintext highlighter-rouge">dstat</code>, <code class="language-plaintext highlighter-rouge">iostat</code>, <code class="language-plaintext highlighter-rouge">vmstat</code>와 <code class="language-plaintext highlighter-rouge">df</code>를 실행해 점검 시점의 System 상태를 저장합니다. 반복 실행 때 무조건 내용을 누적하는 <code class="language-plaintext highlighter-rouge">shell</code> Redirect 대신 <code class="language-plaintext highlighter-rouge">command</code>로 측정하고 <code class="language-plaintext highlighter-rouge">copy</code>로 Report를 갱신합니다.</p>
+</blockquote>
+
+<h2 id="1-작업-범위와-실행-위치">1. 작업 범위와 실행 위치</h2>
+
+<hr />
+
+<p><a href="/cloud-native-58-ansible-architecture-inventory/">Ansible Architecture와 Inventory 구성</a>에서 Control Node, SSH와 Inventory를 구성했고, <a href="/cloud-native-60-ansible-variables-vault-facts-control-flow/">Ansible 변수와 Vault·Facts·제어문</a>에서 Facts와 조건문을 다뤘습니다. 이번 글에서는 준비된 Inventory를 이용한 Server 점검에 집중합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>표기</th>
+      <th>실행 위치</th>
+      <th>작업</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[CONTROL]</code></td>
+      <td>Ansible Control Node</td>
+      <td>Playbook 작성, 문법 검사와 실행</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[MANAGED]</code></td>
+      <td>Managed Node</td>
+      <td>Facts 제공, 점검 명령 실행과 Report 저장</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[CONTROL] Inventory와 Playbook
+  ↓ SSH
+[MANAGED] Facts 수집·점검 명령
+  ↓
+/var/log/daily_check/*.log
+</code></pre></div></div>
+
+<p>이 방식은 특정 시점의 점검 Report를 만드는 자동화입니다. 지속적인 시계열 Monitoring과 Alert는 Prometheus, CloudWatch 같은 Monitoring System을 사용합니다.</p>
+
+<h2 id="2-project-구조와-inventory">2. Project 구조와 Inventory</h2>
+
+<hr />
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ansible-monitoring/
+├── ansible.cfg
+├── inventory.ini
+├── monitoring_facts.yml
+├── monitoring_system.yml
+└── vars_packages.yml
+</code></pre></div></div>
+
+<div class="language-ini highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">[monitoring_targets]</span>
+<span class="err">server-a</span> <span class="py">ansible_host</span><span class="p">=</span><span class="s">&lt;SERVER_A_IP&gt;</span>
+<span class="err">server-b</span> <span class="py">ansible_host</span><span class="p">=</span><span class="s">&lt;SERVER_B_IP&gt;</span>
+
+<span class="nn">[monitoring_targets:vars]</span>
+<span class="py">ansible_user</span><span class="p">=</span><span class="s">&lt;MANAGED_USER&gt;</span>
+</code></pre></div></div>
+
+<p>대상 Host를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [CONTROL]</span>
+ansible-inventory <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  <span class="nt">--graph</span>
+
+ansible monitoring_targets <span class="se">\</span>
+  <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  <span class="nt">-m</span> ansible.builtin.ping
+</code></pre></div></div>
+
+<h2 id="3-facts-report-playbook">3. Facts Report Playbook</h2>
+
+<hr />
+
+<p>Facts는 Play 시작 시 Managed Node에서 수집한 System 정보입니다. <code class="language-plaintext highlighter-rouge">monitoring_facts.yml</code>을 작성합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="nn">---</span>
+<span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Write system facts report</span>
+  <span class="na">hosts</span><span class="pi">:</span> <span class="s">monitoring_targets</span>
+  <span class="na">gather_facts</span><span class="pi">:</span> <span class="no">true</span>
+  <span class="na">become</span><span class="pi">:</span> <span class="no">true</span>
+
+  <span class="na">vars</span><span class="pi">:</span>
+    <span class="na">log_directory</span><span class="pi">:</span> <span class="s">/var/log/daily_check</span>
+
+  <span class="na">tasks</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Create report directory</span>
+      <span class="na">ansible.builtin.file</span><span class="pi">:</span>
+        <span class="na">path</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">log_directory</span><span class="nv"> </span><span class="s">}}"</span>
+        <span class="na">state</span><span class="pi">:</span> <span class="s">directory</span>
+        <span class="na">owner</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">group</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">mode</span><span class="pi">:</span> <span class="s2">"</span><span class="s">0755"</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Write facts report</span>
+      <span class="na">ansible.builtin.copy</span><span class="pi">:</span>
+        <span class="na">dest</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">log_directory</span><span class="nv"> </span><span class="s">}}/system_info.log"</span>
+        <span class="na">owner</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">group</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">mode</span><span class="pi">:</span> <span class="s2">"</span><span class="s">0644"</span>
+        <span class="na">content</span><span class="pi">:</span> <span class="pi">|</span>
+          <span class="s">Date: {{ ansible_facts.date_time.iso8601 }}</span>
+          <span class="s">Hostname: {{ ansible_facts.hostname }}</span>
+          <span class="s">OS: {{ ansible_facts.distribution }}</span>
+          <span class="s">OS Version: {{ ansible_facts.distribution_version }}</span>
+          <span class="s">Kernel: {{ ansible_facts.kernel }}</span>
+          <span class="s">CPU vCPUs: {{ ansible_facts.processor_vcpus }}</span>
+          <span class="s">Memory MiB: {{ ansible_facts.memory_mb.real.total }}</span>
+          <span class="s">Interfaces: {{ ansible_facts.interfaces | join(', ') }}</span>
+          <span class="s">IPv4 Addresses: {{ ansible_facts.all_ipv4_addresses | join(', ') }}</span>
+          <span class="s">Mounts:</span>
+          <span class="s">{{ ansible_facts.mounts | to_nice_yaml(indent=2) | indent(10, true) }}</span>
+
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Fact</th>
+      <th>의미</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">date_time.iso8601</code></td>
+      <td>Facts 수집 시각</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">hostname</code></td>
+      <td>Managed Node Hostname</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">distribution*</code></td>
+      <td>OS 배포판과 Version</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">kernel</code></td>
+      <td>Kernel Version</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">processor_vcpus</code></td>
+      <td>사용 가능한 vCPU 수</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">memory_mb.real.total</code></td>
+      <td>전체 Physical Memory MiB</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">interfaces</code></td>
+      <td>Network Interface 이름</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">all_ipv4_addresses</code></td>
+      <td>수집된 IPv4 주소</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">mounts</code></td>
+      <td>Mount Point, Device와 용량 정보</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">ansible_date_time</code> 계열 값은 Play 시작 시 Facts를 수집한 시각입니다. 장시간 실행하는 Play에서 현재 시각이 계속 갱신되는 값으로 사용하지 않습니다.</p>
+
+<h2 id="4-facts-playbook-검증과-실행">4. Facts Playbook 검증과 실행</h2>
+
+<hr />
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [CONTROL]</span>
+ansible-playbook <span class="se">\</span>
+  <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  <span class="nt">--syntax-check</span> <span class="se">\</span>
+  monitoring_facts.yml
+
+ansible-playbook <span class="se">\</span>
+  <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  <span class="nt">--check</span> <span class="nt">--diff</span> <span class="se">\</span>
+  monitoring_facts.yml <span class="se">\</span>
+  <span class="nt">-K</span>
+
+ansible-playbook <span class="se">\</span>
+  <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  monitoring_facts.yml <span class="se">\</span>
+  <span class="nt">-K</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">--syntax-check</code>는 YAML과 Playbook 구조를 확인합니다. <code class="language-plaintext highlighter-rouge">--check</code>는 변경을 수행하지 않고 지원 Module이 예상 변경을 보고합니다. <code class="language-plaintext highlighter-rouge">--diff</code>에는 File 내용이 표시될 수 있으므로 Secret이 포함된 Template에는 사용하지 않습니다. <code class="language-plaintext highlighter-rouge">-K</code>는 Managed Node의 Privilege Escalation Password를 요청합니다.</p>
+
+<p>Report를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [CONTROL]</span>
+ansible monitoring_targets <span class="se">\</span>
+  <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  <span class="nt">-b</span> <span class="se">\</span>
+  <span class="nt">-m</span> ansible.builtin.command <span class="se">\</span>
+  <span class="nt">-a</span> <span class="s1">'cat /var/log/daily_check/system_info.log'</span>
+</code></pre></div></div>
+
+<h2 id="5-monitoring-package-변수">5. Monitoring Package 변수</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">vars_packages.yml</code>에서 OS Family별 Package와 <code class="language-plaintext highlighter-rouge">dstat</code> 명령 이름을 구분합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
+<span class="na">log_directory</span><span class="pi">:</span> <span class="s">/var/log/daily_check</span>
+
+<span class="na">monitoring_packages</span><span class="pi">:</span>
+  <span class="na">Debian</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">dstat</span>
+    <span class="pi">-</span> <span class="s">sysstat</span>
+  <span class="na">RedHat</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">pcp-system-tools</span>
+    <span class="pi">-</span> <span class="s">sysstat</span>
+
+<span class="na">dstat_binary</span><span class="pi">:</span>
+  <span class="na">Debian</span><span class="pi">:</span> <span class="s">dstat</span>
+  <span class="na">RedHat</span><span class="pi">:</span> <span class="s">pcp-dstat</span>
+</code></pre></div></div>
+
+<p>Package 이름은 배포판과 Version에 따라 다를 수 있습니다. 실행 전에 대상 Repository에서 <code class="language-plaintext highlighter-rouge">dstat</code> 또는 <code class="language-plaintext highlighter-rouge">pcp-dstat</code>, <code class="language-plaintext highlighter-rouge">sysstat</code> Package 제공 여부를 확인합니다.</p>
+
+<h2 id="6-system-점검-playbook">6. System 점검 Playbook</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">monitoring_system.yml</code>을 작성합니다. <code class="language-plaintext highlighter-rouge">shell</code> Redirect를 반복하는 대신 각 명령의 Standard Output을 등록하고 File 내용을 한 번에 갱신합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="nn">---</span>
+<span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Collect point-in-time system report</span>
+  <span class="na">hosts</span><span class="pi">:</span> <span class="s">monitoring_targets</span>
+  <span class="na">gather_facts</span><span class="pi">:</span> <span class="no">true</span>
+  <span class="na">become</span><span class="pi">:</span> <span class="no">true</span>
+
+  <span class="na">vars_files</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="s">vars_packages.yml</span>
+
+  <span class="na">pre_tasks</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Validate supported OS family</span>
+      <span class="na">ansible.builtin.assert</span><span class="pi">:</span>
+        <span class="na">that</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="s">ansible_facts.os_family in monitoring_packages</span>
+        <span class="na">fail_msg</span><span class="pi">:</span> <span class="pi">&gt;-</span>
+          <span class="s">Unsupported OS family: {{ ansible_facts.os_family }}</span>
+
+  <span class="na">tasks</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Create report directory</span>
+      <span class="na">ansible.builtin.file</span><span class="pi">:</span>
+        <span class="na">path</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">log_directory</span><span class="nv"> </span><span class="s">}}"</span>
+        <span class="na">state</span><span class="pi">:</span> <span class="s">directory</span>
+        <span class="na">owner</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">group</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">mode</span><span class="pi">:</span> <span class="s2">"</span><span class="s">0755"</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Install monitoring packages on Debian family</span>
+      <span class="na">ansible.builtin.apt</span><span class="pi">:</span>
+        <span class="na">name</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">monitoring_packages.Debian</span><span class="nv"> </span><span class="s">}}"</span>
+        <span class="na">state</span><span class="pi">:</span> <span class="s">present</span>
+        <span class="na">update_cache</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">ansible_facts.os_family == "Debian"</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Install monitoring packages on Red Hat family</span>
+      <span class="na">ansible.builtin.dnf</span><span class="pi">:</span>
+        <span class="na">name</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">monitoring_packages.RedHat</span><span class="nv"> </span><span class="s">}}"</span>
+        <span class="na">state</span><span class="pi">:</span> <span class="s">present</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">ansible_facts.os_family == "RedHat"</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Collect dstat samples</span>
+      <span class="na">ansible.builtin.command</span><span class="pi">:</span>
+        <span class="na">argv</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">dstat_binary[ansible_facts.os_family]</span><span class="nv"> </span><span class="s">}}"</span>
+          <span class="pi">-</span> <span class="s">--nocolor</span>
+          <span class="pi">-</span> <span class="s2">"</span><span class="s">1"</span>
+          <span class="pi">-</span> <span class="s2">"</span><span class="s">5"</span>
+      <span class="na">register</span><span class="pi">:</span> <span class="s">dstat_result</span>
+      <span class="na">changed_when</span><span class="pi">:</span> <span class="no">false</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">not ansible_check_mode</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Collect iostat report</span>
+      <span class="na">ansible.builtin.command</span><span class="pi">:</span>
+        <span class="na">argv</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="s">iostat</span>
+          <span class="pi">-</span> <span class="s">-t</span>
+          <span class="pi">-</span> <span class="s">-c</span>
+          <span class="pi">-</span> <span class="s">-d</span>
+      <span class="na">register</span><span class="pi">:</span> <span class="s">iostat_result</span>
+      <span class="na">changed_when</span><span class="pi">:</span> <span class="no">false</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">not ansible_check_mode</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Collect vmstat report</span>
+      <span class="na">ansible.builtin.command</span><span class="pi">:</span>
+        <span class="na">argv</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="s">vmstat</span>
+          <span class="pi">-</span> <span class="s">-d</span>
+          <span class="pi">-</span> <span class="s">-t</span>
+      <span class="na">register</span><span class="pi">:</span> <span class="s">vmstat_result</span>
+      <span class="na">changed_when</span><span class="pi">:</span> <span class="no">false</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">not ansible_check_mode</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Collect file system report</span>
+      <span class="na">ansible.builtin.command</span><span class="pi">:</span>
+        <span class="na">argv</span><span class="pi">:</span>
+          <span class="pi">-</span> <span class="s">df</span>
+          <span class="pi">-</span> <span class="s">-h</span>
+      <span class="na">register</span><span class="pi">:</span> <span class="s">df_result</span>
+      <span class="na">changed_when</span><span class="pi">:</span> <span class="no">false</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">not ansible_check_mode</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Write dstat report</span>
+      <span class="na">ansible.builtin.copy</span><span class="pi">:</span>
+        <span class="na">dest</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">log_directory</span><span class="nv"> </span><span class="s">}}/dstat.log"</span>
+        <span class="na">content</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">dstat_result.stdout</span><span class="nv"> </span><span class="s">}}</span><span class="se">\n</span><span class="s">"</span>
+        <span class="na">owner</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">group</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">mode</span><span class="pi">:</span> <span class="s2">"</span><span class="s">0644"</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">not ansible_check_mode</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Write iostat report</span>
+      <span class="na">ansible.builtin.copy</span><span class="pi">:</span>
+        <span class="na">dest</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">log_directory</span><span class="nv"> </span><span class="s">}}/iostat.log"</span>
+        <span class="na">content</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">iostat_result.stdout</span><span class="nv"> </span><span class="s">}}</span><span class="se">\n</span><span class="s">"</span>
+        <span class="na">owner</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">group</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">mode</span><span class="pi">:</span> <span class="s2">"</span><span class="s">0644"</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">not ansible_check_mode</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Write vmstat report</span>
+      <span class="na">ansible.builtin.copy</span><span class="pi">:</span>
+        <span class="na">dest</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">log_directory</span><span class="nv"> </span><span class="s">}}/vmstat.log"</span>
+        <span class="na">content</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">vmstat_result.stdout</span><span class="nv"> </span><span class="s">}}</span><span class="se">\n</span><span class="s">"</span>
+        <span class="na">owner</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">group</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">mode</span><span class="pi">:</span> <span class="s2">"</span><span class="s">0644"</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">not ansible_check_mode</span>
+
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">Write file system report</span>
+      <span class="na">ansible.builtin.copy</span><span class="pi">:</span>
+        <span class="na">dest</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">log_directory</span><span class="nv"> </span><span class="s">}}/df.log"</span>
+        <span class="na">content</span><span class="pi">:</span> <span class="s2">"</span><span class="s">{{</span><span class="nv"> </span><span class="s">df_result.stdout</span><span class="nv"> </span><span class="s">}}</span><span class="se">\n</span><span class="s">"</span>
+        <span class="na">owner</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">group</span><span class="pi">:</span> <span class="s">root</span>
+        <span class="na">mode</span><span class="pi">:</span> <span class="s2">"</span><span class="s">0644"</span>
+      <span class="na">when</span><span class="pi">:</span> <span class="s">not ansible_check_mode</span>
+
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">command</code> Module은 Shell을 통하지 않으므로 Redirect와 Pipe를 해석하지 않습니다. 이 Playbook은 <code class="language-plaintext highlighter-rouge">stdout</code>을 등록한 뒤 <code class="language-plaintext highlighter-rouge">copy</code> Module로 File을 관리합니다. 점검 명령은 상태를 읽기만 하므로 <code class="language-plaintext highlighter-rouge">changed_when: false</code>로 표시합니다.</p>
+
+<h2 id="7-실행과-결과-해석">7. 실행과 결과 해석</h2>
+
+<hr />
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [CONTROL]</span>
+ansible-playbook <span class="se">\</span>
+  <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  <span class="nt">--syntax-check</span> <span class="se">\</span>
+  monitoring_system.yml
+
+ansible-playbook <span class="se">\</span>
+  <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  <span class="nt">--check</span> <span class="nt">--diff</span> <span class="se">\</span>
+  monitoring_system.yml <span class="se">\</span>
+  <span class="nt">-K</span>
+
+ansible-playbook <span class="se">\</span>
+  <span class="nt">-i</span> inventory.ini <span class="se">\</span>
+  monitoring_system.yml <span class="se">\</span>
+  <span class="nt">-K</span>
+</code></pre></div></div>
+
+<p>Check Mode에서는 Package와 Directory 변경 예상만 확인하고 실제 측정 명령과 Report 작성은 건너뜁니다. 실제 실행 후 Managed Node에 다음 File이 생성됩니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/var/log/daily_check/
+├── system_info.log
+├── dstat.log
+├── iostat.log
+├── vmstat.log
+└── df.log
+</code></pre></div></div>
+
+<p>Play Recap에서 <code class="language-plaintext highlighter-rouge">unreachable</code>과 <code class="language-plaintext highlighter-rouge">failed</code>를 먼저 확인합니다. 특정 Host만 점검하려면 <code class="language-plaintext highlighter-rouge">--limit &lt;HOST_OR_GROUP&gt;</code>을 사용합니다.</p>
+
+<h2 id="8-자동화의-한계">8. 자동화의 한계</h2>
+
+<hr />
+
+<p>이 Playbook은 실행 시점의 Snapshot을 여러 Host에서 같은 형식으로 수집하는 데 적합합니다. 다음 기능은 제공하지 않습니다.</p>
+
+<ul>
+  <li>
+    <p>시간에 따른 Metric 저장과 Query</p>
+  </li>
+  <li>
+    <p>실시간 Dashboard</p>
+  </li>
+  <li>
+    <p>Threshold 기반 Alert와 Notification</p>
+  </li>
+  <li>
+    <p>Trace와 Application Request 상관관계 분석</p>
+  </li>
+</ul>
+
+<p>지속 Monitoring은 Node Exporter와 Prometheus 또는 CloudWatch Agent 같은 수집기를 사용하고, Ansible은 수집기 설치·설정과 일회성 점검 자동화에 사용합니다.</p>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Facts는 Managed Node에서 수집한 System 정보이며 Host별 Report를 같은 형식으로 만들 수 있습니다.</p>
+    </li>
+    <li>
+      <p>반복 Redirect 대신 <code class="language-plaintext highlighter-rouge">command</code> 결과를 등록하고 <code class="language-plaintext highlighter-rouge">copy</code>로 Report를 관리합니다.</p>
+    </li>
+    <li>
+      <p>Check Mode가 모든 Module과 명령 실행을 완전히 검증하는 것은 아닙니다.</p>
+    </li>
+    <li>
+      <p>Package 이름과 Block Device 이름은 OS와 환경마다 다르므로 고정하지 않습니다.</p>
+    </li>
+    <li>
+      <p>Ansible 점검은 Snapshot 자동화이며 지속 Monitoring System을 대체하지 않습니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_vars_facts.html">Ansible Facts</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.ansible.com/projects/ansible/latest/collections/ansible/builtin/gather_facts_module.html">gather_facts Module</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_checkmode.html">Check Mode와 Diff Mode</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-native-62-observability-linux-server-monitoring/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">Observability와 Linux Server Monitoring</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-native-64-kubernetes-prometheus-monitoring-architecture/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">Kubernetes Monitoring과 Prometheus Architecture</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791623819"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791623819"></script>
+  </body>
+</html>

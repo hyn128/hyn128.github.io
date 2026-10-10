@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>AWS Lambda와 S3 Event로 JSON·Thumbnail 처리 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="Amazon S3 Object 생성 Event로 Lambda를 호출해 JSON 온도 데이터를 기록하고 Pillow Layer를 이용해 Thumbnail을 생성하는 과정을 구성합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-19-lambda-s3-event-thumbnail/">
+<meta property="og:title" content="AWS Lambda와 S3 Event로 JSON·Thumbnail 처리 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="Amazon S3 Object 생성 Event로 Lambda를 호출해 JSON 온도 데이터를 기록하고 Pillow Layer를 이용해 Thumbnail을 생성하는 과정을 구성합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-19-lambda-s3-event-thumbnail/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="AWS Lambda와 S3 Event로 JSON·Thumbnail 처리 | renamed.log">
+<meta name="twitter:description" content="Amazon S3 Object 생성 Event로 Lambda를 호출해 JSON 온도 데이터를 기록하고 Pillow Layer를 이용해 Thumbnail을 생성하는 과정을 구성합니다">
+
+  <meta property="article:published_time" content="2026-10-07T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791623819" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791623819" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791623819">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791623819" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791623819">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "AWS Lambda와 S3 Event로 JSON·Thumbnail 처리 | renamed.log",
+    "description": "Amazon S3 Object 생성 Event로 Lambda를 호출해 JSON 온도 데이터를 기록하고 Pillow Layer를 이용해 Thumbnail을 생성하는 과정을 구성합니다",
+    "url": "https://hyn128.site/cloud-19-lambda-s3-event-thumbnail/",
+    "datePublished": "2026-10-07T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">AWS Lambda와 S3 Event로 JSON·Thumbnail 처리</h1>
+    
+      <p class="post-head__description">Amazon S3 Object 생성 Event로 Lambda를 호출해 JSON 온도 데이터를 기록하고 Pillow Layer를 이용해 Thumbnail을 생성하는 과정을 구성합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 7일 · 6분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Amazon S3에 Object가 생성되면 Event Notification이 AWS Lambda를 호출하도록 구성합니다. 첫 번째 함수는 JSON Object의 <code class="language-plaintext highlighter-rouge">temperature</code>를 읽어 CloudWatch Logs에 기록하고, 두 번째 함수는 원본 이미지를 내려받아 Thumbnail을 별도 S3 Bucket에 저장합니다. S3 Bucket은 공개하지 않고 Lambda Execution Role에 필요한 Object 권한만 부여합니다.</p>
+</blockquote>
+
+<h2 id="1-serverless와-lambda">1. Serverless와 Lambda</h2>
+
+<hr />
+
+<p>Serverless는 Server가 존재하지 않는다는 뜻이 아닙니다. 사용자가 Server의 Provisioning, OS 관리와 Capacity 조정을 직접 수행하지 않고 Function이나 Managed Backend 단위로 Code를 실행하는 운영 모델입니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>역할</th>
+      <th>AWS 예시</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>FaaS</td>
+      <td>Event에 반응해 Function Code 실행</td>
+      <td>AWS Lambda</td>
+    </tr>
+    <tr>
+      <td>Managed Backend</td>
+      <td>Storage, Message와 인증 기능 제공</td>
+      <td>Amazon S3, Amazon SNS</td>
+    </tr>
+    <tr>
+      <td>Observability</td>
+      <td>Function 실행 Log와 Metric 수집</td>
+      <td>Amazon CloudWatch</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Lambda는 Trigger가 전달한 Event를 Handler에 넘깁니다. Handler가 다른 AWS Resource를 사용하려면 Lambda Execution Role에 해당 작업 권한이 있어야 합니다. 반대로 S3가 Lambda를 호출하려면 Lambda의 Resource-based Policy에 <code class="language-plaintext highlighter-rouge">lambda:InvokeFunction</code> 권한이 필요합니다. Console에서 S3 Trigger를 추가하면 이 호출 권한과 Bucket Event Notification을 함께 구성합니다.</p>
+
+<h2 id="2-실습-구조와-실행-위치">2. 실습 구조와 실행 위치</h2>
+
+<hr />
+
+<p>이 실습은 다음 위치를 구분합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>표기</th>
+      <th>실행 위치</th>
+      <th>작업</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code></td>
+      <td>AWS Management Console</td>
+      <td>S3 Bucket, IAM Role, Lambda Function과 Trigger 구성</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[LOCAL]</code></td>
+      <td>Local Terminal</td>
+      <td>Pillow Layer Package 생성과 Test File 준비</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[LAMBDA]</code></td>
+      <td>Lambda Execution Environment</td>
+      <td>JSON 해석, Image Resize와 S3 Object 저장</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>전체 흐름은 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>JSON 또는 Image Upload
+  ↓
+Amazon S3 ObjectCreated Event
+  ↓
+AWS Lambda
+  ├── JSON: temperature 확인 → CloudWatch Logs
+  └── Image: Pillow로 Resize → Thumbnail Bucket
+</code></pre></div></div>
+
+<p>S3 Bucket과 Lambda Function은 같은 Region에 생성합니다. Bucket 이름은 전 세계에서 고유해야 하므로 아래 이름은 실제 환경에 맞게 바꿉니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>예제 이름</th>
+      <th>용도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>JSON Source Bucket</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;JSON_SOURCE_BUCKET&gt;</code></td>
+      <td><code class="language-plaintext highlighter-rouge">.json</code> Object 저장</td>
+    </tr>
+    <tr>
+      <td>Image Source Bucket</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;IMAGE_SOURCE_BUCKET&gt;</code></td>
+      <td>원본 Image 저장</td>
+    </tr>
+    <tr>
+      <td>Thumbnail Bucket</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;THUMBNAIL_BUCKET&gt;</code></td>
+      <td>Resize 결과 저장</td>
+    </tr>
+    <tr>
+      <td>JSON Function</td>
+      <td><code class="language-plaintext highlighter-rouge">temperature-event-handler</code></td>
+      <td>JSON 온도 데이터 처리</td>
+    </tr>
+    <tr>
+      <td>Image Function</td>
+      <td><code class="language-plaintext highlighter-rouge">thumbnail-event-handler</code></td>
+      <td>Thumbnail 생성</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="3-공개-bucket-policy-대신-execution-role-사용">3. 공개 Bucket Policy 대신 Execution Role 사용</h2>
+
+<hr />
+
+<p>S3 Event를 처리하기 위해 Bucket을 공개할 필요는 없습니다. S3 Block Public Access를 유지하고 Lambda Execution Role에 필요한 권한만 부여합니다.</p>
+
+<p>Lambda가 Log를 기록할 수 있도록 AWS Managed Policy <code class="language-plaintext highlighter-rouge">AWSLambdaBasicExecutionRole</code>을 Role에 연결합니다. S3 Object 접근은 다음과 같은 Inline Policy로 제한합니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"Version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2012-10-17"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"Statement"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"Sid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ReadJsonAndSourceImages"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"s3:GetObject"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Resource"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="s2">"arn:aws:s3:::&lt;JSON_SOURCE_BUCKET&gt;/*"</span><span class="p">,</span><span class="w">
+        </span><span class="s2">"arn:aws:s3:::&lt;IMAGE_SOURCE_BUCKET&gt;/*"</span><span class="w">
+      </span><span class="p">]</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"Sid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"WriteThumbnails"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="s2">"s3:PutObject"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"Resource"</span><span class="p">:</span><span class="w"> </span><span class="s2">"arn:aws:s3:::&lt;THUMBNAIL_BUCKET&gt;/*"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">s3:ListBucket</code>, <code class="language-plaintext highlighter-rouge">s3:DeleteObject</code>와 공개 <code class="language-plaintext highlighter-rouge">Principal</code>은 이 실습에 필요하지 않습니다. Function마다 역할을 분리하면 JSON Function에는 Source JSON <code class="language-plaintext highlighter-rouge">GetObject</code>만, Thumbnail Function에는 Source Image <code class="language-plaintext highlighter-rouge">GetObject</code>와 Destination <code class="language-plaintext highlighter-rouge">PutObject</code>만 부여할 수 있습니다.</p>
+
+<h2 id="4-json-온도-데이터-처리">4. JSON 온도 데이터 처리</h2>
+
+<hr />
+
+<h3 id="41-lambda-function-생성">4.1 Lambda Function 생성</h3>
+
+<p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>에서 Python Runtime Lambda Function을 생성하고 앞에서 만든 Execution Role을 지정합니다. Function Code는 S3 Event의 모든 Record를 순회하도록 작성합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">unquote_plus</span>
+
+<span class="kn">import</span> <span class="nn">boto3</span>
+
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="p">.</span><span class="n">getLogger</span><span class="p">()</span>
+<span class="n">logger</span><span class="p">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="p">.</span><span class="n">INFO</span><span class="p">)</span>
+<span class="n">s3_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="p">.</span><span class="n">client</span><span class="p">(</span><span class="s">"s3"</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">lambda_handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">event</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="s">"Records"</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="n">bucket</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s">"s3"</span><span class="p">][</span><span class="s">"bucket"</span><span class="p">][</span><span class="s">"name"</span><span class="p">]</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">unquote_plus</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s">"s3"</span><span class="p">][</span><span class="s">"object"</span><span class="p">][</span><span class="s">"key"</span><span class="p">])</span>
+        <span class="n">event_time</span> <span class="o">=</span> <span class="n">record</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="s">"eventTime"</span><span class="p">,</span> <span class="s">"unknown"</span><span class="p">)</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="n">s3_client</span><span class="p">.</span><span class="n">get_object</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="n">bucket</span><span class="p">,</span> <span class="n">Key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="p">.</span><span class="n">loads</span><span class="p">(</span><span class="n">response</span><span class="p">[</span><span class="s">"Body"</span><span class="p">].</span><span class="n">read</span><span class="p">().</span><span class="n">decode</span><span class="p">(</span><span class="s">"utf-8"</span><span class="p">))</span>
+        <span class="n">temperature</span> <span class="o">=</span> <span class="n">payload</span><span class="p">[</span><span class="s">"temperature"</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">temperature</span> <span class="o">&gt;</span> <span class="mi">40</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="s">"주의하세요. 매우 덥습니다."</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="s">"나쁘지 않은 날씨입니다."</span>
+
+        <span class="n">logger</span><span class="p">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s">"temperature=%s event_time=%s bucket=%s key=%s message=%s"</span><span class="p">,</span>
+            <span class="n">temperature</span><span class="p">,</span>
+            <span class="n">event_time</span><span class="p">,</span>
+            <span class="n">bucket</span><span class="p">,</span>
+            <span class="n">key</span><span class="p">,</span>
+            <span class="n">message</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">results</span><span class="p">.</span><span class="n">append</span><span class="p">({</span><span class="s">"key"</span><span class="p">:</span> <span class="n">key</span><span class="p">,</span> <span class="s">"temperature"</span><span class="p">:</span> <span class="n">temperature</span><span class="p">,</span> <span class="s">"message"</span><span class="p">:</span> <span class="n">message</span><span class="p">})</span>
+
+    <span class="k">return</span> <span class="p">{</span><span class="s">"processed"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">),</span> <span class="s">"results"</span><span class="p">:</span> <span class="n">results</span><span class="p">}</span>
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>처리</th>
+      <th>이유</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">unquote_plus()</code></td>
+      <td>S3 Event의 URL Encoding된 Object Key 복원</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">event.get("Records", [])</code></td>
+      <td>한 Event에 여러 Record가 포함되는 경우 처리</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">record["eventTime"]</code></td>
+      <td>Object 생성 Event가 기록한 UTC 시각 사용</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">logger.info()</code></td>
+      <td>CloudWatch Logs에서 Field를 구분해 조회</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Code를 저장한 뒤 <code class="language-plaintext highlighter-rouge">Deploy</code>를 눌러 현재 Version에 반영합니다.</p>
+
+<h3 id="42-s3-event-notification-생성">4.2 S3 Event Notification 생성</h3>
+
+<p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>에서 JSON Source Bucket의 <code class="language-plaintext highlighter-rouge">Properties → Event notifications</code>로 이동해 다음 값을 설정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>값</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>이름</td>
+      <td><code class="language-plaintext highlighter-rouge">temperature-json-created</code></td>
+    </tr>
+    <tr>
+      <td>Event Type</td>
+      <td><code class="language-plaintext highlighter-rouge">All object create events</code></td>
+    </tr>
+    <tr>
+      <td>Suffix</td>
+      <td><code class="language-plaintext highlighter-rouge">.json</code></td>
+    </tr>
+    <tr>
+      <td>Destination</td>
+      <td><code class="language-plaintext highlighter-rouge">temperature-event-handler</code> Lambda Function</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>이 Function은 생성된 Object를 읽으므로 Object 삭제 Event를 연결하지 않습니다.</p>
+
+<h3 id="43-test와-log-확인">4.3 Test와 Log 확인</h3>
+
+<p>다음 Test File을 JSON Source Bucket에 Upload합니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"temperature"</span><span class="p">:</span><span class="w"> </span><span class="mi">45</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>CloudWatch에서 <code class="language-plaintext highlighter-rouge">/aws/lambda/temperature-event-handler</code> Log Group의 최신 Log Stream을 확인합니다. <code class="language-plaintext highlighter-rouge">temperature=45</code>, Object Key와 Event Time이 기록되면 S3 Event 전달과 Function 실행이 완료된 것입니다.</p>
+
+<p>잘못된 JSON, <code class="language-plaintext highlighter-rouge">temperature</code> Field 누락 또는 숫자가 아닌 값은 Function Error가 됩니다. 운영 Code에서는 Schema 검증과 실패 Event를 보관할 Destination 또는 Dead-letter 처리를 추가로 설계합니다.</p>
+
+<h2 id="5-image-thumbnail-생성">5. Image Thumbnail 생성</h2>
+
+<hr />
+
+<h3 id="51-source와-destination-분리">5.1 Source와 Destination 분리</h3>
+
+<p>Image Source Bucket과 Thumbnail Bucket을 별도로 사용합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>&lt;IMAGE_SOURCE_BUCKET&gt;/photo.jpg
+  ↓ ObjectCreated Event
+thumbnail-event-handler
+  ↓ Resize
+&lt;THUMBNAIL_BUCKET&gt;/photo.jpg
+</code></pre></div></div>
+
+<p>Trigger Bucket에 결과를 다시 쓰면 새 Object가 Function을 반복 호출하는 Recursive Invocation이 발생할 수 있습니다. 별도 Destination Bucket을 사용하는 이유입니다.</p>
+
+<p>Thumbnail Function의 Environment Variable에 다음 값을 설정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">THUMBNAIL_BUCKET</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;THUMBNAIL_BUCKET&gt;</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="52-function-code-작성">5.2 Function Code 작성</h3>
+
+<p>Pillow는 Lambda Python Runtime에 기본 포함되지 않으므로 다음 절에서 Layer로 추가합니다. Function Code는 Source Image를 <code class="language-plaintext highlighter-rouge">/tmp</code>에 내려받고 원본 크기의 절반을 넘지 않도록 축소합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">unquote_plus</span>
+
+<span class="kn">import</span> <span class="nn">boto3</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">ImageOps</span>
+
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="p">.</span><span class="n">getLogger</span><span class="p">()</span>
+<span class="n">logger</span><span class="p">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="p">.</span><span class="n">INFO</span><span class="p">)</span>
+<span class="n">s3_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="p">.</span><span class="n">client</span><span class="p">(</span><span class="s">"s3"</span><span class="p">)</span>
+<span class="n">thumbnail_bucket</span> <span class="o">=</span> <span class="n">os</span><span class="p">.</span><span class="n">environ</span><span class="p">[</span><span class="s">"THUMBNAIL_BUCKET"</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">resize_image</span><span class="p">(</span><span class="n">source_path</span><span class="p">,</span> <span class="n">destination_path</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">Image</span><span class="p">.</span><span class="nb">open</span><span class="p">(</span><span class="n">source_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">source_image</span><span class="p">:</span>
+        <span class="n">image_format</span> <span class="o">=</span> <span class="n">source_image</span><span class="p">.</span><span class="nb">format</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">ImageOps</span><span class="p">.</span><span class="n">exif_transpose</span><span class="p">(</span><span class="n">source_image</span><span class="p">)</span>
+        <span class="n">target_size</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">image</span><span class="p">.</span><span class="n">width</span> <span class="o">//</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">image</span><span class="p">.</span><span class="n">height</span> <span class="o">//</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">image</span><span class="p">.</span><span class="n">thumbnail</span><span class="p">(</span><span class="n">target_size</span><span class="p">)</span>
+        <span class="n">image</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="n">destination_path</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">image_format</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">lambda_handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">event</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="s">"Records"</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="n">source_bucket</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s">"s3"</span><span class="p">][</span><span class="s">"bucket"</span><span class="p">][</span><span class="s">"name"</span><span class="p">]</span>
+        <span class="n">source_key</span> <span class="o">=</span> <span class="n">unquote_plus</span><span class="p">(</span><span class="n">record</span><span class="p">[</span><span class="s">"s3"</span><span class="p">][</span><span class="s">"object"</span><span class="p">][</span><span class="s">"key"</span><span class="p">])</span>
+        <span class="n">suffix</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source_key</span><span class="p">).</span><span class="n">suffix</span>
+
+        <span class="k">with</span> <span class="n">tempfile</span><span class="p">.</span><span class="n">TemporaryDirectory</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="s">"/tmp"</span><span class="p">)</span> <span class="k">as</span> <span class="n">work_dir</span><span class="p">:</span>
+            <span class="n">source_path</span> <span class="o">=</span> <span class="n">os</span><span class="p">.</span><span class="n">path</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s">"source</span><span class="si">{</span><span class="n">suffix</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">os</span><span class="p">.</span><span class="n">path</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s">"thumbnail</span><span class="si">{</span><span class="n">suffix</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+
+            <span class="n">s3_client</span><span class="p">.</span><span class="n">download_file</span><span class="p">(</span><span class="n">source_bucket</span><span class="p">,</span> <span class="n">source_key</span><span class="p">,</span> <span class="n">source_path</span><span class="p">)</span>
+            <span class="n">resize_image</span><span class="p">(</span><span class="n">source_path</span><span class="p">,</span> <span class="n">output_path</span><span class="p">)</span>
+            <span class="n">s3_client</span><span class="p">.</span><span class="n">upload_file</span><span class="p">(</span><span class="n">output_path</span><span class="p">,</span> <span class="n">thumbnail_bucket</span><span class="p">,</span> <span class="n">source_key</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="p">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s">"source=s3://%s/%s destination=s3://%s/%s"</span><span class="p">,</span>
+            <span class="n">source_bucket</span><span class="p">,</span>
+            <span class="n">source_key</span><span class="p">,</span>
+            <span class="n">thumbnail_bucket</span><span class="p">,</span>
+            <span class="n">source_key</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">processed</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">source_key</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span><span class="s">"processed"</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">processed</span><span class="p">),</span> <span class="s">"keys"</span><span class="p">:</span> <span class="n">processed</span><span class="p">}</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">/tmp</code>는 Lambda 실행 환경에서 Function이 쓸 수 있는 임시 Storage입니다. 실행 환경 재사용 여부에 의존하지 않도록 호출마다 임시 Directory를 만들고 처리 후 제거합니다.</p>
+
+<h3 id="53-pillow-layer-생성">5.3 Pillow Layer 생성</h3>
+
+<p>Pillow는 Native Library를 포함하므로 Lambda와 같은 Linux 환경, 같은 Python Version과 같은 CPU Architecture를 기준으로 Package를 만들어야 합니다. 다음 예제는 Python 3.14, <code class="language-plaintext highlighter-rouge">x86_64</code> Function 기준입니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [LOCAL]</span>
+<span class="nb">mkdir</span> <span class="nt">-p</span> lambda-layer/python
+
+docker run <span class="nt">--rm</span> <span class="se">\</span>
+  <span class="nt">--platform</span> linux/amd64 <span class="se">\</span>
+  <span class="nt">--volume</span> <span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/lambda-layer:/var/task"</span> <span class="se">\</span>
+  public.ecr.aws/sam/build-python3.14 <span class="se">\</span>
+  /bin/bash <span class="nt">-c</span> <span class="s1">'pip install --no-cache-dir pillow boto3 -t /var/task/python'</span>
+
+<span class="nb">cd </span>lambda-layer
+zip <span class="nt">-r</span> ../pillow-layer.zip python
+<span class="nb">cd</span> ..
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>조건</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Runtime</td>
+      <td>Function과 Layer의 Python Version 일치</td>
+    </tr>
+    <tr>
+      <td>Architecture</td>
+      <td><code class="language-plaintext highlighter-rouge">x86_64</code>이면 <code class="language-plaintext highlighter-rouge">linux/amd64</code>, <code class="language-plaintext highlighter-rouge">arm64</code>이면 <code class="language-plaintext highlighter-rouge">linux/arm64</code> 사용</td>
+    </tr>
+    <tr>
+      <td>ZIP Root</td>
+      <td>최상위에 <code class="language-plaintext highlighter-rouge">python/</code> Directory 존재</td>
+    </tr>
+    <tr>
+      <td>Build OS</td>
+      <td>Lambda에서 실행할 수 있는 Linux 호환 Package 생성</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>에서 Lambda Layer를 만들고 <code class="language-plaintext highlighter-rouge">pillow-layer.zip</code>을 Upload한 뒤 Thumbnail Function에 연결합니다. Layer의 Compatible Runtime과 Function Runtime이 일치하는지 확인합니다.</p>
+
+<h3 id="54-trigger와-결과-검증">5.4 Trigger와 결과 검증</h3>
+
+<p>Image Source Bucket에 <code class="language-plaintext highlighter-rouge">All object create events</code> Notification을 추가하고 Thumbnail Function을 Destination으로 선택합니다. 필요하면 <code class="language-plaintext highlighter-rouge">.jpg</code>, <code class="language-plaintext highlighter-rouge">.jpeg</code> 또는 <code class="language-plaintext highlighter-rouge">.png</code> Suffix별 Notification을 구분합니다.</p>
+
+<p>검증 순서는 다음과 같습니다.</p>
+
+<ol>
+  <li>
+    <p>Image Source Bucket에 Test Image를 Upload합니다.</p>
+  </li>
+  <li>
+    <p>Thumbnail Bucket에 같은 Key의 Object가 생성됐는지 확인합니다.</p>
+  </li>
+  <li>
+    <p>두 Object의 Image 가로·세로 크기를 비교합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">/aws/lambda/thumbnail-event-handler</code> Log Group에서 Source와 Destination을 확인합니다.</p>
+  </li>
+</ol>
+
+<p><code class="language-plaintext highlighter-rouge">No module named PIL</code>이면 Layer 연결과 ZIP의 <code class="language-plaintext highlighter-rouge">python/</code> Directory를 확인합니다. <code class="language-plaintext highlighter-rouge">cannot load shared object</code>와 같은 Error가 발생하면 Build OS 또는 Architecture가 Function과 다른지 확인합니다.</p>
+
+<h2 id="6-resource-정리">6. Resource 정리</h2>
+
+<hr />
+
+<p>Test가 끝나면 다음 순서로 정리합니다.</p>
+
+<ol>
+  <li>
+    <p>Source Bucket의 Event Notification을 제거합니다.</p>
+  </li>
+  <li>
+    <p>Source와 Thumbnail Bucket의 Object를 비웁니다.</p>
+  </li>
+  <li>
+    <p>세 S3 Bucket을 삭제합니다.</p>
+  </li>
+  <li>
+    <p>두 Lambda Function과 Pillow Layer Version을 삭제합니다.</p>
+  </li>
+  <li>
+    <p>실습용 IAM Policy와 Execution Role을 삭제합니다.</p>
+  </li>
+  <li>
+    <p>CloudWatch Log Group을 더 보관할 필요가 없으면 삭제합니다.</p>
+  </li>
+</ol>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>S3 <code class="language-plaintext highlighter-rouge">ObjectCreated</code> Event는 Lambda Function을 자동으로 호출할 수 있습니다.</p>
+    </li>
+    <li>
+      <p>S3 Bucket을 공개하지 않고 Lambda Execution Role에 필요한 Object 권한만 부여합니다.</p>
+    </li>
+    <li>
+      <p>Event의 Object Key는 URL Decoding한 뒤 사용합니다.</p>
+    </li>
+    <li>
+      <p>Trigger Source와 결과 Bucket을 분리해 Recursive Invocation을 방지합니다.</p>
+    </li>
+    <li>
+      <p>Pillow Layer는 Lambda와 같은 Python Version, Linux 환경과 CPU Architecture에 맞춰 Package로 만듭니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/lambda/latest/dg/with-s3-example.html">Amazon S3 Trigger로 Lambda 호출</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-how-to-event-types-and-destinations.html">S3 Event Notification Type과 Destination</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/lambda/latest/dg/python-layers.html">Python Lambda Layer 생성</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/lambda/latest/dg/packaging-layers.html">Lambda Layer Package 구조</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-18-cloudwatch-metrics-logs-alarm-sns/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">CloudWatch Metric·Logs·Alarm과 SNS 알림</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-20-aws-hybrid-cloud-vpc-network/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">AWS Hybrid Cloud와 VPC Network 설계</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791623819"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791623819"></script>
+  </body>
+</html>

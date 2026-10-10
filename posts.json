@@ -4,6 +4,111 @@
       
       
       {
+        "title": "Kubernetes Monitoring과 Prometheus Architecture",
+        "url": "/cloud-native-64-kubernetes-prometheus-monitoring-architecture/",
+        "description": "Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다",
+        "thumbnail": null,
+        "tags": ["CloudNative","AutoEverSW","Monitoring"],
+        "series_key": "cloudnative",
+        "series_title": "CloudNative",
+        "date_label": "2026년 10월 9일",
+        "reading_time_label": "5분 읽기",
+        "search": "kubernetes monitoring과 prometheus architecture kubernetes resource metrics pipeline과 prometheus full monitoring pipeline을 구분하고 node exporter, kube-state-metrics, alertmanager와 operator의 역할을 정리합니다 cloudnative autoeversw monitoring cloudnative"
+      },
+    
+      
+      
+      {
+        "title": "Ansible Facts와 Linux Server 점검 자동화",
+        "url": "/cloud-native-63-ansible-server-monitoring/",
+        "description": "Ansible Facts로 여러 Managed Node의 System 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 File로 저장하는 Playbook을 구성합니다",
+        "thumbnail": null,
+        "tags": ["CloudNative","AutoEverSW","Ansible"],
+        "series_key": "cloudnative",
+        "series_title": "CloudNative",
+        "date_label": "2026년 10월 9일",
+        "reading_time_label": "5분 읽기",
+        "search": "ansible facts와 linux server 점검 자동화 ansible facts로 여러 managed node의 system 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 file로 저장하는 playbook을 구성합니다 cloudnative autoeversw ansible cloudnative"
+      },
+    
+      
+      
+      {
+        "title": "Observability와 Linux Server Monitoring",
+        "url": "/cloud-native-62-observability-linux-server-monitoring/",
+        "description": "Metric·Log·Trace의 차이를 이해하고 Linux CPU, Memory, Disk, Network와 Service 상태를 점검해 Alert와 장애 대응 흐름으로 연결합니다",
+        "thumbnail": null,
+        "tags": ["CloudNative","AutoEverSW","Monitoring"],
+        "series_key": "cloudnative",
+        "series_title": "CloudNative",
+        "date_label": "2026년 10월 9일",
+        "reading_time_label": "5분 읽기",
+        "search": "observability와 linux server monitoring metric·log·trace의 차이를 이해하고 linux cpu, memory, disk, network와 service 상태를 점검해 alert와 장애 대응 흐름으로 연결합니다 cloudnative autoeversw monitoring cloudnative"
+      },
+    
+      
+      
+      {
+        "title": "AWS Site-to-Site VPN Architecture와 EC2 Router 실습",
+        "url": "/cloud-22-site-to-site-vpn-ec2-router/",
+        "description": "Customer Gateway, Virtual Private Gateway와 두 IPsec Tunnel의 역할을 이해하고 서로 다른 CIDR의 두 VPC로 On-Premise 연결을 모의 구성합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 8일",
+        "reading_time_label": "6분 읽기",
+        "search": "aws site-to-site vpn architecture와 ec2 router 실습 customer gateway, virtual private gateway와 두 ipsec tunnel의 역할을 이해하고 서로 다른 cidr의 두 vpc로 on-premise 연결을 모의 구성합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "2-AZ VPC Public·Private Network 구축",
+        "url": "/cloud-21-vpc-public-private-network/",
+        "description": "두 Availability Zone에 Public·Private Subnet을 나누고 Internet Gateway, NAT Gateway, Route Table과 Security Group을 구성해 접속 경로를 검증합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 8일",
+        "reading_time_label": "5분 읽기",
+        "search": "2-az vpc public·private network 구축 두 availability zone에 public·private subnet을 나누고 internet gateway, nat gateway, route table과 security group을 구성해 접속 경로를 검증합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "AWS Hybrid Cloud와 VPC Network 설계",
+        "url": "/cloud-20-aws-hybrid-cloud-vpc-network/",
+        "description": "On-Premise와 AWS를 연결하는 Hybrid Cloud Pattern을 구분하고 Direct Connect, Site-to-Site VPN, Outposts와 VPC Network의 Traffic 흐름을 정리합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 7일",
+        "reading_time_label": "7분 읽기",
+        "search": "aws hybrid cloud와 vpc network 설계 on-premise와 aws를 연결하는 hybrid cloud pattern을 구분하고 direct connect, site-to-site vpn, outposts와 vpc network의 traffic 흐름을 정리합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
+        "title": "AWS Lambda와 S3 Event로 JSON·Thumbnail 처리",
+        "url": "/cloud-19-lambda-s3-event-thumbnail/",
+        "description": "Amazon S3 Object 생성 Event로 Lambda를 호출해 JSON 온도 데이터를 기록하고 Pillow Layer를 이용해 Thumbnail을 생성하는 과정을 구성합니다",
+        "thumbnail": null,
+        "tags": ["Cloud","AWS","AutoEverSW"],
+        "series_key": "cloud",
+        "series_title": "Cloud",
+        "date_label": "2026년 10월 7일",
+        "reading_time_label": "6분 읽기",
+        "search": "aws lambda와 s3 event로 json·thumbnail 처리 amazon s3 object 생성 event로 lambda를 호출해 json 온도 데이터를 기록하고 pillow layer를 이용해 thumbnail을 생성하는 과정을 구성합니다 cloud aws autoeversw cloud"
+      },
+    
+      
+      
+      {
         "title": "CloudWatch Metric·Logs·Alarm과 SNS 알림",
         "url": "/cloud-18-cloudwatch-metrics-logs-alarm-sns/",
         "description": "CloudWatch의 Metric, Logs, Dashboard와 Alarm 상태를 구분하고 EC2 Detailed Monitoring, SNS Email 알림과 CPU 부하 검증 절차를 구성합니다",

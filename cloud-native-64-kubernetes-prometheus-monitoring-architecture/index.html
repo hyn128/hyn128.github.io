@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>Kubernetes Monitoring과 Prometheus Architecture | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-native-64-kubernetes-prometheus-monitoring-architecture/">
+<meta property="og:title" content="Kubernetes Monitoring과 Prometheus Architecture | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-native-64-kubernetes-prometheus-monitoring-architecture/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Kubernetes Monitoring과 Prometheus Architecture | renamed.log">
+<meta name="twitter:description" content="Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다">
+
+  <meta property="article:published_time" content="2026-10-09T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791623819" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791623819" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791623819">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791623819" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791623819">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "Kubernetes Monitoring과 Prometheus Architecture | renamed.log",
+    "description": "Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다",
+    "url": "https://hyn128.site/cloud-native-64-kubernetes-prometheus-monitoring-architecture/",
+    "datePublished": "2026-10-09T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">CloudNative</p>
+    
+    <h1 class="post-head__title">Kubernetes Monitoring과 Prometheus Architecture</h1>
+    
+      <p class="post-head__description">Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 9일 · 5분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=CloudNative">CloudNative</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+          <a class="tag-chip" href="/?tag=Monitoring">Monitoring</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Kubernetes Pod와 IP는 계속 생성·교체되므로 고정 Host 목록보다 API 기반 Service Discovery와 선언형 Monitoring 구성이 필요합니다. Metrics Server는 HPA와 <code class="language-plaintext highlighter-rouge">kubectl top</code>에 필요한 현재 CPU·Memory Resource Metric을 제공하고, Prometheus는 Exporter가 공개한 Metric을 주기적으로 수집해 시계열로 저장합니다. Grafana는 조회 결과를 시각화하고 Alertmanager는 Prometheus가 보낸 Alert를 Grouping·Deduplication·Routing합니다.</p>
+</blockquote>
+
+<h2 id="1-고정-host와-kubernetes의-차이">1. 고정 Host와 Kubernetes의 차이</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>전통적인 Host 환경</th>
+      <th>Kubernetes 환경</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>대상 수명</td>
+      <td>Host가 장기간 유지</td>
+      <td>Pod가 생성·교체·삭제됨</td>
+    </tr>
+    <tr>
+      <td>주소</td>
+      <td>비교적 고정된 Host IP</td>
+      <td>Pod 재생성 시 IP 변경 가능</td>
+    </tr>
+    <tr>
+      <td>설정</td>
+      <td>Host 목록과 정적 설정 사용 가능</td>
+      <td>Label과 API 기반 Discovery 필요</td>
+    </tr>
+    <tr>
+      <td>상태</td>
+      <td>Process 중심</td>
+      <td>Node, Pod, Deployment와 Service 상태 연결</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Kubernetes Monitoring은 Control Plane의 Desired State와 Worker Node의 실제 실행 상태를 함께 봐야 합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Control Plane
+├── API Server의 Object 상태
+├── Scheduler·Controller 동작
+└── Desired Replica와 Condition
+
+Worker Node
+├── kubelet과 Container Runtime
+├── Node CPU·Memory·Disk·Network
+└── 실제 Pod Resource와 Restart
+</code></pre></div></div>
+
+<h2 id="2-resource-metrics-pipeline">2. Resource Metrics Pipeline</h2>
+
+<hr />
+
+<p>Resource Metrics Pipeline은 HPA, VPA와 <code class="language-plaintext highlighter-rouge">kubectl top</code>에 필요한 최소 CPU·Memory Metric을 제공합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Container Runtime·cgroup
+  ↓
+kubelet의 Resource Metric Endpoint
+  ↓ Pull
+Metrics Server
+  ↓ metrics.k8s.io API
+API Server
+  ├── kubectl top
+  └── HPA·VPA
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>구성 요소</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>cAdvisor·CRI Metric</td>
+      <td>Container Resource 사용량 제공</td>
+    </tr>
+    <tr>
+      <td>kubelet</td>
+      <td>Node와 Pod Resource 통계를 인증된 Endpoint로 공개</td>
+    </tr>
+    <tr>
+      <td>Metrics Server</td>
+      <td>각 Node의 kubelet에서 CPU·Memory Metric 수집·집계</td>
+    </tr>
+    <tr>
+      <td>Metrics API</td>
+      <td><code class="language-plaintext highlighter-rouge">metrics.k8s.io</code>로 현재 Resource Metric 제공</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Metrics Server는 최신 값 중심의 짧은 수명 Pipeline입니다. 장기 추세 저장, 임의 Application Metric Query와 Alert를 위한 완전한 Monitoring System이 아닙니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [CONTROL-PLANE-CLIENT]</span>
+kubectl top nodes
+kubectl top pods <span class="nt">--all-namespaces</span>
+</code></pre></div></div>
+
+<p>명령이 실패하면 Metrics Server Pod, APIService <code class="language-plaintext highlighter-rouge">v1beta1.metrics.k8s.io</code>와 kubelet 통신을 확인합니다.</p>
+
+<h2 id="3-full-monitoring-pipeline">3. Full Monitoring Pipeline</h2>
+
+<hr />
+
+<p>Prometheus 기반 Pipeline은 여러 Target의 Metric을 수집해 시계열 Database에 보관합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Worker Node ─ Node Exporter ─┐
+Kubernetes API ─ kube-state-metrics ─┤
+Application ─ /metrics ─────┤
+Batch Job ─ Pushgateway ────┘
+                              ↓ Pull
+                         Prometheus
+                         ├── PromQL
+                         ├── Recording·Alerting Rule
+                         ├── Grafana
+                         └── Alertmanager → Notification
+</code></pre></div></div>
+
+<p>Prometheus는 Target의 HTTP Metric Endpoint를 Pull 방식으로 Scrape합니다. Target은 정적 설정 또는 Kubernetes Service Discovery로 찾습니다.</p>
+
+<h2 id="4-도구의-역할">4. 도구의 역할</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>도구</th>
+      <th>중심 역할</th>
+      <th>운영 형태</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Prometheus</td>
+      <td>Metric 수집, 시계열 저장, PromQL과 Rule 평가</td>
+      <td>직접 운영 또는 Managed Service</td>
+    </tr>
+    <tr>
+      <td>Grafana</td>
+      <td>여러 Data Source의 Dashboard와 시각화</td>
+      <td>직접 운영 또는 Managed Service</td>
+    </tr>
+    <tr>
+      <td>Datadog</td>
+      <td>Infrastructure·Log·APM 통합 Observability</td>
+      <td>SaaS</td>
+    </tr>
+    <tr>
+      <td>New Relic</td>
+      <td>Application Performance와 Telemetry 분석</td>
+      <td>SaaS</td>
+    </tr>
+    <tr>
+      <td>InfluxDB</td>
+      <td>범용 시계열 Database</td>
+      <td>직접 운영, Cloud와 Enterprise</td>
+    </tr>
+    <tr>
+      <td>Kibana</td>
+      <td>Elasticsearch Data 검색과 시각화</td>
+      <td>Elastic Stack</td>
+    </tr>
+    <tr>
+      <td>Chronograf</td>
+      <td>InfluxDB Data 탐색과 시각화</td>
+      <td>InfluxDB 생태계</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>제품 기능, License와 요금은 Version과 계약에 따라 바뀝니다. 선택할 때는 다음을 비교합니다.</p>
+
+<ul>
+  <li>
+    <p>Data를 조직 외부 Service에 저장할 수 있는가</p>
+  </li>
+  <li>
+    <p>수집 대상과 Data 양에 따른 비용을 감당할 수 있는가</p>
+  </li>
+  <li>
+    <p>Metric, Log와 Trace를 하나의 Platform에서 연결해야 하는가</p>
+  </li>
+  <li>
+    <p>Monitoring Platform 자체의 Backup과 고가용성을 운영할 수 있는가</p>
+  </li>
+</ul>
+
+<h2 id="5-prometheus-server">5. Prometheus Server</h2>
+
+<hr />
+
+<p>Prometheus Server는 다음 기능을 담당합니다.</p>
+
+<ul>
+  <li>
+    <p>Service Discovery와 설정으로 Scrape Target을 찾습니다.</p>
+  </li>
+  <li>
+    <p>Target의 Metric Endpoint를 주기적으로 Pull합니다.</p>
+  </li>
+  <li>
+    <p>Sample을 Label 기반 시계열로 저장합니다.</p>
+  </li>
+  <li>
+    <p>PromQL Query, Recording Rule과 Alerting Rule을 평가합니다.</p>
+  </li>
+  <li>
+    <p>Target 상태와 Query를 확인하는 Web UI와 API를 제공합니다.</p>
+  </li>
+</ul>
+
+<p>Prometheus의 Local Storage는 각 Server가 독립적으로 동작하는 구조입니다. 장기 보관, 전역 Query와 대규모 고가용성이 필요하면 Remote Write나 별도 장기 Storage Architecture를 검토합니다.</p>
+
+<h2 id="6-node-exporter">6. Node Exporter</h2>
+
+<hr />
+
+<p>Node Exporter는 Linux Node의 <code class="language-plaintext highlighter-rouge">/proc</code>, <code class="language-plaintext highlighter-rouge">/sys</code>와 OS Interface에서 CPU, Memory, File System, Disk와 Network Metric을 읽어 HTTP <code class="language-plaintext highlighter-rouge">/metrics</code> Endpoint로 공개합니다.</p>
+
+<p>Kubernetes에서는 일반적으로 DaemonSet으로 배포해 각 Worker Node의 Host Metric을 수집합니다. Control Plane Node에도 배포하려면 해당 Node의 Taint와 Monitoring 정책에 맞는 Toleration이 필요할 수 있습니다. Managed Kubernetes에서는 Provider가 관리하는 Control Plane Host에 Node Exporter를 직접 배포할 수 없습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Node Exporter: Host OS Resource 상태
+kube-state-metrics: Kubernetes API Object 상태
+</code></pre></div></div>
+
+<p>두 Component는 같은 정보를 중복 수집하는 것이 아닙니다.</p>
+
+<h2 id="7-kube-state-metrics">7. kube-state-metrics</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">kube-state-metrics</code>는 Kubernetes API Server를 Watch하고 Deployment, ReplicaSet, Pod, Node 같은 Object의 현재 상태를 Metric으로 변환해 <code class="language-plaintext highlighter-rouge">/metrics</code>로 공개합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>예시 질문</th>
+      <th>Metric 영역</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>원하는 Replica와 사용 가능한 Replica가 다른가</td>
+      <td>Deployment State</td>
+    </tr>
+    <tr>
+      <td>Pod가 반복해서 Restart됐는가</td>
+      <td>Pod Container Status</td>
+    </tr>
+    <tr>
+      <td>Node가 Ready Condition인가</td>
+      <td>Node Status</td>
+    </tr>
+    <tr>
+      <td>Resource Request와 Limit가 어떻게 설정됐는가</td>
+      <td>Pod Container Resource Spec</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Node의 실제 CPU 사용률을 읽는 Component가 아닙니다. API Object의 Spec과 Status를 Metric으로 나타냅니다.</p>
+
+<h2 id="8-alertmanager">8. Alertmanager</h2>
+
+<hr />
+
+<p>Alerting Rule은 Prometheus가 평가합니다. 조건이 충족되면 Prometheus가 Alert를 Alertmanager에 보내고 Alertmanager는 다음 작업을 수행합니다.</p>
+
+<ul>
+  <li>
+    <p>같은 원인의 Alert를 Grouping합니다.</p>
+  </li>
+  <li>
+    <p>중복 Notification을 제거합니다.</p>
+  </li>
+  <li>
+    <p>Label에 따라 Email, Chat 또는 On-call Receiver로 Routing합니다.</p>
+  </li>
+  <li>
+    <p>Maintenance 동안 Silence를 적용합니다.</p>
+  </li>
+  <li>
+    <p>상위 Alert가 발생했을 때 하위 Alert Notification을 Inhibition합니다.</p>
+  </li>
+</ul>
+
+<p>Alertmanager가 Metric을 직접 수집하거나 Alert 조건을 평가하는 것은 아닙니다.</p>
+
+<h2 id="9-pushgateway">9. Pushgateway</h2>
+
+<hr />
+
+<p>Pushgateway는 Prometheus가 실행 중에 Scrape하기 어려운 짧은 Service-level Batch Job의 결과를 임시로 노출합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Short-lived Batch Job
+  ↓ Push
+Pushgateway
+  ↓ Pull
+Prometheus
+</code></pre></div></div>
+
+<p>일반 Host나 장기 Service의 Metric을 Pushgateway로 보내지 않습니다. Pushgateway는 Producer가 사라져도 Series를 자동 삭제하지 않으므로 오래된 Metric 수명 주기를 별도로 관리해야 합니다. Host 단위 Batch 결과는 Node Exporter Textfile Collector가 더 적합할 수 있습니다.</p>
+
+<h2 id="10-prometheus-operator-pattern">10. Prometheus Operator Pattern</h2>
+
+<hr />
+
+<p>Prometheus Operator는 Kubernetes Custom Resource를 Watch하고 Prometheus와 Alertmanager의 배포·설정을 Desired State에 맞게 조정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Custom Resource</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Prometheus</code></td>
+      <td>Version, Replica, Storage와 Retention 등 Instance 상태 선언</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Alertmanager</code></td>
+      <td>Alertmanager Instance 상태 선언</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">ServiceMonitor</code></td>
+      <td>Label로 Service Endpoint를 찾아 Scrape 방법 정의</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">PodMonitor</code></td>
+      <td>Service 없이 Pod Label로 Target과 Scrape 방법 정의</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">PrometheusRule</code></td>
+      <td>Recording Rule과 Alerting Rule 정의</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">AlertmanagerConfig</code></td>
+      <td>Receiver, Route와 Inhibition 설정 분리</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>사용자: ServiceMonitor·PrometheusRule 생성
+  ↓
+Kubernetes API Server
+  ↓ Watch
+Prometheus Operator
+  ↓ Reconcile
+Prometheus Scrape 설정·Rule과 Workload 갱신
+  ↓
+Prometheus가 새 Target Scrape·Rule 평가
+</code></pre></div></div>
+
+<p>Operator는 Label Selector를 이용해 <code class="language-plaintext highlighter-rouge">ServiceMonitor</code>, <code class="language-plaintext highlighter-rouge">PodMonitor</code>와 Rule을 Prometheus Instance에 연결합니다. 설정이 바뀌면 필요한 구성을 Reconcile하고 Prometheus가 재시작 없이 동적으로 반영할 수 있도록 관리합니다.</p>
+
+<h2 id="11-control-plane과-worker-관점">11. Control Plane과 Worker 관점</h2>
+
+<hr />
+
+<p>Monitoring Resource를 적용했을 때 역할은 다음처럼 이어집니다.</p>
+
+<ol>
+  <li>
+    <p>관리자가 API Server에 <code class="language-plaintext highlighter-rouge">ServiceMonitor</code> 또는 <code class="language-plaintext highlighter-rouge">PrometheusRule</code>을 제출합니다.</p>
+  </li>
+  <li>
+    <p>API Server가 Desired State를 저장하고 Prometheus Operator가 변경을 감지합니다.</p>
+  </li>
+  <li>
+    <p>Operator가 Prometheus 설정과 관련 Workload를 Reconcile합니다.</p>
+  </li>
+  <li>
+    <p>Scheduler가 Monitoring Pod의 실행 Node를 선택합니다.</p>
+  </li>
+  <li>
+    <p>선택된 Worker의 kubelet이 Container Runtime을 통해 Pod를 실행합니다.</p>
+  </li>
+  <li>
+    <p>Prometheus가 Worker의 Exporter와 Application Metric Endpoint를 Scrape합니다.</p>
+  </li>
+  <li>
+    <p>Prometheus Rule이 조건을 충족하면 Alertmanager로 Alert를 전달합니다.</p>
+  </li>
+</ol>
+
+<p>Control Plane의 API Object 상태와 Worker의 Host·Container Resource Metric을 함께 봐야 <code class="language-plaintext highlighter-rouge">Pod가 원하는 수만큼 존재하지 않는 이유</code>와 <code class="language-plaintext highlighter-rouge">실행 중인 Pod가 느린 이유</code>를 구분할 수 있습니다.</p>
+
+<h2 id="12-monitoring-설계-점검">12. Monitoring 설계 점검</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p>Metrics Server와 Prometheus의 목적을 구분했는가</p>
+  </li>
+  <li>
+    <p>Node Exporter와 kube-state-metrics가 제공하는 상태를 구분했는가</p>
+  </li>
+  <li>
+    <p>Label Cardinality가 불필요하게 증가하지 않는가</p>
+  </li>
+  <li>
+    <p>Prometheus Retention과 Storage 용량을 계산했는가</p>
+  </li>
+  <li>
+    <p>Alert에 담당자, 우선순위와 대응 절차가 연결됐는가</p>
+  </li>
+  <li>
+    <p>Monitoring Component 자체의 Resource, 고가용성과 Backup을 설계했는가</p>
+  </li>
+  <li>
+    <p>Metric Endpoint와 Dashboard 접근을 인증·Network Policy로 제한했는가</p>
+  </li>
+</ul>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Metrics Server는 HPA와 <code class="language-plaintext highlighter-rouge">kubectl top</code>에 필요한 현재 CPU·Memory Resource Metric을 제공합니다.</p>
+    </li>
+    <li>
+      <p>Prometheus는 Exporter와 Application Endpoint의 Metric을 Pull해 시계열로 저장합니다.</p>
+    </li>
+    <li>
+      <p>Node Exporter는 Host 상태를, kube-state-metrics는 Kubernetes API Object 상태를 공개합니다.</p>
+    </li>
+    <li>
+      <p>Prometheus가 Alert Rule을 평가하고 Alertmanager가 Notification을 Grouping·Deduplication·Routing합니다.</p>
+    </li>
+    <li>
+      <p>Prometheus Operator는 CRD와 Label Selector로 Monitoring Desired State를 Reconcile합니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/">Kubernetes Resource Metrics Pipeline</a></p>
+  </li>
+  <li>
+    <p><a href="https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/">Kubernetes Resource Monitoring 도구</a></p>
+  </li>
+  <li>
+    <p><a href="https://prometheus.io/docs/introduction/overview/">Prometheus Architecture</a></p>
+  </li>
+  <li>
+    <p><a href="https://github.com/kubernetes/kube-state-metrics">kube-state-metrics</a></p>
+  </li>
+  <li>
+    <p><a href="https://prometheus-operator.dev/docs/getting-started/introduction/">Prometheus Operator</a></p>
+  </li>
+  <li>
+    <p><a href="https://prometheus.io/docs/alerting/latest/alertmanager/">Alertmanager</a></p>
+  </li>
+  <li>
+    <p><a href="https://prometheus.io/docs/practices/pushing/">Pushgateway 사용 기준</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-native-63-ansible-server-monitoring/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">Ansible Facts와 Linux Server 점검 자동화</strong>
+          </span>
+        </a>
+      
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791623819"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791623819"></script>
+  </body>
+</html>

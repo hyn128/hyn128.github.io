@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>AWS Site-to-Site VPN Architecture와 EC2 Router 실습 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="Customer Gateway, Virtual Private Gateway와 두 IPsec Tunnel의 역할을 이해하고 서로 다른 CIDR의 두 VPC로 On-Premise 연결을 모의 구성합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-22-site-to-site-vpn-ec2-router/">
+<meta property="og:title" content="AWS Site-to-Site VPN Architecture와 EC2 Router 실습 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="Customer Gateway, Virtual Private Gateway와 두 IPsec Tunnel의 역할을 이해하고 서로 다른 CIDR의 두 VPC로 On-Premise 연결을 모의 구성합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-22-site-to-site-vpn-ec2-router/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="AWS Site-to-Site VPN Architecture와 EC2 Router 실습 | renamed.log">
+<meta name="twitter:description" content="Customer Gateway, Virtual Private Gateway와 두 IPsec Tunnel의 역할을 이해하고 서로 다른 CIDR의 두 VPC로 On-Premise 연결을 모의 구성합니다">
+
+  <meta property="article:published_time" content="2026-10-08T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791623819" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791623819" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791623819">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791623819" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791623819">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "AWS Site-to-Site VPN Architecture와 EC2 Router 실습 | renamed.log",
+    "description": "Customer Gateway, Virtual Private Gateway와 두 IPsec Tunnel의 역할을 이해하고 서로 다른 CIDR의 두 VPC로 On-Premise 연결을 모의 구성합니다",
+    "url": "https://hyn128.site/cloud-22-site-to-site-vpn-ec2-router/",
+    "datePublished": "2026-10-08T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Cloud</p>
+    
+    <h1 class="post-head__title">AWS Site-to-Site VPN Architecture와 EC2 Router 실습</h1>
+    
+      <p class="post-head__description">Customer Gateway, Virtual Private Gateway와 두 IPsec Tunnel의 역할을 이해하고 서로 다른 CIDR의 두 VPC로 On-Premise 연결을 모의 구성합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 8일 · 6분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Cloud">Cloud</a>
+        
+          <a class="tag-chip" href="/?tag=AWS">AWS</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>AWS Site-to-Site VPN은 On-Premise Customer Gateway와 AWS 측 Virtual Private Gateway 또는 Transit Gateway 사이에 두 IPsec Tunnel을 구성합니다. Static Route와 BGP Dynamic Route의 차이를 구분하고, 실제 Router 대신 Public EC2에 StrongSwan을 설치해 On-Premise Network를 모의합니다. 두 VPC는 겹치지 않는 CIDR를 사용하고 Tunnel Secret은 문서나 Repository에 저장하지 않습니다.</p>
+</blockquote>
+
+<h2 id="1-site-to-site-vpn-구성-요소">1. Site-to-Site VPN 구성 요소</h2>
+
+<hr />
+
+<p>기본 연결 구조는 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>On-Premise Network
+  ↓
+Customer Gateway Device
+  ⇅ IPsec Tunnel 1·2
+Virtual Private Gateway 또는 Transit Gateway
+  ↓
+AWS VPC Private Network
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>구성 요소</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Customer Gateway Device</td>
+      <td>On-Premise Router 또는 Firewall에서 VPN Tunnel 종료</td>
+    </tr>
+    <tr>
+      <td>Customer Gateway Resource</td>
+      <td>Device의 Public IP와 BGP ASN 등을 AWS에 표현</td>
+    </tr>
+    <tr>
+      <td>Site-to-Site VPN Connection</td>
+      <td>AWS와 Customer Gateway 사이의 두 Tunnel</td>
+    </tr>
+    <tr>
+      <td>Virtual Private Gateway</td>
+      <td>하나의 VPC에 Attach하는 AWS 측 VPN 종단점</td>
+    </tr>
+    <tr>
+      <td>Transit Gateway</td>
+      <td>여러 VPC와 On-Premise Network를 Hub 형태로 연결</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Customer Gateway Device에는 Internet에서 도달 가능한 고정 Public IP가 필요합니다. Device가 NAT 뒤에 있고 NAT Traversal을 지원하면 AWS Customer Gateway Resource에는 NAT Device의 Public IP를 사용합니다.</p>
+
+<h2 id="2-두-tunnel과-보안-protocol">2. 두 Tunnel과 보안 Protocol</h2>
+
+<hr />
+
+<p>AWS Site-to-Site VPN Connection은 고가용성을 위해 두 Tunnel을 제공합니다. Customer Gateway Device에 두 Tunnel을 모두 구성해야 AWS 측 Tunnel Endpoint 유지보수나 장애 시 보조 경로를 사용할 수 있습니다.</p>
+
+<p>두 Tunnel을 단순히 Primary와 Secondary로 고정하지 않습니다. Route 방식과 Target Gateway에 따라 Traffic 경로가 달라질 수 있으므로 AWS가 제공한 두 Tunnel 구성과 Route 우선순위를 함께 적용합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Protocol</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>IKE</td>
+      <td>양 끝의 Security Association 협상과 Key 교환</td>
+    </tr>
+    <tr>
+      <td>IPsec ESP</td>
+      <td>IP Packet Payload의 기밀성과 무결성 보호</td>
+    </tr>
+    <tr>
+      <td>NAT-T</td>
+      <td>NAT 환경에서 IPsec Traffic을 UDP 4500으로 전달</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>방화벽에서는 AWS가 생성한 Tunnel Outside IP를 Source 또는 Destination으로 제한하고 필요한 IKE, NAT-T와 ESP Traffic만 허용합니다.</p>
+
+<h2 id="3-static-route와-bgp-dynamic-route">3. Static Route와 BGP Dynamic Route</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>구분</th>
+      <th>Static Route</th>
+      <th>BGP Dynamic Route</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>경로 등록</td>
+      <td>On-Premise CIDR를 수동 등록</td>
+      <td>BGP Peer가 경로 광고</td>
+    </tr>
+    <tr>
+      <td>Network 변경</td>
+      <td>Route를 수동 갱신</td>
+      <td>광고한 경로를 동적으로 반영</td>
+    </tr>
+    <tr>
+      <td>장애 감지</td>
+      <td>Device의 별도 Health Check 필요</td>
+      <td>BGP Liveness가 Failover 판단 지원</td>
+    </tr>
+    <tr>
+      <td>적용</td>
+      <td>소규모 Lab, BGP 미지원 Device</td>
+      <td>변경이 잦거나 복수 경로를 가진 환경</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>BGP를 지원하는 Device에는 Dynamic Routing을 우선 검토합니다. Static Routing을 선택하면 VPN Connection 생성 시 AWS에 광고할 On-Premise Prefix를 직접 입력합니다.</p>
+
+<p>Customer Gateway ASN은 지원되는 Private ASN 범위에서 선택하고 AWS 측 Gateway ASN과 다르게 설정합니다. 단순히 특정 기본 번호를 유지하는 것이 Static Routing의 조건은 아닙니다.</p>
+
+<h2 id="4-packet-왕복-흐름">4. Packet 왕복 흐름</h2>
+
+<hr />
+
+<p>On-Premise Client가 VPC EC2에 접근하는 흐름은 다음과 같습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>On-Premise Client
+  ↓ On-Premise Route Table
+Customer Gateway에서 IPsec 암호화
+  ↓ Internet
+AWS VPN Tunnel Endpoint에서 복호화
+  ↓ Virtual Private Gateway
+VPC Route Table
+  ↓ Security Group·Network ACL
+Target EC2
+</code></pre></div></div>
+
+<p>응답은 반대 경로로 돌아가야 합니다. VPC에 On-Premise CIDR Route가 있어도 On-Premise Subnet이 VPC CIDR를 Customer Gateway로 보내지 않으면 통신할 수 없습니다.</p>
+
+<h2 id="5-lab-구성과-주의-사항">5. Lab 구성과 주의 사항</h2>
+
+<hr />
+
+<p>실제 On-Premise Router가 없는 환경에서는 두 VPC 중 하나를 On-Premise Network처럼 사용합니다. 이 구성은 VPN 학습용이며 실제 Data Center의 Firewall, 회선과 장애 조건을 대체하지 않습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Simulated On-Premise VPC 10.10.0.0/16
+├── Public Router Subnet 10.10.1.0/24
+│   └── StrongSwan Router EC2 + Elastic IP
+└── Private Client Subnet 10.10.11.0/24
+    └── Client EC2
+
+Cloud VPC 10.20.0.0/16
+└── Private Workload Subnet 10.20.11.0/24
+    └── Target EC2
+</code></pre></div></div>
+
+<p>두 VPC가 같은 CIDR를 사용하면 Route가 겹치므로 VPN 실습을 진행할 수 없습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>표기</th>
+      <th>실행 위치</th>
+      <th>작업</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code></td>
+      <td>AWS Management Console</td>
+      <td>VPC, VPN Resource, Route와 Security 구성</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[ROUTER-EC2]</code></td>
+      <td>On-Premise Simulation Router</td>
+      <td>StrongSwan, IP Forwarding과 Tunnel 구성</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[ONPREM-CLIENT]</code></td>
+      <td>Simulated On-Premise Private EC2</td>
+      <td>Cloud VPC 연결 검증</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[CLOUD-TARGET]</code></td>
+      <td>Cloud VPC Private EC2</td>
+      <td>Service와 반환 경로 검증</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="6-두-vpc와-ec2-준비">6. 두 VPC와 EC2 준비</h2>
+
+<hr />
+
+<h3 id="61-simulated-on-premise-vpc">6.1 Simulated On-Premise VPC</h3>
+
+<p>다음 Resource를 준비합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>값</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>VPC</td>
+      <td><code class="language-plaintext highlighter-rouge">onprem-vpc</code>, <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code></td>
+    </tr>
+    <tr>
+      <td>Router Subnet</td>
+      <td><code class="language-plaintext highlighter-rouge">10.10.1.0/24</code>, Internet Gateway Route</td>
+    </tr>
+    <tr>
+      <td>Client Subnet</td>
+      <td><code class="language-plaintext highlighter-rouge">10.10.11.0/24</code></td>
+    </tr>
+    <tr>
+      <td>Router EC2</td>
+      <td>Ubuntu, Elastic IP, Public Subnet</td>
+    </tr>
+    <tr>
+      <td>Client EC2</td>
+      <td>Ubuntu, Public IPv4 없음</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Client Subnet Route Table에는 Cloud VPC 경로를 Router EC2의 Network Interface로 추가합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Destination</th>
+      <th>Target</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;ROUTER_EC2_NETWORK_INTERFACE_ID&gt;</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Router EC2는 다른 Instance의 Packet을 전달해야 하므로 <code class="language-plaintext highlighter-rouge">Source/destination check</code>를 비활성화합니다.</p>
+
+<h3 id="62-cloud-vpc">6.2 Cloud VPC</h3>
+
+<p>다음 Resource를 준비합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>값</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>VPC</td>
+      <td><code class="language-plaintext highlighter-rouge">cloud-vpc</code>, <code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
+    </tr>
+    <tr>
+      <td>Workload Subnet</td>
+      <td><code class="language-plaintext highlighter-rouge">10.20.11.0/24</code></td>
+    </tr>
+    <tr>
+      <td>Target EC2</td>
+      <td>Ubuntu, Public IPv4 없음</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Target EC2 Security Group은 Test Protocol을 <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code>에서만 허용합니다. 관리 접속은 Session Manager를 사용합니다.</p>
+
+<h2 id="7-router-ec2-network-설정">7. Router EC2 Network 설정</h2>
+
+<hr />
+
+<p>Router Security Group은 전체 Internet가 아니라 AWS가 할당한 두 VPN Tunnel Outside IP와 관리자 주소로 Source를 제한합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Protocol</th>
+      <th>Port 또는 Type</th>
+      <th>Source</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>UDP</td>
+      <td>500</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;AWS_TUNNEL_1_OUTSIDE_IP&gt;/32</code>, <code class="language-plaintext highlighter-rouge">&lt;AWS_TUNNEL_2_OUTSIDE_IP&gt;/32</code></td>
+    </tr>
+    <tr>
+      <td>UDP</td>
+      <td>4500</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;AWS_TUNNEL_1_OUTSIDE_IP&gt;/32</code>, <code class="language-plaintext highlighter-rouge">&lt;AWS_TUNNEL_2_OUTSIDE_IP&gt;/32</code></td>
+    </tr>
+    <tr>
+      <td>ESP</td>
+      <td>Protocol 50</td>
+      <td>Tunnel 구성에서 요구하는 경우 AWS Tunnel Endpoint</td>
+    </tr>
+    <tr>
+      <td>TCP</td>
+      <td>22</td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;ADMIN_PUBLIC_IP&gt;/32</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">[ROUTER-EC2]</code>에서 StrongSwan을 설치하고 IP Forwarding을 영구 활성화합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ROUTER-EC2]</span>
+<span class="nb">sudo </span>apt update
+<span class="nb">sudo </span>apt <span class="nb">install</span> <span class="nt">-y</span> strongswan
+
+<span class="nb">sudo tee</span> /etc/sysctl.d/99-vpn-router.conf <span class="o">&gt;</span>/dev/null <span class="o">&lt;&lt;</span><span class="sh">'</span><span class="no">EOF</span><span class="sh">'
+net.ipv4.ip_forward=1
+</span><span class="no">EOF
+
+</span><span class="nb">sudo </span>sysctl <span class="nt">--system</span>
+sysctl net.ipv4.ip_forward
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">net.ipv4.ip_forward = 1</code>이 출력돼야 합니다.</p>
+
+<h2 id="8-aws-vpn-resource-구성">8. AWS VPN Resource 구성</h2>
+
+<hr />
+
+<h3 id="81-virtual-private-gateway">8.1 Virtual Private Gateway</h3>
+
+<p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>에서 Virtual Private Gateway를 만들고 <code class="language-plaintext highlighter-rouge">cloud-vpc</code>에 Attach합니다.</p>
+
+<h3 id="82-customer-gateway">8.2 Customer Gateway</h3>
+
+<p>Customer Gateway Resource에 다음 값을 설정합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>값</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>IP Address</td>
+      <td>Router EC2의 Elastic IP</td>
+    </tr>
+    <tr>
+      <td>Routing</td>
+      <td>이 Lab에서는 Static</td>
+    </tr>
+    <tr>
+      <td>BGP ASN</td>
+      <td>Console이 요구하는 지원 범위의 예제 ASN</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Static Routing이어도 Customer Gateway Resource에는 ASN Field가 필요합니다. 이 값은 BGP Session을 구성하지 않으면 실제 경로 교환에 사용되지 않습니다.</p>
+
+<h3 id="83-site-to-site-vpn-connection">8.3 Site-to-Site VPN Connection</h3>
+
+<p>Target Gateway로 Virtual Private Gateway를, Customer Gateway로 앞에서 만든 Resource를 선택합니다. Static IP Prefix에는 Simulated On-Premise VPC CIDR인 <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code>을 입력합니다.</p>
+
+<p>VPN이 생성되면 Router Software에 맞는 Sample Configuration을 Download합니다. File에는 Tunnel Outside IP와 Pre-Shared Key가 있으므로 Repository, Blog, Screenshot과 협업 Chat에 올리지 않습니다.</p>
+
+<h2 id="9-strongswan-tunnel-구성">9. StrongSwan Tunnel 구성</h2>
+
+<hr />
+
+<p>AWS에서 Download한 Configuration의 IKE Version, Encryption, Integrity, Diffie-Hellman Group, Lifetime과 Tunnel별 Outside IP를 기준으로 StrongSwan을 설정합니다. 임의의 Algorithm으로 바꾸거나 두 Tunnel을 하나의 설정으로 합치지 않습니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">/etc/ipsec.secrets</code>에는 실제 값 대신 다음 구조가 들어갑니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>&lt;CUSTOMER_GATEWAY_PUBLIC_IP&gt; &lt;AWS_TUNNEL_1_OUTSIDE_IP&gt; : PSK "&lt;VPN_TUNNEL_1_PRESHARED_KEY&gt;"
+&lt;CUSTOMER_GATEWAY_PUBLIC_IP&gt; &lt;AWS_TUNNEL_2_OUTSIDE_IP&gt; : PSK "&lt;VPN_TUNNEL_2_PRESHARED_KEY&gt;"
+</code></pre></div></div>
+
+<p>Secret File 권한을 제한합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ROUTER-EC2]</span>
+<span class="nb">sudo chown </span>root:root /etc/ipsec.secrets
+<span class="nb">sudo chmod </span>600 /etc/ipsec.secrets
+</code></pre></div></div>
+
+<p>AWS Configuration File에 맞춰 <code class="language-plaintext highlighter-rouge">/etc/ipsec.conf</code>와 필요한 Tunnel별 설정을 작성한 뒤 StrongSwan을 다시 시작합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ROUTER-EC2]</span>
+<span class="nb">sudo </span>systemctl restart strongswan-starter
+<span class="nb">sudo </span>systemctl status strongswan-starter <span class="nt">--no-pager</span>
+<span class="nb">sudo </span>ipsec statusall
+</code></pre></div></div>
+
+<p>두 Tunnel의 Security Association 상태를 각각 확인합니다. Download File의 실제 Secret과 Outside IP를 Terminal History나 문서에 출력하지 않습니다.</p>
+
+<h2 id="10-cloud-route-구성">10. Cloud Route 구성</h2>
+
+<hr />
+
+<p>Cloud Workload Subnet의 Route Table에서 Virtual Private Gateway Route Propagation을 활성화합니다. VPN Connection이 <code class="language-plaintext highlighter-rouge">UP</code>이면 Static VPN Prefix인 <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code> Route가 전파됩니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Destination</th>
+      <th>Target</th>
+      <th>Origin</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
+      <td><code class="language-plaintext highlighter-rouge">local</code></td>
+      <td>Create Route Table</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">10.10.0.0/16</code></td>
+      <td>Virtual Private Gateway</td>
+      <td>Propagated</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Static Route를 직접 추가하는 경우에도 Destination은 On-Premise CIDR이고 Target은 Virtual Private Gateway입니다. 동일 Destination의 Static Route와 Propagated Route가 동시에 있으면 Route 우선순위를 확인합니다.</p>
+
+<h2 id="11-연결-검증">11. 연결 검증</h2>
+
+<hr />
+
+<p>검증 순서는 다음과 같습니다.</p>
+
+<ol>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>에서 두 VPN Tunnel의 상태를 확인합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">[ROUTER-EC2]</code>에서 <code class="language-plaintext highlighter-rouge">sudo ipsec statusall</code>로 IKE와 Child SA를 확인합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">[ONPREM-CLIENT]</code>의 Route가 <code class="language-plaintext highlighter-rouge">10.20.0.0/16</code>을 Router EC2로 보내는지 확인합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">[CLOUD-TARGET]</code> Security Group이 <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code>의 Test Traffic을 허용하는지 확인합니다.</p>
+  </li>
+  <li>
+    <p>On-Premise Client에서 Cloud Target Private IP로 Test합니다.</p>
+  </li>
+</ol>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ONPREM-CLIENT]</span>
+ip route get &lt;CLOUD_TARGET_PRIVATE_IP&gt;
+ping <span class="nt">-c</span> 3 &lt;CLOUD_TARGET_PRIVATE_IP&gt;
+nc <span class="nt">-vz</span> &lt;CLOUD_TARGET_PRIVATE_IP&gt; &lt;APP_PORT&gt;
+</code></pre></div></div>
+
+<p>통신이 실패하면 Tunnel 상태만 보지 말고 다음 왕복 경로를 확인합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>On-Premise Client Route
+→ Router EC2 IP Forwarding
+→ StrongSwan Tunnel
+→ Cloud Route Table
+→ Cloud Security Group·Network ACL
+→ Return Route
+</code></pre></div></div>
+
+<h2 id="12-고가용성과-운영-설계">12. 고가용성과 운영 설계</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p>AWS가 제공하는 두 Tunnel을 모두 구성하고 Failover를 Test합니다.</p>
+  </li>
+  <li>
+    <p>On-Premise 단일 Router가 장애점이 되지 않도록 두 Customer Gateway Device와 별도 전원·회선을 검토합니다.</p>
+  </li>
+  <li>
+    <p>BGP 지원 Device는 Dynamic Routing을 사용해 경로 변경과 Tunnel 장애 감지를 자동화합니다.</p>
+  </li>
+  <li>
+    <p>Direct Connect를 Primary 경로로 사용할 때도 Site-to-Site VPN을 Backup 또는 암호화 계층으로 사용할 수 있습니다.</p>
+  </li>
+  <li>
+    <p>MTU와 TCP MSS가 Tunnel Overhead를 고려하는지 확인합니다.</p>
+  </li>
+  <li>
+    <p>CloudWatch Tunnel Metric과 VPN Log를 이용해 상태와 협상 Error를 감시합니다.</p>
+  </li>
+</ul>
+
+<h2 id="13-resource-정리">13. Resource 정리</h2>
+
+<hr />
+
+<p>실습 후 다음 순서로 제거합니다.</p>
+
+<ol>
+  <li>
+    <p>Site-to-Site VPN Connection을 삭제합니다.</p>
+  </li>
+  <li>
+    <p>Customer Gateway Resource를 삭제합니다.</p>
+  </li>
+  <li>
+    <p>Virtual Private Gateway를 Cloud VPC에서 Detach한 뒤 삭제합니다.</p>
+  </li>
+  <li>
+    <p>Router와 Client EC2를 종료하고 Elastic IP를 Release합니다.</p>
+  </li>
+  <li>
+    <p>Route, Security Group, Subnet, Internet Gateway와 두 VPC를 삭제합니다.</p>
+  </li>
+</ol>
+
+<p>VPN Connection을 삭제하면 기존 Pre-Shared Key도 사용할 수 없게 됩니다. 실제 Key가 문서나 Log에 노출됐다면 연결을 유지한 채 숨기는 것으로 끝내지 말고 Tunnel Option의 Key를 교체합니다.</p>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Site-to-Site VPN은 Customer Gateway와 AWS Gateway 사이에 두 IPsec Tunnel을 제공합니다.</p>
+    </li>
+    <li>
+      <p>BGP Dynamic Routing은 경로 광고와 Tunnel Failover 판단을 자동화하고 Static Routing은 Prefix를 수동 관리합니다.</p>
+    </li>
+    <li>
+      <p>VPN으로 연결할 Network CIDR는 서로 겹치면 안 됩니다.</p>
+    </li>
+    <li>
+      <p>EC2 Router Lab에서는 Source/Destination Check와 Kernel IP Forwarding을 함께 설정합니다.</p>
+    </li>
+    <li>
+      <p>Pre-Shared Key와 Tunnel Configuration은 Secret이므로 Repository와 게시물에 저장하지 않습니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/vpn/latest/s2svpn/SetUpVPNConnections.html">AWS Site-to-Site VPN 시작</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-static-dynamic.html">Static Routing과 Dynamic Routing</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/vpn/latest/s2svpn/cgw-static-routing-examples.html">VPN Customer Gateway Device Configuration</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/vpc/latest/userguide/WorkWithRouteTables.html#route-table-propagation">Virtual Private Gateway Route Propagation</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.aws.amazon.com/vpc/latest/userguide/route-tables-priority.html">VPC Route 우선순위</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-21-vpc-public-private-network/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">2-AZ VPC Public·Private Network 구축</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-native-62-observability-linux-server-monitoring/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">Observability와 Linux Server Monitoring</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791623819"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791623819"></script>
+  </body>
+</html>
