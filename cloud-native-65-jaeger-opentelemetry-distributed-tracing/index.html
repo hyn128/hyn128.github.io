@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>Jaeger와 OpenTelemetry로 Kubernetes 분산 추적 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="Jaeger v2 All-in-one과 OpenTelemetry로 Flask Application을 계측하고 Kubernetes에서 Trace를 전송·조회하는 과정을 정리합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing/">
+<meta property="og:title" content="Jaeger와 OpenTelemetry로 Kubernetes 분산 추적 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="Jaeger v2 All-in-one과 OpenTelemetry로 Flask Application을 계측하고 Kubernetes에서 Trace를 전송·조회하는 과정을 정리합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Jaeger와 OpenTelemetry로 Kubernetes 분산 추적 | renamed.log">
+<meta name="twitter:description" content="Jaeger v2 All-in-one과 OpenTelemetry로 Flask Application을 계측하고 Kubernetes에서 Trace를 전송·조회하는 과정을 정리합니다">
+
+  <meta property="article:published_time" content="2026-10-12T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791800637" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791800637" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791800637">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791800637" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791800637">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "Jaeger와 OpenTelemetry로 Kubernetes 분산 추적 | renamed.log",
+    "description": "Jaeger v2 All-in-one과 OpenTelemetry로 Flask Application을 계측하고 Kubernetes에서 Trace를 전송·조회하는 과정을 정리합니다",
+    "url": "https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing/",
+    "datePublished": "2026-10-12T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">CloudNative</p>
+    
+    <h1 class="post-head__title">Jaeger와 OpenTelemetry로 Kubernetes 분산 추적</h1>
+    
+      <p class="post-head__description">Jaeger v2 All-in-one과 OpenTelemetry로 Flask Application을 계측하고 Kubernetes에서 Trace를 전송·조회하는 과정을 정리합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 12일 · 7분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=CloudNative">CloudNative</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+          <a class="tag-chip" href="/?tag=Monitoring">Monitoring</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>분산 추적은 하나의 요청이 여러 Service를 통과하는 과정을 Trace와 Span으로 기록합니다. Application은 OpenTelemetry SDK로 Trace를 생성하고 OTLP로 Jaeger Collector에 전송합니다. Jaeger는 Trace를 저장하며 Query Service와 UI는 수집된 요청의 호출 순서, 소요 시간과 Error 구간을 조회합니다.</p>
+</blockquote>
+
+<h2 id="1-분산-추적이-필요한-이유">1. 분산 추적이 필요한 이유</h2>
+
+<hr />
+
+<p>Microservice 환경에서는 하나의 사용자 요청이 여러 Service를 거칠 수 있습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Client
+  ↓
+Frontend
+  ↓
+Order API
+  ├── Payment Service
+  └── Inventory Service
+</code></pre></div></div>
+
+<p>전체 응답이 느리다는 사실만으로는 어느 Service에서 지연이 발생했는지 판단하기 어렵습니다. 분산 추적은 요청에 같은 Context를 전달하고 각 처리 구간을 Span으로 기록해 다음 질문에 답합니다.</p>
+
+<ul>
+  <li>
+    <p>요청이 어떤 Service를 거쳤는가</p>
+  </li>
+  <li>
+    <p>각 구간에서 얼마의 시간이 걸렸는가</p>
+  </li>
+  <li>
+    <p>Error 또는 지연이 처음 발생한 구간은 어디인가</p>
+  </li>
+  <li>
+    <p>Service 사이의 호출 관계는 어떻게 구성되는가</p>
+  </li>
+</ul>
+
+<h2 id="2-trace와-span">2. Trace와 Span</h2>
+
+<hr />
+
+<blockquote>
+  <p><strong>Trace</strong>는 하나의 요청이 시작부터 종료될 때까지 거친 전체 처리 흐름입니다.</p>
+</blockquote>
+
+<blockquote>
+  <p><strong>Span</strong>은 Trace를 구성하는 개별 작업 단위입니다. Service 호출, Database Query와 특정 Business Logic을 각각 Span으로 기록할 수 있습니다.</p>
+</blockquote>
+
+<blockquote>
+  <p><strong>Context</strong>는 Trace ID와 현재 Span 정보를 담고 다음 Service로 전달되는 정보입니다. Context가 전달돼야 여러 Service가 생성한 Span을 하나의 Trace로 연결할 수 있습니다.</p>
+</blockquote>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Trace: 사용자 주문 요청
+├── Span: Frontend 요청 처리
+├── Span: Order API 처리
+│   ├── Span: Payment Service 호출
+│   └── Span: Inventory Service 호출
+└── Span: 응답 반환
+</code></pre></div></div>
+
+<p>Trace ID는 전체 요청을 식별하고 Span ID는 개별 구간을 식별합니다. Parent Span ID는 호출 관계를 연결합니다.</p>
+
+<h2 id="3-jaeger-구성-요소">3. Jaeger 구성 요소</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>구성 요소</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>OpenTelemetry SDK</td>
+      <td>Application에서 Trace와 Span을 생성하고 Context를 전달합니다.</td>
+    </tr>
+    <tr>
+      <td>Collector</td>
+      <td>OTLP로 전달된 Trace를 수신하고 처리한 뒤 Storage에 기록합니다.</td>
+    </tr>
+    <tr>
+      <td>Storage</td>
+      <td>Trace Data를 저장합니다.</td>
+    </tr>
+    <tr>
+      <td>Query Service</td>
+      <td>조건에 맞는 Trace를 Storage에서 조회합니다.</td>
+    </tr>
+    <tr>
+      <td>Jaeger UI</td>
+      <td>Service, Operation과 시간 범위로 Trace를 검색하고 Timeline을 시각화합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>이번 실습은 Collector, Query Service와 Memory Storage를 하나의 Process로 실행하는 Jaeger All-in-one 구성을 사용합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Flask Application
+  ↓ OTLP gRPC :4317
+Jaeger Collector
+  ↓
+Memory Storage
+  ↓
+Jaeger Query Service
+  ↓ HTTP :16686
+Jaeger UI
+</code></pre></div></div>
+
+<p>Memory Storage의 Trace는 Jaeger Pod가 재시작되면 사라집니다. All-in-one과 Memory Storage는 기능 확인을 위한 실습 구성이고 장기 보관이나 고가용성을 제공하는 운영 구성은 아닙니다.</p>
+
+<h2 id="4-jaeger-version과-port">4. Jaeger Version과 Port</h2>
+
+<hr />
+
+<p>Jaeger v1은 2025년 12월 31일에 지원이 종료됐습니다. <code class="language-plaintext highlighter-rouge">jaegertracing/all-in-one:1.57.0</code>과 <code class="language-plaintext highlighter-rouge">COLLECTOR_OTLP_ENABLED</code> 같은 v1 예제 대신 Jaeger v2 Image를 사용합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Port</th>
+      <th>Protocol</th>
+      <th>용도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">4317</code></td>
+      <td>gRPC</td>
+      <td>OpenTelemetry OTLP Trace 수신</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">4318</code></td>
+      <td>HTTP</td>
+      <td>OpenTelemetry OTLP HTTP <code class="language-plaintext highlighter-rouge">/v1/traces</code> 수신</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">16686</code></td>
+      <td>HTTP</td>
+      <td>Jaeger Query Service와 Web UI</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>실습 Image는 결과가 임의로 바뀌지 않도록 <code class="language-plaintext highlighter-rouge">cr.jaegertracing.io/jaegertracing/jaeger:2.22.0</code>으로 고정합니다.</p>
+
+<h2 id="5-실행-위치와-사전-조건">5. 실행 위치와 사전 조건</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>표기</th>
+      <th>실행 위치</th>
+      <th>주요 작업</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[ADMIN]</code></td>
+      <td><code class="language-plaintext highlighter-rouge">kubectl</code>이 설정된 관리 Host</td>
+      <td>Manifest 작성·적용, 상태 확인과 Port Forwarding</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[BUILD]</code></td>
+      <td>Docker를 실행할 수 있는 Build Host</td>
+      <td>Flask Image Build와 Registry Push</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[BROWSER]</code></td>
+      <td>관리자가 사용하는 Browser</td>
+      <td>Jaeger UI에서 Trace 검색</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>다음 조건을 먼저 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl cluster-info
+kubectl get nodes
+kubectl auth can-i create deployments.apps <span class="nt">--namespace</span> observability
+kubectl auth can-i create services <span class="nt">--namespace</span> observability
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">yes</code>가 출력되지 않으면 해당 Namespace에 Deployment와 Service를 생성할 권한이 필요합니다.</p>
+
+<h2 id="6-jaeger-v2-all-in-one-배포">6. Jaeger v2 All-in-one 배포</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">jaeger-all-in-one.yaml</code>에 Namespace, Deployment와 두 Service를 작성합니다. 하나의 Jaeger Pod를 사용하지만 Trace 수집 경로와 UI 조회 경로를 구분하기 위해 Service를 분리합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Namespace</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">observability</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">apps/v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Deployment</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">jaeger</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">observability</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">app.kubernetes.io/name</span><span class="pi">:</span> <span class="s">jaeger</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">replicas</span><span class="pi">:</span> <span class="m">1</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">matchLabels</span><span class="pi">:</span>
+      <span class="na">app.kubernetes.io/name</span><span class="pi">:</span> <span class="s">jaeger</span>
+  <span class="na">template</span><span class="pi">:</span>
+    <span class="na">metadata</span><span class="pi">:</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">app.kubernetes.io/name</span><span class="pi">:</span> <span class="s">jaeger</span>
+    <span class="na">spec</span><span class="pi">:</span>
+      <span class="na">containers</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">jaeger</span>
+          <span class="na">image</span><span class="pi">:</span> <span class="s">cr.jaegertracing.io/jaegertracing/jaeger:2.22.0</span>
+          <span class="na">ports</span><span class="pi">:</span>
+            <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">otlp-grpc</span>
+              <span class="na">containerPort</span><span class="pi">:</span> <span class="m">4317</span>
+            <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">otlp-http</span>
+              <span class="na">containerPort</span><span class="pi">:</span> <span class="m">4318</span>
+            <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">query-http</span>
+              <span class="na">containerPort</span><span class="pi">:</span> <span class="m">16686</span>
+          <span class="na">resources</span><span class="pi">:</span>
+            <span class="na">requests</span><span class="pi">:</span>
+              <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">100m"</span>
+              <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">256Mi"</span>
+            <span class="na">limits</span><span class="pi">:</span>
+              <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">500m"</span>
+              <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">512Mi"</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Service</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">jaeger-collector</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">observability</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">type</span><span class="pi">:</span> <span class="s">ClusterIP</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">app.kubernetes.io/name</span><span class="pi">:</span> <span class="s">jaeger</span>
+  <span class="na">ports</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">otlp-grpc</span>
+      <span class="na">port</span><span class="pi">:</span> <span class="m">4317</span>
+      <span class="na">targetPort</span><span class="pi">:</span> <span class="s">otlp-grpc</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">otlp-http</span>
+      <span class="na">port</span><span class="pi">:</span> <span class="m">4318</span>
+      <span class="na">targetPort</span><span class="pi">:</span> <span class="s">otlp-http</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Service</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">jaeger-query</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">observability</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">type</span><span class="pi">:</span> <span class="s">ClusterIP</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">app.kubernetes.io/name</span><span class="pi">:</span> <span class="s">jaeger</span>
+  <span class="na">ports</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">query-http</span>
+      <span class="na">port</span><span class="pi">:</span> <span class="m">16686</span>
+      <span class="na">targetPort</span><span class="pi">:</span> <span class="s">query-http</span>
+</code></pre></div></div>
+
+<p>Manifest를 적용하고 Rollout 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl apply <span class="nt">-f</span> jaeger-all-in-one.yaml
+kubectl rollout status deployment/jaeger <span class="nt">-n</span> observability
+kubectl get pods,services,endpoints <span class="nt">-n</span> observability
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">jaeger-collector</code> Endpoint에는 <code class="language-plaintext highlighter-rouge">4317</code>, <code class="language-plaintext highlighter-rouge">4318</code>이 표시되고 <code class="language-plaintext highlighter-rouge">jaeger-query</code> Endpoint에는 <code class="language-plaintext highlighter-rouge">16686</code>이 표시돼야 합니다.</p>
+
+<h2 id="7-flask-application-계측">7. Flask Application 계측</h2>
+
+<hr />
+
+<h3 id="71-package-구성">7.1 Package 구성</h3>
+
+<p><code class="language-plaintext highlighter-rouge">requirements.txt</code>를 작성합니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Flask
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-instrumentation-flask
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Package</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">opentelemetry-api</code></td>
+      <td>Trace와 Span을 생성하는 공통 API를 제공합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">opentelemetry-sdk</code></td>
+      <td>Tracer Provider, Processor와 Export 동작을 구현합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">opentelemetry-exporter-otlp-proto-grpc</code></td>
+      <td>Trace를 OTLP gRPC로 Collector에 전송합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">opentelemetry-instrumentation-flask</code></td>
+      <td>Flask 요청을 자동으로 계측합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="72-application-작성">7.2 Application 작성</h3>
+
+<p><code class="language-plaintext highlighter-rouge">app.py</code>를 작성합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">from</span> <span class="nn">flask</span> <span class="kn">import</span> <span class="n">Flask</span>
+<span class="kn">from</span> <span class="nn">opentelemetry</span> <span class="kn">import</span> <span class="n">trace</span>
+<span class="kn">from</span> <span class="nn">opentelemetry.exporter.otlp.proto.grpc.trace_exporter</span> <span class="kn">import</span> <span class="n">OTLPSpanExporter</span>
+<span class="kn">from</span> <span class="nn">opentelemetry.instrumentation.flask</span> <span class="kn">import</span> <span class="n">FlaskInstrumentor</span>
+<span class="kn">from</span> <span class="nn">opentelemetry.sdk.resources</span> <span class="kn">import</span> <span class="n">Resource</span>
+<span class="kn">from</span> <span class="nn">opentelemetry.sdk.trace</span> <span class="kn">import</span> <span class="n">TracerProvider</span>
+<span class="kn">from</span> <span class="nn">opentelemetry.sdk.trace.export</span> <span class="kn">import</span> <span class="n">BatchSpanProcessor</span>
+
+<span class="n">resource</span> <span class="o">=</span> <span class="n">Resource</span><span class="p">.</span><span class="n">create</span><span class="p">({</span><span class="s">"service.name"</span><span class="p">:</span> <span class="s">"sample-python-api"</span><span class="p">})</span>
+<span class="n">provider</span> <span class="o">=</span> <span class="n">TracerProvider</span><span class="p">(</span><span class="n">resource</span><span class="o">=</span><span class="n">resource</span><span class="p">)</span>
+<span class="n">processor</span> <span class="o">=</span> <span class="n">BatchSpanProcessor</span><span class="p">(</span>
+    <span class="n">OTLPSpanExporter</span><span class="p">(</span>
+        <span class="n">endpoint</span><span class="o">=</span><span class="s">"http://jaeger-collector.observability.svc.cluster.local:4317"</span><span class="p">,</span>
+        <span class="n">insecure</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">provider</span><span class="p">.</span><span class="n">add_span_processor</span><span class="p">(</span><span class="n">processor</span><span class="p">)</span>
+<span class="n">trace</span><span class="p">.</span><span class="n">set_tracer_provider</span><span class="p">(</span><span class="n">provider</span><span class="p">)</span>
+<span class="n">tracer</span> <span class="o">=</span> <span class="n">trace</span><span class="p">.</span><span class="n">get_tracer</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+<span class="n">FlaskInstrumentor</span><span class="p">().</span><span class="n">instrument_app</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
+
+
+<span class="o">@</span><span class="n">app</span><span class="p">.</span><span class="n">route</span><span class="p">(</span><span class="s">"/"</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">hello</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">tracer</span><span class="p">.</span><span class="n">start_as_current_span</span><span class="p">(</span><span class="s">"business-logic-span"</span><span class="p">):</span>
+        <span class="n">time</span><span class="p">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s">"Hello Jaeger in Kubernetes!</span><span class="se">\n</span><span class="s">"</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">"__main__"</span><span class="p">:</span>
+    <span class="n">app</span><span class="p">.</span><span class="n">run</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">"0.0.0.0"</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8080</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">service.name</code>은 Jaeger UI의 Service 목록에 표시할 논리적인 Application 이름입니다. Flask 자동 계측은 HTTP 요청 Span을 만들고 <code class="language-plaintext highlighter-rouge">business-logic-span</code>은 Application 내부 처리 구간을 별도 Span으로 기록합니다.</p>
+
+<p>OTLP gRPC는 실습 Cluster 내부의 평문 통신이므로 <code class="language-plaintext highlighter-rouge">insecure=True</code>를 사용합니다. Cluster 밖이나 신뢰할 수 없는 Network를 통과한다면 TLS와 인증을 구성해야 합니다.</p>
+
+<h2 id="8-container-image-build와-push">8. Container Image Build와 Push</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">Dockerfile</code>을 작성합니다.</p>
+
+<div class="language-dockerfile highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">FROM</span><span class="s"> python:3.11-slim</span>
+
+<span class="k">WORKDIR</span><span class="s"> /app</span>
+
+<span class="k">COPY</span><span class="s"> requirements.txt .</span>
+<span class="k">RUN </span>pip <span class="nb">install</span> <span class="nt">--no-cache-dir</span> <span class="nt">-r</span> requirements.txt
+
+<span class="k">COPY</span><span class="s"> app.py .</span>
+
+<span class="k">EXPOSE</span><span class="s"> 8080</span>
+
+<span class="k">CMD</span><span class="s"> ["python", "app.py"]</span>
+</code></pre></div></div>
+
+<p>Registry 사용자 이름과 Tag를 실제 값으로 바꿔 Image를 Build하고 Push합니다. Password나 Access Token은 명령 인자, Source Code와 문서에 직접 작성하지 않습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [BUILD]</span>
+<span class="nv">TRACE_IMAGE_REGISTRY_USER</span><span class="o">=</span><span class="s2">"&lt;CONTAINER_REGISTRY_USERNAME&gt;"</span>
+<span class="nv">TRACE_IMAGE_TAG</span><span class="o">=</span><span class="s2">"&lt;TAG&gt;"</span>
+
+docker build <span class="se">\</span>
+  <span class="nt">-t</span> <span class="s2">"</span><span class="k">${</span><span class="nv">TRACE_IMAGE_REGISTRY_USER</span><span class="k">}</span><span class="s2">/jaeger-sample-api:</span><span class="k">${</span><span class="nv">TRACE_IMAGE_TAG</span><span class="k">}</span><span class="s2">"</span> <span class="nb">.</span>
+
+docker login
+
+docker push <span class="se">\</span>
+  <span class="s2">"</span><span class="k">${</span><span class="nv">TRACE_IMAGE_REGISTRY_USER</span><span class="k">}</span><span class="s2">/jaeger-sample-api:</span><span class="k">${</span><span class="nv">TRACE_IMAGE_TAG</span><span class="k">}</span><span class="s2">"</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">&lt;TAG&gt;</code>에는 <code class="language-plaintext highlighter-rouge">latest</code>보다 <code class="language-plaintext highlighter-rouge">1.0.0</code>이나 Commit SHA처럼 배포한 Image를 구분할 수 있는 값을 사용합니다.</p>
+
+<h2 id="9-sample-api-배포">9. Sample API 배포</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">sample-api.yaml</code>을 작성합니다. <code class="language-plaintext highlighter-rouge">image</code> 값을 앞에서 Push한 Image로 변경해야 합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">apps/v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Deployment</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">sample-api</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">observability</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">replicas</span><span class="pi">:</span> <span class="m">1</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">matchLabels</span><span class="pi">:</span>
+      <span class="na">app.kubernetes.io/name</span><span class="pi">:</span> <span class="s">sample-api</span>
+  <span class="na">template</span><span class="pi">:</span>
+    <span class="na">metadata</span><span class="pi">:</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">app.kubernetes.io/name</span><span class="pi">:</span> <span class="s">sample-api</span>
+    <span class="na">spec</span><span class="pi">:</span>
+      <span class="na">containers</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">api</span>
+          <span class="na">image</span><span class="pi">:</span> <span class="s">&lt;CONTAINER_REGISTRY_USERNAME&gt;/jaeger-sample-api:&lt;TAG&gt;</span>
+          <span class="na">ports</span><span class="pi">:</span>
+            <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">http</span>
+              <span class="na">containerPort</span><span class="pi">:</span> <span class="m">8080</span>
+          <span class="na">resources</span><span class="pi">:</span>
+            <span class="na">requests</span><span class="pi">:</span>
+              <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">50m"</span>
+              <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">64Mi"</span>
+            <span class="na">limits</span><span class="pi">:</span>
+              <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">250m"</span>
+              <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">256Mi"</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Service</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">sample-api</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">observability</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">type</span><span class="pi">:</span> <span class="s">ClusterIP</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">app.kubernetes.io/name</span><span class="pi">:</span> <span class="s">sample-api</span>
+  <span class="na">ports</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">http</span>
+      <span class="na">port</span><span class="pi">:</span> <span class="m">80</span>
+      <span class="na">targetPort</span><span class="pi">:</span> <span class="s">http</span>
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl apply <span class="nt">-f</span> sample-api.yaml
+kubectl rollout status deployment/sample-api <span class="nt">-n</span> observability
+kubectl get pods,services,endpoints <span class="nt">-n</span> observability <span class="nt">-o</span> wide
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">ImagePullBackOff</code>가 발생하면 Image 이름과 Tag, Registry 공개 범위, <code class="language-plaintext highlighter-rouge">imagePullSecrets</code>를 확인합니다.</p>
+
+<h2 id="10-요청을-생성하고-trace-확인">10. 요청을 생성하고 Trace 확인</h2>
+
+<hr />
+
+<h3 id="101-sample-api-요청">10.1 Sample API 요청</h3>
+
+<p>첫 번째 Terminal에서 Sample API Service를 Local Port로 전달합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN: TERMINAL 1]</span>
+kubectl port-forward service/sample-api 8080:80 <span class="nt">-n</span> observability
+</code></pre></div></div>
+
+<p>두 번째 Terminal에서 여러 번 요청을 보냅니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN: TERMINAL 2]</span>
+<span class="k">for </span>request <span class="k">in </span>1 2 3 4 5<span class="p">;</span> <span class="k">do
+  </span>curl <span class="nt">--fail</span> <span class="nt">--silent</span> <span class="nt">--show-error</span> http://127.0.0.1:8080/
+<span class="k">done</span>
+</code></pre></div></div>
+
+<p>Application이 Collector로 Trace를 전송하지 못하면 Pod Log를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl logs deployment/sample-api <span class="nt">-n</span> observability
+kubectl logs deployment/jaeger <span class="nt">-n</span> observability
+</code></pre></div></div>
+
+<h3 id="102-jaeger-ui-접근">10.2 Jaeger UI 접근</h3>
+
+<p>Jaeger UI는 ClusterIP로 유지하고 Port Forwarding으로 접근합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl port-forward service/jaeger-query 16686:16686 <span class="nt">-n</span> observability
+</code></pre></div></div>
+
+<p>Browser에서 <code class="language-plaintext highlighter-rouge">http://127.0.0.1:16686</code>에 접속한 뒤 다음 순서로 확인합니다.</p>
+
+<ol>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Service</code>에서 <code class="language-plaintext highlighter-rouge">sample-python-api</code>를 선택합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Find Traces</code>를 실행합니다.</p>
+  </li>
+  <li>
+    <p>Trace를 선택해 Flask 요청 Span과 <code class="language-plaintext highlighter-rouge">business-logic-span</code>의 Parent·Child 관계를 확인합니다.</p>
+  </li>
+  <li>
+    <p>각 Span의 시작 시각, Duration과 Tag를 확인합니다.</p>
+  </li>
+</ol>
+
+<p>요청 직후 Service가 보이지 않으면 잠시 기다린 뒤 다시 조회하고 Application과 Jaeger Log에서 OTLP 전송 Error를 확인합니다.</p>
+
+<h2 id="11-nodeport-선택지와-주의-사항">11. NodePort 선택지와 주의 사항</h2>
+
+<hr />
+
+<p>Port Forwarding을 유지할 수 없는 실습 환경에서는 Sample API를 NodePort로 변경할 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl patch service sample-api <span class="nt">-n</span> observability <span class="se">\</span>
+  <span class="nt">--type</span> merge <span class="se">\</span>
+  <span class="nt">--patch</span> <span class="s1">'{"spec":{"type":"NodePort"}}'</span>
+
+kubectl get service sample-api <span class="nt">-n</span> observability
+</code></pre></div></div>
+
+<p>NodePort를 사용하면 Node Network에 접근 가능한 다른 Host도 Service에 접속할 수 있습니다. 방화벽과 접근 가능한 Network 범위를 확인해야 합니다. 실습이 끝나면 ClusterIP로 복구합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl patch service sample-api <span class="nt">-n</span> observability <span class="se">\</span>
+  <span class="nt">--type</span> merge <span class="se">\</span>
+  <span class="nt">--patch</span> <span class="s1">'{"spec":{"type":"ClusterIP"}}'</span>
+</code></pre></div></div>
+
+<p>Jaeger UI는 Trace에 포함된 Service 이름, Route와 Attribute를 노출할 수 있으므로 인증 없이 외부에 공개하지 않습니다.</p>
+
+<h2 id="12-운영-환경으로-확장할-때-확인할-항목">12. 운영 환경으로 확장할 때 확인할 항목</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p>OpenTelemetry Operator 또는 Jaeger Helm Chart로 수명 주기를 관리합니다.</p>
+  </li>
+  <li>
+    <p>Memory Storage 대신 운영 요구 사항에 맞는 영구 Storage를 구성합니다.</p>
+  </li>
+  <li>
+    <p>Collector와 Query Service를 분리하고 Replica, Resource와 고가용성을 설계합니다.</p>
+  </li>
+  <li>
+    <p>OTLP Endpoint와 Jaeger UI에 TLS, 인증, Network Policy와 접근 제어를 적용합니다.</p>
+  </li>
+  <li>
+    <p>Sampling 정책으로 수집량, Storage 사용량과 비용을 제어합니다.</p>
+  </li>
+  <li>
+    <p>Trace Attribute에 Password, Token, 개인정보와 민감한 Request Body를 기록하지 않습니다.</p>
+  </li>
+</ul>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Trace는 하나의 요청 전체를 나타내고 Span은 요청을 구성하는 개별 처리 구간입니다.</p>
+    </li>
+    <li>
+      <p>OpenTelemetry SDK는 Flask 요청과 사용자 정의 작업을 계측해 OTLP로 Jaeger Collector에 전송합니다.</p>
+    </li>
+    <li>
+      <p>Jaeger All-in-one과 Memory Storage는 실습에 적합하지만 Pod 재시작 시 Trace가 사라집니다.</p>
+    </li>
+    <li>
+      <p>Application 요청을 생성한 뒤 Jaeger UI에서 Service, Trace와 Span의 Duration을 확인해야 전체 흐름을 검증할 수 있습니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://www.jaegertracing.io/docs/2.22/getting-started/">Jaeger v2 Getting Started</a></p>
+  </li>
+  <li>
+    <p><a href="https://www.jaegertracing.io/docs/2.22/deployment/kubernetes/">Jaeger Kubernetes 배포</a></p>
+  </li>
+  <li>
+    <p><a href="https://www.jaegertracing.io/download/">Jaeger Download와 Version 상태</a></p>
+  </li>
+  <li>
+    <p><a href="https://opentelemetry.io/docs/languages/python/instrumentation/">OpenTelemetry Python Instrumentation</a></p>
+  </li>
+  <li>
+    <p><a href="https://opentelemetry.io/docs/specs/semconv/">OpenTelemetry Semantic Conventions</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-native-64-kubernetes-prometheus-monitoring-architecture/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">Kubernetes Monitoring과 Prometheus Architecture</strong>
+          </span>
+        </a>
+      
+      
+        <a class="post-navigation__item post-navigation__item--next" href="/cloud-native-66-kube-prometheus-stack-installation/">
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">다음 포스트</span>
+            <strong class="post-navigation__title">kube-prometheus-stack 설치와 Grafana·Prometheus 검증</strong>
+          </span>
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11h12.17l-5.58-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4z" fill="currentColor"></path>
+            </svg>
+          </span>
+        </a>
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791800637"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791800637"></script>
+  </body>
+</html>

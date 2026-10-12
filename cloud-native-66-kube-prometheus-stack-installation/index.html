@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>kube-prometheus-stack 설치와 Grafana·Prometheus 검증 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="Helm으로 kube-prometheus-stack을 설치하고 Kubernetes Monitoring Component, Grafana Dashboard, Prometheus Target과 Storage 상태를 검증합니다">
+<link rel="canonical" href="https://hyn128.site/cloud-native-66-kube-prometheus-stack-installation/">
+<meta property="og:title" content="kube-prometheus-stack 설치와 Grafana·Prometheus 검증 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="Helm으로 kube-prometheus-stack을 설치하고 Kubernetes Monitoring Component, Grafana Dashboard, Prometheus Target과 Storage 상태를 검증합니다">
+<meta property="og:url" content="https://hyn128.site/cloud-native-66-kube-prometheus-stack-installation/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="kube-prometheus-stack 설치와 Grafana·Prometheus 검증 | renamed.log">
+<meta name="twitter:description" content="Helm으로 kube-prometheus-stack을 설치하고 Kubernetes Monitoring Component, Grafana Dashboard, Prometheus Target과 Storage 상태를 검증합니다">
+
+  <meta property="article:published_time" content="2026-10-12T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1791800637" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1791800637" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1791800637">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1791800637" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1791800637">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "kube-prometheus-stack 설치와 Grafana·Prometheus 검증 | renamed.log",
+    "description": "Helm으로 kube-prometheus-stack을 설치하고 Kubernetes Monitoring Component, Grafana Dashboard, Prometheus Target과 Storage 상태를 검증합니다",
+    "url": "https://hyn128.site/cloud-native-66-kube-prometheus-stack-installation/",
+    "datePublished": "2026-10-12T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">CloudNative</p>
+    
+    <h1 class="post-head__title">kube-prometheus-stack 설치와 Grafana·Prometheus 검증</h1>
+    
+      <p class="post-head__description">Helm으로 kube-prometheus-stack을 설치하고 Kubernetes Monitoring Component, Grafana Dashboard, Prometheus Target과 Storage 상태를 검증합니다</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 10월 12일 · 6분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=CloudNative">CloudNative</a>
+        
+          <a class="tag-chip" href="/?tag=AutoEverSW">AutoEverSW</a>
+        
+          <a class="tag-chip" href="/?tag=Monitoring">Monitoring</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p><code class="language-plaintext highlighter-rouge">kube-prometheus-stack</code>은 Prometheus Operator를 중심으로 Prometheus, Alertmanager, Grafana, kube-state-metrics와 Node Exporter를 함께 설치하는 Helm Chart입니다. 설치 성공 여부는 Pod가 <code class="language-plaintext highlighter-rouge">Running</code>인지 확인하는 데서 끝나지 않습니다. Helm Release, Workload, Prometheus Target, Grafana Data Source와 Storage 상태를 순서대로 확인해야 합니다.</p>
+</blockquote>
+
+<h2 id="1-helm-chart와-release">1. Helm Chart와 Release</h2>
+
+<hr />
+
+<blockquote>
+  <p><strong>Chart</strong>는 Kubernetes Resource를 생성하기 위한 Template, 기본값과 Metadata를 묶은 Package입니다.</p>
+</blockquote>
+
+<blockquote>
+  <p><strong>Release</strong>는 Chart를 특정 Cluster와 Namespace에 설치한 Instance입니다. 같은 Chart도 Release 이름과 설정을 달리해 여러 번 설치할 수 있습니다.</p>
+</blockquote>
+
+<p>이번 실습의 이름은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>값</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Chart</td>
+      <td><code class="language-plaintext highlighter-rouge">prometheus-community/kube-prometheus-stack</code></td>
+    </tr>
+    <tr>
+      <td>Release</td>
+      <td><code class="language-plaintext highlighter-rouge">prometheus-stack</code></td>
+    </tr>
+    <tr>
+      <td>Namespace</td>
+      <td><code class="language-plaintext highlighter-rouge">monitoring</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Helm은 Chart를 Rendering한 뒤 Kubernetes API Server에 Resource 생성을 요청합니다. Helm 자체가 Monitoring Data를 수집하는 것은 아닙니다.</p>
+
+<h2 id="2-설치되는-주요-구성-요소">2. 설치되는 주요 구성 요소</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>구성 요소</th>
+      <th>역할</th>
+      <th>일반적인 Workload</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Prometheus Operator</td>
+      <td>Monitoring CRD를 Watch하고 Prometheus 구성을 Reconcile합니다.</td>
+      <td>Deployment</td>
+    </tr>
+    <tr>
+      <td>Prometheus</td>
+      <td>Target의 Metric을 수집·저장하고 PromQL과 Rule을 평가합니다.</td>
+      <td>StatefulSet</td>
+    </tr>
+    <tr>
+      <td>Alertmanager</td>
+      <td>Alert를 Grouping·Deduplication하고 Receiver로 Routing합니다.</td>
+      <td>StatefulSet</td>
+    </tr>
+    <tr>
+      <td>Grafana</td>
+      <td>Prometheus Data Source를 Dashboard로 시각화합니다.</td>
+      <td>Deployment</td>
+    </tr>
+    <tr>
+      <td>kube-state-metrics</td>
+      <td>Kubernetes API Object의 Spec과 Status를 Metric으로 공개합니다.</td>
+      <td>Deployment</td>
+    </tr>
+    <tr>
+      <td>Node Exporter</td>
+      <td>각 Node의 Linux Host Metric을 공개합니다.</td>
+      <td>DaemonSet</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Chart Version에 따라 생성되는 Resource 이름과 Container 구성이 달라질 수 있습니다. 명령에서 사용하는 Service 이름은 설치 후 <code class="language-plaintext highlighter-rouge">kubectl get service -n monitoring</code>으로 확인합니다.</p>
+
+<h2 id="3-control-plane과-worker의-동작">3. Control Plane과 Worker의 동작</h2>
+
+<hr />
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>관리 Host에서 Helm 실행
+  ↓
+API Server에 CRD·Deployment·StatefulSet·DaemonSet 등록
+  ↓
+Prometheus Operator가 Monitoring Resource Reconcile
+  ↓
+Scheduler가 실행할 Node 선택
+  ↓
+각 Worker의 kubelet이 Pod 실행
+  ├── Node Exporter: Node마다 실행
+  ├── Prometheus: Target Metric 수집
+  ├── kube-state-metrics: API Object 상태 공개
+  └── Grafana: Prometheus Data 시각화
+</code></pre></div></div>
+
+<p>Node Exporter는 DaemonSet이므로 Scheduling 조건을 만족하는 각 Node에서 실행됩니다. Prometheus와 Alertmanager는 StatefulSet으로 배포되며 Storage 설정을 추가하면 Pod가 교체돼도 PVC를 다시 연결할 수 있습니다.</p>
+
+<h2 id="4-실행-위치와-사전-조건">4. 실행 위치와 사전 조건</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>표기</th>
+      <th>실행 위치</th>
+      <th>주요 작업</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[ADMIN]</code></td>
+      <td><code class="language-plaintext highlighter-rouge">kubectl</code>과 Helm을 사용할 관리 Host</td>
+      <td>설치, 상태 확인과 Port Forwarding</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">[BROWSER]</code></td>
+      <td>관리자가 사용하는 Browser</td>
+      <td>Grafana Dashboard와 Prometheus Target 확인</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Cluster 연결과 Node 상태를 먼저 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl cluster-info
+kubectl get nodes <span class="nt">-o</span> wide
+kubectl auth can-i create namespaces
+kubectl auth can-i create customresourcedefinitions.apiextensions.k8s.io
+</code></pre></div></div>
+
+<p>최신 Chart를 설치하려면 Cluster Version과 Chart의 지원 범위도 확인해야 합니다.</p>
+
+<h2 id="5-helm-설치와-확인">5. Helm 설치와 확인</h2>
+
+<hr />
+
+<p>공식 설치 Script를 바로 Pipe로 실행하지 않고 File로 내려받아 확인한 뒤 실행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+curl <span class="nt">-fsSL</span> <span class="se">\</span>
+  <span class="nt">-o</span> get_helm.sh <span class="se">\</span>
+  https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+
+less get_helm.sh
+<span class="nb">chmod </span>700 get_helm.sh
+./get_helm.sh
+
+helm version
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">curl | bash</code>는 내려받은 내용을 확인하기 전에 실행합니다. 학습 환경에서도 실행할 Script의 출처와 내용을 확인하는 절차를 유지합니다.</p>
+
+<p>이미 Helm이 설치돼 있다면 Script를 다시 실행하지 않고 <code class="language-plaintext highlighter-rouge">helm version</code>만 확인합니다.</p>
+
+<h2 id="6-chart-repository-준비">6. Chart Repository 준비</h2>
+
+<hr />
+
+<p>Prometheus Community Repository를 등록하고 Local Index를 갱신합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+helm repo add <span class="se">\</span>
+  prometheus-community <span class="se">\</span>
+  https://prometheus-community.github.io/helm-charts
+
+helm repo update
+helm search repo prometheus-community/kube-prometheus-stack
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>명령</th>
+      <th>변경·확인 대상</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">helm repo add</code></td>
+      <td>Repository 이름과 URL을 Helm 설정에 등록합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">helm repo update</code></td>
+      <td>Chart Version과 Metadata Index를 갱신합니다.</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">helm search repo</code></td>
+      <td>설치 가능한 Chart와 Version을 확인합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>재현 가능한 설치가 필요하면 검증한 Chart Version을 기록하고 <code class="language-plaintext highlighter-rouge">helm install --version &lt;CHART_VERSION&gt;</code>으로 고정합니다.</p>
+
+<h2 id="7-kube-prometheus-stack-설치">7. kube-prometheus-stack 설치</h2>
+
+<hr />
+
+<p>Namespace를 생성하고 <code class="language-plaintext highlighter-rouge">prometheus-stack</code>이라는 Release 이름으로 Chart를 설치합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl create namespace monitoring
+
+helm <span class="nb">install </span>prometheus-stack <span class="se">\</span>
+  prometheus-community/kube-prometheus-stack <span class="se">\</span>
+  <span class="nt">--namespace</span> monitoring
+</code></pre></div></div>
+
+<p>Namespace가 이미 존재하면 <code class="language-plaintext highlighter-rouge">AlreadyExists</code>가 출력될 수 있습니다. 이 경우 Namespace 상태를 확인한 뒤 Helm 설치만 실행합니다.</p>
+
+<p>설치 명령은 여러 CRD와 Workload를 생성합니다. 일부 Pod는 Image Pull과 초기화에 시간이 필요하므로 즉시 모든 Pod가 <code class="language-plaintext highlighter-rouge">Running</code>이 아닐 수 있습니다.</p>
+
+<h2 id="8-helm-release와-workload-검증">8. Helm Release와 Workload 검증</h2>
+
+<hr />
+
+<p>Helm과 Kubernetes 두 관점에서 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+helm status prometheus-stack <span class="nt">--namespace</span> monitoring
+helm list <span class="nt">--namespace</span> monitoring
+
+kubectl get pods <span class="nt">-n</span> monitoring <span class="nt">-o</span> wide
+kubectl get deployments,statefulsets,daemonsets <span class="nt">-n</span> monitoring
+kubectl get services <span class="nt">-n</span> monitoring
+</code></pre></div></div>
+
+<p>확인 기준은 다음과 같습니다.</p>
+
+<ul>
+  <li>
+    <p>Helm Release의 상태가 <code class="language-plaintext highlighter-rouge">deployed</code>인가</p>
+  </li>
+  <li>
+    <p>Prometheus Operator와 Grafana Deployment가 사용 가능한 Replica를 확보했는가</p>
+  </li>
+  <li>
+    <p>Prometheus와 Alertmanager StatefulSet Pod가 <code class="language-plaintext highlighter-rouge">Ready</code>인가</p>
+  </li>
+  <li>
+    <p>Node Exporter Pod가 대상 Node마다 실행되는가</p>
+  </li>
+  <li>
+    <p>kube-state-metrics Pod가 실행되고 Service Endpoint가 생성됐는가</p>
+  </li>
+</ul>
+
+<p>Pod가 <code class="language-plaintext highlighter-rouge">Pending</code>, <code class="language-plaintext highlighter-rouge">CrashLoopBackOff</code> 또는 <code class="language-plaintext highlighter-rouge">ImagePullBackOff</code> 상태라면 Event와 Log를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl get events <span class="nt">-n</span> monitoring <span class="se">\</span>
+  <span class="nt">--sort-by</span><span class="o">=</span>.metadata.creationTimestamp
+
+kubectl describe pod &lt;POD_NAME&gt; <span class="nt">-n</span> monitoring
+kubectl logs &lt;POD_NAME&gt; <span class="nt">-n</span> monitoring <span class="nt">--all-containers</span>
+</code></pre></div></div>
+
+<h2 id="9-grafana-접근과-dashboard-확인">9. Grafana 접근과 Dashboard 확인</h2>
+
+<hr />
+
+<h3 id="91-port-forwarding">9.1 Port Forwarding</h3>
+
+<p>Grafana Service를 Local Port <code class="language-plaintext highlighter-rouge">3000</code>으로 전달합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl port-forward <span class="se">\</span>
+  service/prometheus-stack-grafana <span class="se">\</span>
+  3000:80 <span class="se">\</span>
+  <span class="nt">--namespace</span> monitoring
+</code></pre></div></div>
+
+<p>기본 Bind Address는 <code class="language-plaintext highlighter-rouge">127.0.0.1</code>이므로 관리 Host 외부에 Port가 공개되지 않습니다. <code class="language-plaintext highlighter-rouge">--address 0.0.0.0</code>을 추가하면 다른 Host에서도 접근할 수 있으므로 방화벽과 접근 대상을 제한하지 않은 상태에서는 사용하지 않습니다.</p>
+
+<h3 id="92-초기-login-정보-확인">9.2 초기 Login 정보 확인</h3>
+
+<p>ID는 <code class="language-plaintext highlighter-rouge">admin</code>입니다. Password는 Secret에서 조회하되 문서, Screenshot, Shell Script와 Git Commit에 기록하지 않습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl get secret prometheus-stack-grafana <span class="se">\</span>
+  <span class="nt">--namespace</span> monitoring <span class="se">\</span>
+  <span class="nt">--output</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.data.admin-password}'</span> <span class="se">\</span>
+  | <span class="nb">base64</span> <span class="nt">--decode</span>
+<span class="nb">echo</span>
+</code></pre></div></div>
+
+<p>조회한 초기 Password는 공유 Credential로 계속 사용하지 않고 운영 구성에서는 Secret 관리 체계와 Grafana 인증 설정을 적용합니다.</p>
+
+<h3 id="93-kubernetes-dashboard-확인">9.3 Kubernetes Dashboard 확인</h3>
+
+<p>Browser에서 <code class="language-plaintext highlighter-rouge">http://127.0.0.1:3000</code>에 접속합니다.</p>
+
+<ol>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Dashboards</code>를 선택합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Browse</code>를 선택합니다.</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Kubernetes / Compute Resources / Cluster</code> Dashboard를 엽니다.</p>
+  </li>
+  <li>
+    <p>Node, Namespace, Pod Resource Graph에 Data가 표시되는지 확인합니다.</p>
+  </li>
+</ol>
+
+<h2 id="10-prometheus-web-ui와-target-확인">10. Prometheus Web UI와 Target 확인</h2>
+
+<hr />
+
+<p>Prometheus Service를 Local Port <code class="language-plaintext highlighter-rouge">9090</code>으로 전달합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl port-forward <span class="se">\</span>
+  service/prometheus-stack-kube-prom-prometheus <span class="se">\</span>
+  9090:9090 <span class="se">\</span>
+  <span class="nt">--namespace</span> monitoring
+</code></pre></div></div>
+
+<p>Browser에서 <code class="language-plaintext highlighter-rouge">http://127.0.0.1:9090</code>에 접속합니다. Prometheus UI의 <code class="language-plaintext highlighter-rouge">Status → Targets</code>에서 다음을 확인합니다.</p>
+
+<ul>
+  <li>
+    <p>Target이 검색되는가</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Health</code>가 <code class="language-plaintext highlighter-rouge">UP</code>인가</p>
+  </li>
+  <li>
+    <p><code class="language-plaintext highlighter-rouge">Last Scrape</code>가 계속 갱신되는가</p>
+  </li>
+  <li>
+    <p>Error 열에 Scrape 실패 원인이 표시되는가</p>
+  </li>
+</ul>
+
+<p>이번 범위는 설치와 연결 상태 확인까지입니다. PromQL 문법, Custom Application Scrape, <code class="language-plaintext highlighter-rouge">ServiceMonitor</code>와 <code class="language-plaintext highlighter-rouge">PodMonitor</code> 작성은 별도 학습 범위입니다.</p>
+
+<h2 id="11-nodeport-실습-선택지">11. NodePort 실습 선택지</h2>
+
+<hr />
+
+<p>Port Forwarding을 유지할 수 없는 폐쇄된 실습 Network에서는 Grafana와 Prometheus Service를 NodePort로 변경할 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl patch service prometheus-stack-grafana <span class="se">\</span>
+  <span class="nt">--namespace</span> monitoring <span class="se">\</span>
+  <span class="nt">--type</span> merge <span class="se">\</span>
+  <span class="nt">--patch</span> <span class="s1">'{"spec":{"type":"NodePort"}}'</span>
+
+kubectl patch service prometheus-stack-kube-prom-prometheus <span class="se">\</span>
+  <span class="nt">--namespace</span> monitoring <span class="se">\</span>
+  <span class="nt">--type</span> merge <span class="se">\</span>
+  <span class="nt">--patch</span> <span class="s1">'{"spec":{"type":"NodePort"}}'</span>
+
+kubectl get services <span class="nt">-n</span> monitoring
+</code></pre></div></div>
+
+<p>NodePort는 Node Network에 접근할 수 있는 Host에 Web UI를 노출합니다. 인증, 방화벽과 Security Group을 확인하지 않은 채 Internet에 공개하지 않습니다.</p>
+
+<p>실습이 끝나면 Service를 ClusterIP로 복구합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl patch service prometheus-stack-grafana <span class="se">\</span>
+  <span class="nt">--namespace</span> monitoring <span class="se">\</span>
+  <span class="nt">--type</span> merge <span class="se">\</span>
+  <span class="nt">--patch</span> <span class="s1">'{"spec":{"type":"ClusterIP"}}'</span>
+
+kubectl patch service prometheus-stack-kube-prom-prometheus <span class="se">\</span>
+  <span class="nt">--namespace</span> monitoring <span class="se">\</span>
+  <span class="nt">--type</span> merge <span class="se">\</span>
+  <span class="nt">--patch</span> <span class="s1">'{"spec":{"type":"ClusterIP"}}'</span>
+</code></pre></div></div>
+
+<p>운영 환경의 Web UI는 TLS와 인증을 적용한 Ingress, Gateway 또는 조직의 Private Access 경로를 사용합니다.</p>
+
+<h2 id="12-storage-확인">12. Storage 확인</h2>
+
+<hr />
+
+<p>Storage 설정을 별도로 지정하지 않은 실습 구성은 Pod 재생성 시 Data가 유지되지 않을 수 있습니다. 먼저 StorageClass와 PVC 상태를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl get storageclass
+kubectl get persistentvolumeclaims <span class="nt">-n</span> monitoring
+kubectl get statefulsets <span class="nt">-n</span> monitoring
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>확인 결과</th>
+      <th>의미</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PVC가 없음</td>
+      <td>Chart 설정에서 영구 Storage를 사용하지 않는 구성일 수 있습니다.</td>
+    </tr>
+    <tr>
+      <td>PVC가 <code class="language-plaintext highlighter-rouge">Pending</code></td>
+      <td>요청 조건을 만족하는 StorageClass나 Volume을 찾지 못했습니다.</td>
+    </tr>
+    <tr>
+      <td>PVC가 <code class="language-plaintext highlighter-rouge">Bound</code></td>
+      <td>PVC가 PV에 연결됐습니다. 실제 Mount와 Data 유지 여부를 추가로 확인합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>운영 환경에서는 Chart의 <code class="language-plaintext highlighter-rouge">values.yaml</code>에 Prometheus와 Grafana Persistence, StorageClass, 요청 용량과 Retention을 명시합니다. NFS나 <code class="language-plaintext highlighter-rouge">local-path-provisioner</code>를 사용한다는 이유만으로 Backup과 고가용성이 자동으로 확보되지는 않습니다.</p>
+
+<h2 id="13-resource-계획과-장애-점검">13. Resource 계획과 장애 점검</h2>
+
+<hr />
+
+<p>소규모 실습에서는 Node당 4GB 이상의 RAM을 계획값으로 둘 수 있지만 모든 Cluster에 적용되는 절대 최소 요구 사항은 아닙니다. 실제 요구량은 Node 수, Scrape Target 수, Scrape 주기, Retention, Dashboard와 Rule 수에 따라 달라집니다.</p>
+
+<p>설치 후 다음 명령으로 실제 사용량과 Scheduling 실패를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl top nodes
+kubectl top pods <span class="nt">-n</span> monitoring
+kubectl get events <span class="nt">-n</span> monitoring <span class="se">\</span>
+  <span class="nt">--field-selector</span> <span class="nv">reason</span><span class="o">=</span>FailedScheduling
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">kubectl top</code>을 사용할 수 없다면 Resource Metrics Pipeline 상태를 별도로 확인해야 합니다.</p>
+
+<p>Dashboard에 Data가 표시되지 않으면 다음 순서로 점검합니다.</p>
+
+<ol>
+  <li>
+    <p>Node Exporter Pod가 대상 Node마다 <code class="language-plaintext highlighter-rouge">Ready</code>인지 확인합니다.</p>
+  </li>
+  <li>
+    <p>kube-state-metrics Pod와 Service Endpoint를 확인합니다.</p>
+  </li>
+  <li>
+    <p>Prometheus <code class="language-plaintext highlighter-rouge">Status → Targets</code>에서 Scrape Error를 확인합니다.</p>
+  </li>
+  <li>
+    <p>Grafana의 Prometheus Data Source 연결 상태를 확인합니다.</p>
+  </li>
+  <li>
+    <p>선택한 Dashboard의 시간 범위와 변수를 확인합니다.</p>
+  </li>
+  <li>
+    <p>Storage를 사용하는 경우 PVC가 <code class="language-plaintext highlighter-rouge">Bound</code>이고 Volume Mount Error가 없는지 확인합니다.</p>
+  </li>
+</ol>
+
+<blockquote>
+  <p><strong>최종 정리</strong></p>
+  <ul>
+    <li>
+      <p>Helm은 Chart를 Release로 설치하고 Kubernetes API Server에 Monitoring Resource를 등록합니다.</p>
+    </li>
+    <li>
+      <p>Node Exporter는 Node마다 실행되고 Prometheus Operator는 Monitoring Resource를 원하는 상태로 조정합니다.</p>
+    </li>
+    <li>
+      <p>설치 검증은 Helm Release, Workload, Prometheus Target, Grafana Dashboard와 Storage 순서로 진행합니다.</p>
+    </li>
+    <li>
+      <p>Port Forwarding을 기본 접근 방식으로 사용하고 NodePort와 Ingress는 접근 제어 범위를 확인한 뒤 선택합니다.</p>
+    </li>
+    <li>
+      <p>RAM과 Storage 요구량은 고정된 숫자가 아니라 Target 수, Scrape 주기와 Retention을 기준으로 결정합니다.</p>
+    </li>
+  </ul>
+</blockquote>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://helm.sh/docs/intro/install/">Helm 설치</a></p>
+  </li>
+  <li>
+    <p><a href="https://helm.sh/docs/intro/quickstart/">Helm Quickstart</a></p>
+  </li>
+  <li>
+    <p><a href="https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack">kube-prometheus-stack Chart</a></p>
+  </li>
+  <li>
+    <p><a href="https://prometheus-operator.dev/docs/getting-started/introduction/">Prometheus Operator</a></p>
+  </li>
+  <li>
+    <p><a href="https://prometheus.io/docs/prometheus/latest/getting_started/">Prometheus Target 상태</a></p>
+  </li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/cloud-native-65-jaeger-opentelemetry-distributed-tracing/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">Jaeger와 OpenTelemetry로 Kubernetes 분산 추적</strong>
+          </span>
+        </a>
+      
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1791800637"></script>
+    <script src="/assets/js/code-enhancements.js?v=1791800637"></script>
+  </body>
+</html>
