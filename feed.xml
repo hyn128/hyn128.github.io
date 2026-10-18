@@ -1,4 +1,690 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-10-18T17:04:04+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">Jaeger와 OpenTelemetry로 Kubernetes 분산 추적</title><link href="https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing/" rel="alternate" type="text/html" title="Jaeger와 OpenTelemetry로 Kubernetes 분산 추적" /><published>2026-10-12T00:00:00+09:00</published><updated>2026-10-12T00:00:00+09:00</updated><id>https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing</id><content type="html" xml:base="https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing/"><![CDATA[<h2 id="요약">요약</h2>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-10-18T23:46:39+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동</title><link href="https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/" rel="alternate" type="text/html" title="Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동" /><published>2026-10-13T00:00:00+09:00</published><updated>2026-10-13T00:00:00+09:00</updated><id>https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor</id><content type="html" xml:base="https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/"><![CDATA[<h2 id="요약">요약</h2>
+
+<hr />
+
+<blockquote>
+  <p>Spring Boot Application은 Micrometer로 Metric을 기록하고 Actuator의 <code class="language-plaintext highlighter-rouge">/actuator/prometheus</code>에서 수집 가능한 형태로 공개합니다. Kubernetes에서는 ServiceMonitor가 Service Label과 Port 이름으로 수집 대상을 지정합니다. Prometheus가 각 Application Pod를 주기적으로 Scrape하면 Grafana에서 요청 횟수와 처리 시간을 확인할 수 있습니다.</p>
+</blockquote>
+
+<h2 id="1-actuator와-micrometer">1. Actuator와 Micrometer</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>구성 요소</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Spring Boot Actuator</td>
+      <td>Health와 Metric 등 Application 내부 상태를 Endpoint로 공개합니다.</td>
+    </tr>
+    <tr>
+      <td>Micrometer</td>
+      <td>Monitoring Backend에 독립적인 Metric 계측 API를 제공합니다.</td>
+    </tr>
+    <tr>
+      <td>MeterRegistry</td>
+      <td>Counter, Gauge, Timer 등 Meter를 등록하고 관리합니다.</td>
+    </tr>
+    <tr>
+      <td>Prometheus Registry</td>
+      <td>Micrometer Metric을 Prometheus가 수집할 수 있는 형식으로 변환합니다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Actuator Endpoint를 노출하는 설정과 Prometheus Registry 의존성이 모두 필요합니다. 응답은 Content Negotiation에 따라 Prometheus Text 또는 OpenMetrics 형식이 될 수 있으므로 항상 OpenMetrics만 반환한다고 가정하지 않습니다.</p>
+
+<h2 id="2-meter-종류와-tag-설계">2. Meter 종류와 Tag 설계</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>Meter·통계</th>
+      <th>용도</th>
+      <th>예시</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Counter</td>
+      <td>발생 횟수를 누적</td>
+      <td>주문 완료, Error 발생, 방문 횟수</td>
+    </tr>
+    <tr>
+      <td>Gauge</td>
+      <td>현재 값을 관찰</td>
+      <td>활성 Connection, Cache 크기, Queue 길이</td>
+    </tr>
+    <tr>
+      <td>Timer</td>
+      <td>처리 횟수와 소요 시간을 기록</td>
+      <td>HTTP 응답 시간, Database Query 시간</td>
+    </tr>
+    <tr>
+      <td>DistributionSummary</td>
+      <td>시간 이외의 값의 분포 기록</td>
+      <td>결제 금액, Payload 크기</td>
+    </tr>
+    <tr>
+      <td>Histogram</td>
+      <td>관측값을 Bucket 경계별로 집계</td>
+      <td>100ms·200ms 이내 요청 수</td>
+    </tr>
+    <tr>
+      <td>Percentile</td>
+      <td>관측값 분포의 특정 백분위</td>
+      <td>p95·p99 응답 시간</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Counter는 실행 중 증가하지만 Process가 재시작되면 초기화될 수 있습니다. Timer도 처리 횟수를 기록하므로 동일 작업의 횟수만 필요하다면 별도 Counter가 항상 필요한 것은 아닙니다.</p>
+
+<p>다음은 주입받은 <code class="language-plaintext highlighter-rouge">registry</code>와 Application이 유지하는 <code class="language-plaintext highlighter-rouge">cacheMap</code>을 사용하는 개별 계측 예시입니다. 각 Class는 <code class="language-plaintext highlighter-rouge">io.micrometer.core.instrument</code>에서 가져옵니다.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">Counter</span><span class="o">.</span><span class="na">builder</span><span class="o">(</span><span class="s">"order.success.total"</span><span class="o">)</span>
+    <span class="o">.</span><span class="na">tag</span><span class="o">(</span><span class="s">"shop"</span><span class="o">,</span> <span class="s">"branch-a"</span><span class="o">)</span>
+    <span class="o">.</span><span class="na">register</span><span class="o">(</span><span class="n">registry</span><span class="o">)</span>
+    <span class="o">.</span><span class="na">increment</span><span class="o">();</span>
+
+<span class="nc">Gauge</span><span class="o">.</span><span class="na">builder</span><span class="o">(</span><span class="s">"cache.size"</span><span class="o">,</span> <span class="n">cacheMap</span><span class="o">,</span> <span class="nl">Map:</span><span class="o">:</span><span class="n">size</span><span class="o">)</span>
+    <span class="o">.</span><span class="na">register</span><span class="o">(</span><span class="n">registry</span><span class="o">);</span>
+
+<span class="nc">Timer</span><span class="o">.</span><span class="na">Sample</span> <span class="n">sample</span> <span class="o">=</span> <span class="nc">Timer</span><span class="o">.</span><span class="na">start</span><span class="o">(</span><span class="n">registry</span><span class="o">);</span>
+<span class="c1">// 측정할 작업을 수행합니다.</span>
+<span class="n">sample</span><span class="o">.</span><span class="na">stop</span><span class="o">(</span><span class="n">registry</span><span class="o">.</span><span class="na">timer</span><span class="o">(</span><span class="s">"api.latency"</span><span class="o">));</span>
+
+<span class="nc">DistributionSummary</span><span class="o">.</span><span class="na">builder</span><span class="o">(</span><span class="s">"order.amount"</span><span class="o">)</span>
+    <span class="o">.</span><span class="na">register</span><span class="o">(</span><span class="n">registry</span><span class="o">)</span>
+    <span class="o">.</span><span class="na">record</span><span class="o">(</span><span class="mi">55000</span><span class="o">);</span>
+</code></pre></div></div>
+
+<p>Gauge는 관찰 대상 객체의 현재 값을 읽습니다. <code class="language-plaintext highlighter-rouge">cacheMap</code>은 지역 변수로 생성하고 버리는 객체가 아니라 Application이 참조를 유지하는 실제 Cache여야 합니다.</p>
+
+<p>p95가 200ms라면 관측 요청의 약 95%가 200ms 이하라는 의미입니다. Timer 생성만으로 p95·p99나 Histogram Bucket이 자동 노출되지는 않습니다. Histogram 또는 Client-side Percentile 발행 설정이 필요하며 여러 Pod의 Percentile 값을 단순 평균해 전체 Percentile로 사용할 수는 없습니다.</p>
+
+<h3 id="cardinality-관리">Cardinality 관리</h3>
+
+<blockquote>
+  <p><strong>Cardinality</strong>는 Metric 이름과 Label 값 조합으로 생성되는 시계열의 수입니다.</p>
+</blockquote>
+
+<p>사용자 ID, 주문 번호처럼 계속 늘어나는 값을 Tag로 지정하면 시계열 수가 급증합니다. <code class="language-plaintext highlighter-rouge">status=success|fail</code>, <code class="language-plaintext highlighter-rouge">method=card|transfer</code>처럼 값의 종류가 제한된 Tag를 사용합니다. 비밀번호, Token과 개인정보를 Tag에 넣지 않습니다.</p>
+
+<h2 id="3-실행-환경과-project-준비">3. 실행 환경과 Project 준비</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>표기</th>
+      <th>실행 위치</th>
+      <th>작업</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>[DEV]</td>
+      <td>JDK·Gradle Wrapper가 있는 개발 Host</td>
+      <td>Spring Boot 작성과 Local 검증</td>
+    </tr>
+    <tr>
+      <td>[BUILD]</td>
+      <td>Docker를 사용할 Build Host</td>
+      <td>Image Build·Push</td>
+    </tr>
+    <tr>
+      <td>[ADMIN]</td>
+      <td>Cluster 접근 권한이 있는 kubectl 관리 Host</td>
+      <td>배포, ServiceMonitor 적용, 상태 확인</td>
+    </tr>
+    <tr>
+      <td>[BROWSER]</td>
+      <td>Port Forwarding을 실행한 Host의 Browser</td>
+      <td>Prometheus와 Grafana 확인</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>예제는 Java 17과 호환되는 Spring Boot 3.x Project, Gradle Groovy DSL을 기준으로 합니다. Project의 Spring Boot Plugin과 Gradle Wrapper는 서로 호환되는 Version을 사용합니다. 기존 Project가 다른 Java Version을 사용하면 Docker Build·Runtime Image도 함께 맞춥니다.</p>
+
+<p>Spring Initializr에서 Spring Web을 포함해 Project를 생성합니다. Lombok은 선택할 수 있지만 아래 코드는 생성자를 직접 작성하므로 필수 의존성이 아닙니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">build.gradle</code>의 기존 <code class="language-plaintext highlighter-rouge">dependencies</code>에 다음 항목을 반영합니다. 이미 존재하는 Spring Web은 중복 추가하지 않습니다. Micrometer Version은 Spring Boot 의존성 관리에 맡깁니다.</p>
+
+<div class="language-groovy highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">dependencies</span> <span class="o">{</span>
+    <span class="n">implementation</span> <span class="s1">'org.springframework.boot:spring-boot-starter-web'</span>
+    <span class="n">implementation</span> <span class="s1">'org.springframework.boot:spring-boot-starter-actuator'</span>
+    <span class="n">implementation</span> <span class="s1">'io.micrometer:micrometer-registry-prometheus'</span>
+<span class="o">}</span>
+
+<span class="n">tasks</span><span class="o">.</span><span class="na">named</span><span class="o">(</span><span class="s1">'bootJar'</span><span class="o">)</span> <span class="o">{</span>
+    <span class="n">archiveFileName</span> <span class="o">=</span> <span class="s1">'app.jar'</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">bootJar</code>의 출력 이름을 고정해 Dockerfile이 실행 가능한 JAR 하나만 복사하도록 합니다.</p>
+
+<h2 id="4-actuator-endpoint-설정">4. Actuator Endpoint 설정</h2>
+
+<hr />
+
+<p><code class="language-plaintext highlighter-rouge">src/main/resources/application.yml</code>에 작성합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">server</span><span class="pi">:</span>
+  <span class="na">port</span><span class="pi">:</span> <span class="m">8080</span>
+
+<span class="na">spring</span><span class="pi">:</span>
+  <span class="na">application</span><span class="pi">:</span>
+    <span class="na">name</span><span class="pi">:</span> <span class="s">prometheus-spring</span>
+
+<span class="na">management</span><span class="pi">:</span>
+  <span class="na">endpoints</span><span class="pi">:</span>
+    <span class="na">web</span><span class="pi">:</span>
+      <span class="na">exposure</span><span class="pi">:</span>
+        <span class="na">include</span><span class="pi">:</span> <span class="s">health, info, prometheus</span>
+  <span class="na">metrics</span><span class="pi">:</span>
+    <span class="na">tags</span><span class="pi">:</span>
+      <span class="na">application</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app</span>
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>설정</th>
+      <th>의미</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">health</code></td>
+      <td>Application Health Endpoint 노출</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">info</code></td>
+      <td>설정된 Application 정보 노출</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">prometheus</code></td>
+      <td><code class="language-plaintext highlighter-rouge">/actuator/prometheus</code> 노출</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">management.metrics.tags.application</code></td>
+      <td>Metric에 공통 Application Label 추가</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Endpoint 노출은 인증 설정과 별개입니다. Spring Security가 적용된 Project에서는 Prometheus 요청에 대한 접근 정책도 확인해야 합니다. Metric Endpoint에는 JVM·Application 내부 정보가 포함되므로 실습에서는 ClusterIP와 Local Port Forwarding으로 접근합니다.</p>
+
+<h2 id="5-custom-metric-controller-작성">5. Custom Metric Controller 작성</h2>
+
+<hr />
+
+<p>Application의 Component Scan 범위 안에 <code class="language-plaintext highlighter-rouge">SampleController.java</code>를 작성합니다. 예제 Package는 <code class="language-plaintext highlighter-rouge">com.example.metrics</code>이며 Main Application Class도 이 Package 또는 상위 Package에 배치합니다.</p>
+
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">package</span> <span class="nn">com.example.metrics</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">io.micrometer.core.instrument.Counter</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">io.micrometer.core.instrument.MeterRegistry</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">io.micrometer.core.instrument.Timer</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">java.util.concurrent.ThreadLocalRandom</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.http.HttpStatus</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.GetMapping</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.RequestParam</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.bind.annotation.RestController</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.springframework.web.server.ResponseStatusException</span><span class="o">;</span>
+
+<span class="nd">@RestController</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">SampleController</span> <span class="o">{</span>
+    <span class="kd">private</span> <span class="kd">final</span> <span class="nc">Counter</span> <span class="n">customVisitCounter</span><span class="o">;</span>
+    <span class="kd">private</span> <span class="kd">final</span> <span class="nc">Timer</span> <span class="n">customProcessTimer</span><span class="o">;</span>
+
+    <span class="kd">public</span> <span class="nf">SampleController</span><span class="o">(</span><span class="nc">MeterRegistry</span> <span class="n">registry</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">customVisitCounter</span> <span class="o">=</span> <span class="nc">Counter</span><span class="o">.</span><span class="na">builder</span><span class="o">(</span><span class="s">"app.visitations.total"</span><span class="o">)</span>
+            <span class="o">.</span><span class="na">description</span><span class="o">(</span><span class="s">"Total visits to the sample endpoints"</span><span class="o">)</span>
+            <span class="o">.</span><span class="na">tag</span><span class="o">(</span><span class="s">"region"</span><span class="o">,</span> <span class="s">"region-a"</span><span class="o">)</span>
+            <span class="o">.</span><span class="na">register</span><span class="o">(</span><span class="n">registry</span><span class="o">);</span>
+        <span class="k">this</span><span class="o">.</span><span class="na">customProcessTimer</span> <span class="o">=</span> <span class="nc">Timer</span><span class="o">.</span><span class="na">builder</span><span class="o">(</span><span class="s">"app.process.latency"</span><span class="o">)</span>
+            <span class="o">.</span><span class="na">description</span><span class="o">(</span><span class="s">"Time taken to process sample business logic"</span><span class="o">)</span>
+            <span class="o">.</span><span class="na">register</span><span class="o">(</span><span class="n">registry</span><span class="o">);</span>
+    <span class="o">}</span>
+
+    <span class="nd">@GetMapping</span><span class="o">(</span><span class="s">"/hello"</span><span class="o">)</span>
+    <span class="kd">public</span> <span class="nc">String</span> <span class="nf">hello</span><span class="o">()</span> <span class="o">{</span>
+        <span class="n">customVisitCounter</span><span class="o">.</span><span class="na">increment</span><span class="o">();</span>
+        <span class="k">return</span> <span class="s">"Hello Micrometer &amp; Kubernetes"</span><span class="o">;</span>
+    <span class="o">}</span>
+
+    <span class="nd">@GetMapping</span><span class="o">(</span><span class="s">"/process"</span><span class="o">)</span>
+    <span class="kd">public</span> <span class="nc">String</span> <span class="nf">processWork</span><span class="o">(</span>
+            <span class="nd">@RequestParam</span><span class="o">(</span><span class="n">name</span> <span class="o">=</span> <span class="s">"millis"</span><span class="o">,</span> <span class="n">defaultValue</span> <span class="o">=</span> <span class="s">"100"</span><span class="o">)</span> <span class="kt">int</span> <span class="n">millis</span><span class="o">)</span> <span class="o">{</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">millis</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="o">||</span> <span class="n">millis</span> <span class="o">&gt;</span> <span class="mi">5000</span><span class="o">)</span> <span class="o">{</span>
+            <span class="k">throw</span> <span class="k">new</span> <span class="nf">ResponseStatusException</span><span class="o">(</span>
+                <span class="nc">HttpStatus</span><span class="o">.</span><span class="na">BAD_REQUEST</span><span class="o">,</span> <span class="s">"millis must be between 0 and 5000"</span><span class="o">);</span>
+        <span class="o">}</span>
+        <span class="n">customVisitCounter</span><span class="o">.</span><span class="na">increment</span><span class="o">();</span>
+        <span class="k">return</span> <span class="n">customProcessTimer</span><span class="o">.</span><span class="na">record</span><span class="o">(()</span> <span class="o">-&gt;</span> <span class="o">{</span>
+            <span class="k">try</span> <span class="o">{</span>
+                <span class="kt">int</span> <span class="n">sleepTime</span> <span class="o">=</span> <span class="n">millis</span> <span class="o">+</span> <span class="nc">ThreadLocalRandom</span><span class="o">.</span><span class="na">current</span><span class="o">().</span><span class="na">nextInt</span><span class="o">(</span><span class="mi">50</span><span class="o">);</span>
+                <span class="nc">Thread</span><span class="o">.</span><span class="na">sleep</span><span class="o">(</span><span class="n">sleepTime</span><span class="o">);</span>
+            <span class="o">}</span> <span class="k">catch</span> <span class="o">(</span><span class="nc">InterruptedException</span> <span class="n">exception</span><span class="o">)</span> <span class="o">{</span>
+                <span class="nc">Thread</span><span class="o">.</span><span class="na">currentThread</span><span class="o">().</span><span class="na">interrupt</span><span class="o">();</span>
+                <span class="k">throw</span> <span class="k">new</span> <span class="nf">ResponseStatusException</span><span class="o">(</span>
+                    <span class="nc">HttpStatus</span><span class="o">.</span><span class="na">SERVICE_UNAVAILABLE</span><span class="o">,</span> <span class="s">"Processing interrupted"</span><span class="o">,</span> <span class="n">exception</span><span class="o">);</span>
+            <span class="o">}</span>
+            <span class="k">return</span> <span class="s">"Processed work in simulated time"</span><span class="o">;</span>
+        <span class="o">});</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>Spring이 자동 구성한 MeterRegistry를 생성자에서 주입받아 Meter를 한 번 등록합니다. 요청마다 새 Registry를 생성하지 않습니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">/hello</code>와 유효한 <code class="language-plaintext highlighter-rouge">/process</code> 요청 모두 방문 Counter를 증가시킵니다. <code class="language-plaintext highlighter-rouge">/process</code>만 Timer로 처리 시간을 측정하며, 이 Counter는 성공 건수만을 의미하지 않습니다. <code class="language-plaintext highlighter-rouge">millis</code> 범위 검사는 음수 Sleep과 과도한 대기를 막습니다. Sleep은 지연을 재현하는 실습 코드입니다.</p>
+
+<h2 id="6-local-실행과-metric-확인">6. Local 실행과 Metric 확인</h2>
+
+<hr />
+
+<p>Project Root에서 Application을 실행합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [DEV: Terminal 1]</span>
+<span class="nb">chmod</span> +x gradlew
+./gradlew bootRun
+</code></pre></div></div>
+
+<p>다른 Terminal에서 요청과 Actuator 응답을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [DEV: Terminal 2]</span>
+curl <span class="nt">--fail</span> http://127.0.0.1:8080/hello
+curl <span class="nt">--fail</span> <span class="s1">'http://127.0.0.1:8080/process?millis=100'</span>
+curl <span class="nt">--fail</span> http://127.0.0.1:8080/actuator/health
+curl <span class="nt">--fail</span> http://127.0.0.1:8080/actuator/prometheus
+</code></pre></div></div>
+
+<p>응답에서 다음 이름을 찾습니다. Micrometer의 점 구분 이름은 Prometheus 형식으로 변환되며 Timer의 단위는 초입니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Application Meter</th>
+      <th>Prometheus에서 확인할 Metric</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">app.visitations.total</code></td>
+      <td><code class="language-plaintext highlighter-rouge">app_visitations_total</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">app.process.latency</code></td>
+      <td><code class="language-plaintext highlighter-rouge">app_process_latency_seconds_count</code>, <code class="language-plaintext highlighter-rouge">app_process_latency_seconds_sum</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">application="spring-boot-metrics-app"</code>과 Counter의 <code class="language-plaintext highlighter-rouge">region="region-a"</code> Label도 확인합니다. 실제 노출 이름은 사용하는 Registry Version의 Endpoint 응답을 기준으로 확인합니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">/hello</code>만 호출하면 방문 횟수만 증가합니다. <code class="language-plaintext highlighter-rouge">/process</code>를 호출하면 방문 횟수와 Timer Count·Sum이 함께 증가합니다. 잘못된 <code class="language-plaintext highlighter-rouge">millis</code>는 HTTP 400을 반환해야 합니다.</p>
+
+<h2 id="7-image-build와-registry-push">7. Image Build와 Registry Push</h2>
+
+<hr />
+
+<p>Project Root에 <code class="language-plaintext highlighter-rouge">Dockerfile</code>을 작성합니다.</p>
+
+<div class="language-dockerfile highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">FROM</span><span class="w"> </span><span class="s">eclipse-temurin:17-jdk-alpine</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">build</span>
+<span class="k">WORKDIR</span><span class="s"> /app</span>
+<span class="k">COPY</span><span class="s"> gradlew .</span>
+<span class="k">COPY</span><span class="s"> gradle gradle</span>
+<span class="k">COPY</span><span class="s"> build.gradle settings.gradle ./</span>
+<span class="k">COPY</span><span class="s"> src src</span>
+<span class="k">RUN </span><span class="nb">chmod</span> +x gradlew <span class="o">&amp;&amp;</span> ./gradlew <span class="nt">--no-daemon</span> bootJar <span class="nt">-x</span> <span class="nb">test</span>
+
+<span class="k">FROM</span><span class="s"> eclipse-temurin:17-jre-alpine</span>
+<span class="k">WORKDIR</span><span class="s"> /app</span>
+<span class="k">COPY</span><span class="s"> --from=build /app/build/libs/app.jar app.jar</span>
+<span class="k">EXPOSE</span><span class="s"> 8080</span>
+<span class="k">ENTRYPOINT</span><span class="s"> ["java", "-jar", "app.jar"]</span>
+</code></pre></div></div>
+
+<p>Build Stage는 JDK로 JAR를 생성하고 Runtime Stage는 JRE로 실행합니다. <code class="language-plaintext highlighter-rouge">-x test</code>는 실습 Build에서 Test를 생략하는 Option이며 검증 성공을 뜻하지 않습니다. 운영 Pipeline에서는 별도 Test를 통과시켜야 합니다.</p>
+
+<p>Docker Hub에 <code class="language-plaintext highlighter-rouge">prometheus-springboot</code> Repository를 생성한 뒤 다음 변수의 Placeholder를 실제 값으로 바꿉니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [BUILD]</span>
+<span class="nv">METRICS_REGISTRY_USER</span><span class="o">=</span><span class="s2">"&lt;CONTAINER_REGISTRY_USERNAME&gt;"</span>
+<span class="nv">METRICS_IMAGE_TAG</span><span class="o">=</span><span class="s2">"&lt;TAG&gt;"</span>
+<span class="nv">METRICS_IMAGE</span><span class="o">=</span><span class="s2">"</span><span class="k">${</span><span class="nv">METRICS_REGISTRY_USER</span><span class="k">}</span><span class="s2">/prometheus-springboot:</span><span class="k">${</span><span class="nv">METRICS_IMAGE_TAG</span><span class="k">}</span><span class="s2">"</span>
+
+docker login
+docker build <span class="nt">-t</span> <span class="s2">"</span><span class="nv">$METRICS_IMAGE</span><span class="s2">"</span> <span class="nb">.</span>
+docker push <span class="s2">"</span><span class="nv">$METRICS_IMAGE</span><span class="s2">"</span>
+</code></pre></div></div>
+
+<p>Build Host와 Worker의 CPU Architecture가 다르면 Worker용 Image를 Build해야 합니다. Private Repository를 사용한다면 배포 Namespace에 <code class="language-plaintext highlighter-rouge">imagePullSecrets</code>를 별도로 구성합니다.</p>
+
+<h2 id="8-kubernetes-application-배포">8. Kubernetes Application 배포</h2>
+
+<hr />
+
+<p>이미 <code class="language-plaintext highlighter-rouge">monitoring</code> Namespace에 <code class="language-plaintext highlighter-rouge">prometheus-stack</code> Release가 설치돼 있다고 가정합니다. Application과 ServiceMonitor도 같은 Namespace를 사용해 수집 범위를 명확히 합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+helm list <span class="nt">-n</span> monitoring
+kubectl get crd servicemonitors.monitoring.coreos.com
+kubectl get prometheus <span class="nt">-n</span> monitoring
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">spring-boot-metrics.yaml</code>을 작성합니다. Image Placeholder는 Push한 Image와 동일하게 변경합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">apps/v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Deployment</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">monitoring</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">replicas</span><span class="pi">:</span> <span class="m">2</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">matchLabels</span><span class="pi">:</span>
+      <span class="na">app</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app</span>
+  <span class="na">template</span><span class="pi">:</span>
+    <span class="na">metadata</span><span class="pi">:</span>
+      <span class="na">labels</span><span class="pi">:</span>
+        <span class="na">app</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app</span>
+    <span class="na">spec</span><span class="pi">:</span>
+      <span class="na">containers</span><span class="pi">:</span>
+        <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app</span>
+          <span class="na">image</span><span class="pi">:</span> <span class="s2">"</span><span class="s">&lt;CONTAINER_REGISTRY_USERNAME&gt;/prometheus-springboot:&lt;TAG&gt;"</span>
+          <span class="na">ports</span><span class="pi">:</span>
+            <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">http</span>
+              <span class="na">containerPort</span><span class="pi">:</span> <span class="m">8080</span>
+          <span class="na">resources</span><span class="pi">:</span>
+            <span class="na">limits</span><span class="pi">:</span>
+              <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">500m"</span>
+              <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">512Mi"</span>
+            <span class="na">requests</span><span class="pi">:</span>
+              <span class="na">cpu</span><span class="pi">:</span> <span class="s2">"</span><span class="s">200m"</span>
+              <span class="na">memory</span><span class="pi">:</span> <span class="s2">"</span><span class="s">256Mi"</span>
+<span class="nn">---</span>
+<span class="na">apiVersion</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">Service</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app-service</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">monitoring</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">app</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">app</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app</span>
+  <span class="na">ports</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">http</span>
+      <span class="na">protocol</span><span class="pi">:</span> <span class="s">TCP</span>
+      <span class="na">port</span><span class="pi">:</span> <span class="m">80</span>
+      <span class="na">targetPort</span><span class="pi">:</span> <span class="s">http</span>
+  <span class="na">type</span><span class="pi">:</span> <span class="s">ClusterIP</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">requests</code>는 <code class="language-plaintext highlighter-rouge">resources</code> 안에 들어갑니다. Scheduler는 Request와 Node의 가용 Resource 등을 고려해 Pod를 배치하고, 선택된 Worker의 kubelet이 Container Runtime을 통해 Application을 실행합니다. Replica 2개가 반드시 서로 다른 Node에 배치되는 것은 아닙니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl apply <span class="nt">-f</span> spring-boot-metrics.yaml
+kubectl rollout status deployment/spring-boot-metrics-app <span class="nt">-n</span> monitoring
+kubectl get pods <span class="nt">-n</span> monitoring <span class="nt">-l</span> <span class="nv">app</span><span class="o">=</span>spring-boot-metrics-app <span class="nt">-o</span> wide
+kubectl get service spring-boot-metrics-app-service <span class="nt">-n</span> monitoring
+kubectl get endpointslices <span class="nt">-n</span> monitoring   <span class="nt">-l</span> kubernetes.io/service-name<span class="o">=</span>spring-boot-metrics-app-service
+</code></pre></div></div>
+
+<p>EndpointSlice에서 실행 중인 Pod 주소와 Port <code class="language-plaintext highlighter-rouge">8080</code>을 확인합니다.</p>
+
+<h3 id="annotation을-사용하는-구성">Annotation을 사용하는 구성</h3>
+
+<p>다음 Pod Annotation은 해당 값을 해석하는 Scrape 설정이 Prometheus에 있을 때 활용할 수 있습니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">annotations</span><span class="pi">:</span>
+  <span class="na">prometheus.io/scrape</span><span class="pi">:</span> <span class="s2">"</span><span class="s">true"</span>
+  <span class="na">prometheus.io/path</span><span class="pi">:</span> <span class="s2">"</span><span class="s">/actuator/prometheus"</span>
+  <span class="na">prometheus.io/port</span><span class="pi">:</span> <span class="s2">"</span><span class="s">8080"</span>
+</code></pre></div></div>
+
+<p>Annotation 자체는 Kubernetes나 Prometheus Operator가 수집을 보장하는 스위치가 아닙니다. 이번 배포는 ServiceMonitor로 수집하므로 이 Annotation을 추가할 필요가 없습니다. 두 방식이 모두 활성화되면 같은 Endpoint를 중복 수집할 수 있습니다.</p>
+
+<h2 id="9-servicemonitor로-수집-대상-지정">9. ServiceMonitor로 수집 대상 지정</h2>
+
+<hr />
+
+<p>ServiceMonitor는 Service의 Metadata Label을 선택하고 그 Service의 이름 있는 Port를 참조합니다. Service가 다시 Pod Label로 Endpoint를 연결합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>연결 지점</th>
+      <th>일치해야 하는 값</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Prometheus → ServiceMonitor</td>
+      <td>Prometheus의 <code class="language-plaintext highlighter-rouge">serviceMonitorSelector</code>와 ServiceMonitor Metadata Label</td>
+    </tr>
+    <tr>
+      <td>ServiceMonitor → Service</td>
+      <td><code class="language-plaintext highlighter-rouge">spec.selector.matchLabels</code>와 Service Metadata Label</td>
+    </tr>
+    <tr>
+      <td>Service → Pod</td>
+      <td>Service의 <code class="language-plaintext highlighter-rouge">spec.selector</code>와 Pod Label</td>
+    </tr>
+    <tr>
+      <td>Scrape Port</td>
+      <td>ServiceMonitor의 <code class="language-plaintext highlighter-rouge">endpoints.port</code>와 Service의 <code class="language-plaintext highlighter-rouge">ports.name</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>먼저 실제 Prometheus 설정을 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl get prometheus <span class="nt">-n</span> monitoring <span class="nt">-o</span> yaml
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">spec.serviceMonitorSelector</code>가 <code class="language-plaintext highlighter-rouge">release: prometheus-stack</code>을 선택하는지, <code class="language-plaintext highlighter-rouge">serviceMonitorNamespaceSelector</code>가 <code class="language-plaintext highlighter-rouge">monitoring</code> Namespace를 포함하는지 확인합니다. Helm Release 이름만으로 Selector를 단정하지 않습니다. 설치 시 Values를 변경했다면 실제 Selector에 맞춰 아래 Label을 조정합니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">service-monitor.yml</code>을 작성합니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">apiVersion</span><span class="pi">:</span> <span class="s">monitoring.coreos.com/v1</span>
+<span class="na">kind</span><span class="pi">:</span> <span class="s">ServiceMonitor</span>
+<span class="na">metadata</span><span class="pi">:</span>
+  <span class="na">name</span><span class="pi">:</span> <span class="s">spring-boot-metrics-monitor</span>
+  <span class="na">namespace</span><span class="pi">:</span> <span class="s">monitoring</span>
+  <span class="na">labels</span><span class="pi">:</span>
+    <span class="na">release</span><span class="pi">:</span> <span class="s">prometheus-stack</span>
+<span class="na">spec</span><span class="pi">:</span>
+  <span class="na">namespaceSelector</span><span class="pi">:</span>
+    <span class="na">matchNames</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="s">monitoring</span>
+  <span class="na">selector</span><span class="pi">:</span>
+    <span class="na">matchLabels</span><span class="pi">:</span>
+      <span class="na">app</span><span class="pi">:</span> <span class="s">spring-boot-metrics-app</span>
+  <span class="na">endpoints</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">port</span><span class="pi">:</span> <span class="s">http</span>
+      <span class="na">path</span><span class="pi">:</span> <span class="s">/actuator/prometheus</span>
+      <span class="na">interval</span><span class="pi">:</span> <span class="s">15s</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">port: http</code>는 숫자 <code class="language-plaintext highlighter-rouge">80</code>이나 Container Port <code class="language-plaintext highlighter-rouge">8080</code>이 아니라 Service Port 이름입니다. Operator는 API Server에 등록된 ServiceMonitor를 감지해 Scrape 설정을 조정하고, Prometheus는 Service의 Endpoint로 발견한 각 Pod에서 Metric을 수집합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl apply <span class="nt">-f</span> service-monitor.yml
+kubectl get servicemonitor spring-boot-metrics-monitor <span class="nt">-n</span> monitoring
+kubectl get services <span class="nt">-n</span> monitoring <span class="nt">-l</span> <span class="nv">app</span><span class="o">=</span>spring-boot-metrics-app
+</code></pre></div></div>
+
+<h2 id="10-요청-생성과-prometheus-확인">10. 요청 생성과 Prometheus 확인</h2>
+
+<hr />
+
+<p>Application Service에 Port Forwarding을 실행합니다. 명령을 실행한 Host에서만 Local 주소에 접근할 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN: Terminal 1]</span>
+kubectl port-forward service/spring-boot-metrics-app-service   8080:80 <span class="nt">-n</span> monitoring
+</code></pre></div></div>
+
+<p>다른 Terminal에서 요청을 반복합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN: Terminal 2]</span>
+<span class="k">for </span>request <span class="k">in </span>1 2 3 4 5<span class="p">;</span> <span class="k">do
+  </span>curl <span class="nt">--fail</span> http://127.0.0.1:8080/hello
+  curl <span class="nt">--fail</span> <span class="s1">'http://127.0.0.1:8080/process?millis=100'</span>
+<span class="k">done
+</span>curl <span class="nt">--fail</span> http://127.0.0.1:8080/actuator/prometheus
+</code></pre></div></div>
+
+<p>Service 대상 Port Forwarding은 선택된 Pod 하나에 연결됩니다. 두 Replica의 Counter가 동일하게 증가해야 하는 것은 아닙니다.</p>
+
+<p>Prometheus Service 이름을 확인한 뒤 별도 Terminal에서 UI에 접근합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN: Terminal 3]</span>
+kubectl get services <span class="nt">-n</span> monitoring
+kubectl port-forward service/prometheus-stack-kube-prom-prometheus   9090:9090 <span class="nt">-n</span> monitoring
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">http://127.0.0.1:9090</code>의 Targets 화면에서 <code class="language-plaintext highlighter-rouge">spring-boot-metrics-monitor</code> 관련 Target과 <code class="language-plaintext highlighter-rouge">UP</code> 상태를 확인합니다. UI Version에 따라 메뉴는 <code class="language-plaintext highlighter-rouge">Status → Targets</code> 또는 <code class="language-plaintext highlighter-rouge">Target health</code>로 표시될 수 있습니다.</p>
+
+<p>15초 수집 주기 이후 Query 화면에서 다음 Metric을 확인합니다.</p>
+
+<pre><code class="language-promql">app_visitations_total{application="spring-boot-metrics-app"}
+</code></pre>
+
+<p>Timer는 다음 두 Metric을 각각 조회합니다.</p>
+
+<pre><code class="language-promql">app_process_latency_seconds_count{application="spring-boot-metrics-app"}
+</code></pre>
+
+<pre><code class="language-promql">app_process_latency_seconds_sum{application="spring-boot-metrics-app"}
+</code></pre>
+
+<p>Pod별로 Label 조합이 달라 각각의 시계열이 나타납니다. 누적값은 Process 재시작 시 초기화될 수 있으므로 계속 유지되는 업무 원장으로 사용하지 않습니다.</p>
+
+<h2 id="11-grafana-dashboard-생성">11. Grafana Dashboard 생성</h2>
+
+<hr />
+
+<p>Grafana Service를 Local Port로 연결합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN: 별도 Terminal]</span>
+kubectl port-forward service/prometheus-stack-grafana   3000:80 <span class="nt">-n</span> monitoring
+</code></pre></div></div>
+
+<p>Browser에서 <code class="language-plaintext highlighter-rouge">http://127.0.0.1:3000</code>에 접속해 다음 순서로 Panel을 만듭니다.</p>
+
+<ol>
+  <li>
+    <p>Dashboard 생성 메뉴에서 새 Dashboard와 Visualization을 추가합니다.</p>
+  </li>
+  <li>
+    <p>설치된 Prometheus Data Source를 선택합니다.</p>
+  </li>
+  <li>
+    <p>방문 횟수 Panel에 <code class="language-plaintext highlighter-rouge">app_visitations_total{application="spring-boot-metrics-app"}</code>을 입력합니다.</p>
+  </li>
+  <li>
+    <p>처리 횟수 Panel에 <code class="language-plaintext highlighter-rouge">app_process_latency_seconds_count{application="spring-boot-metrics-app"}</code>을 입력합니다.</p>
+  </li>
+  <li>
+    <p>총 처리 시간 Panel에 <code class="language-plaintext highlighter-rouge">app_process_latency_seconds_sum{application="spring-boot-metrics-app"}</code>을 입력하고 Unit을 seconds로 지정합니다.</p>
+  </li>
+  <li>
+    <p>최근 15분 등 요청이 발생한 시간 범위를 선택하고 Dashboard를 저장합니다.</p>
+  </li>
+</ol>
+
+<p>이 Panel들은 누적값 확인용입니다. 총 처리 시간은 평균 지연이나 p95가 아니며, p95 Panel을 만들려면 별도의 Histogram 또는 Percentile 설정이 필요합니다.</p>
+
+<h2 id="12-수집되지-않을-때-점검-순서">12. 수집되지 않을 때 점검 순서</h2>
+
+<hr />
+
+<table>
+  <thead>
+    <tr>
+      <th>증상</th>
+      <th>확인 대상</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Local Endpoint가 404</td>
+      <td>Actuator·Prometheus Registry 의존성, Exposure 설정</td>
+    </tr>
+    <tr>
+      <td>Endpoint가 401·403</td>
+      <td>Spring Security의 Metric Endpoint 접근 정책</td>
+    </tr>
+    <tr>
+      <td>Pod가 실행되지 않음</td>
+      <td>Image 이름·Tag·Architecture, Registry 인증, Resource·Event</td>
+    </tr>
+    <tr>
+      <td>Target 자체가 없음</td>
+      <td>Prometheus Selector, ServiceMonitor Namespace·Label, Service Label·Port 이름</td>
+    </tr>
+    <tr>
+      <td>Target이 DOWN</td>
+      <td>Endpoint 경로, Application Listen Port, NetworkPolicy, 연결·인증 Error</td>
+    </tr>
+    <tr>
+      <td>Prometheus에는 값이 있으나 Grafana는 비어 있음</td>
+      <td>Data Source, Query Label, 시간 범위</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>관리 Host에서 다음 명령으로 배포 상태와 Application Log를 확인합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ADMIN]</span>
+kubectl describe deployment spring-boot-metrics-app <span class="nt">-n</span> monitoring
+kubectl get events <span class="nt">-n</span> monitoring <span class="nt">--sort-by</span><span class="o">=</span>.metadata.creationTimestamp
+kubectl logs <span class="nt">-n</span> monitoring <span class="nt">-l</span> <span class="nv">app</span><span class="o">=</span>spring-boot-metrics-app   <span class="nt">--all-containers</span><span class="o">=</span><span class="nb">true</span> <span class="nt">--tail</span><span class="o">=</span>100 <span class="nt">--prefix</span><span class="o">=</span><span class="nb">true
+</span>kubectl get service spring-boot-metrics-app-service <span class="nt">-n</span> monitoring <span class="nt">-o</span> yaml
+kubectl get servicemonitor spring-boot-metrics-monitor <span class="nt">-n</span> monitoring <span class="nt">-o</span> yaml
+</code></pre></div></div>
+
+<p>Pod가 Ready이고 Metric Endpoint가 응답하더라도 ServiceMonitor가 선택되지 않으면 수집되지 않습니다. Application의 노출 상태와 Prometheus의 수집 설정을 각각 확인합니다.</p>
+
+<h2 id="참고-자료">참고 자료</h2>
+
+<hr />
+
+<ul>
+  <li>
+    <p><a href="https://docs.spring.io/spring-boot/reference/actuator/metrics.html">Spring Boot Metric과 Prometheus 연동</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.spring.io/spring-boot/reference/actuator/endpoints.html">Spring Boot Actuator Endpoint</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.micrometer.io/micrometer/reference/concepts/timers.html">Micrometer Timer</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.micrometer.io/micrometer/reference/concepts/distribution-summaries.html">Micrometer DistributionSummary</a></p>
+  </li>
+  <li>
+    <p><a href="https://docs.micrometer.io/micrometer/reference/concepts/histogram-quantiles.html">Micrometer Histogram과 Percentile</a></p>
+  </li>
+  <li>
+    <p><a href="https://prometheus-operator.dev/docs/platform/troubleshooting/">Prometheus Operator 수집 문제 점검</a></p>
+  </li>
+</ul>]]></content><author><name></name></author><category term="CloudNative" /><category term="AutoEverSW" /><category term="Monitoring" /><summary type="html"><![CDATA[Actuator와 Micrometer로 Spring Boot Metric을 노출하고 Kubernetes ServiceMonitor를 통해 수집한 뒤 Grafana에서 확인합니다]]></summary></entry><entry><title type="html">Jaeger와 OpenTelemetry로 Kubernetes 분산 추적</title><link href="https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing/" rel="alternate" type="text/html" title="Jaeger와 OpenTelemetry로 Kubernetes 분산 추적" /><published>2026-10-12T00:00:00+09:00</published><updated>2026-10-12T00:00:00+09:00</updated><id>https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing</id><content type="html" xml:base="https://hyn128.site/cloud-native-65-jaeger-opentelemetry-distributed-tracing/"><![CDATA[<h2 id="요약">요약</h2>
 
 <hr />
 
@@ -4632,574 +5318,4 @@ Application Network Interface
   <li>
     <p><a href="https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Security.html">Security Group과 Network ACL</a></p>
   </li>
-</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[On-Premise와 AWS를 연결하는 Hybrid Cloud Pattern을 구분하고 Direct Connect, Site-to-Site VPN, Outposts와 VPC Network의 Traffic 흐름을 정리합니다]]></summary></entry><entry><title type="html">CloudWatch Metric·Logs·Alarm과 SNS 알림</title><link href="https://hyn128.site/cloud-18-cloudwatch-metrics-logs-alarm-sns/" rel="alternate" type="text/html" title="CloudWatch Metric·Logs·Alarm과 SNS 알림" /><published>2026-10-06T00:00:00+09:00</published><updated>2026-10-06T00:00:00+09:00</updated><id>https://hyn128.site/cloud-18-cloudwatch-metrics-logs-alarm-sns</id><content type="html" xml:base="https://hyn128.site/cloud-18-cloudwatch-metrics-logs-alarm-sns/"><![CDATA[<h2 id="요약">요약</h2>
-
-<hr />
-
-<blockquote>
-  <p>Amazon CloudWatch는 AWS Resource와 Application의 Metric, Log와 Alarm을 수집·조회하는 Monitoring Service입니다. EC2 CPU Metric을 기준으로 Alarm을 만들고 Amazon SNS Email 구독으로 상태 변경을 알립니다. Metric, Log와 Event의 차이를 먼저 구분한 뒤 Alarm 생성, CPU 부하 발생, 상태 확인과 Resource 정리 순서로 실습합니다.</p>
-</blockquote>
-
-<h2 id="1-cloudwatch에서-다루는-데이터">1. CloudWatch에서 다루는 데이터</h2>
-
-<hr />
-
-<p>CloudWatch의 Metric과 Log는 다른 데이터입니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>구분</th>
-      <th>내용</th>
-      <th>예시</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Metric</td>
-      <td>시간에 따른 수치 데이터</td>
-      <td>EC2 <code class="language-plaintext highlighter-rouge">CPUUtilization</code>, EBS <code class="language-plaintext highlighter-rouge">VolumeReadOps</code></td>
-    </tr>
-    <tr>
-      <td>Logs</td>
-      <td>Application과 System이 남긴 Text Event</td>
-      <td>Web Access Log, Container Standard Output</td>
-    </tr>
-    <tr>
-      <td>Alarm</td>
-      <td>Metric이나 Metric Math 결과를 임계값과 비교한 상태</td>
-      <td>평균 CPU가 70%를 초과하면 <code class="language-plaintext highlighter-rouge">ALARM</code></td>
-    </tr>
-    <tr>
-      <td>Dashboard</td>
-      <td>Metric과 Log Widget을 한 화면에 배치</td>
-      <td>EC2·EBS 운영 현황</td>
-    </tr>
-    <tr>
-      <td>Event</td>
-      <td>AWS Resource 상태 변화나 일정</td>
-      <td>Instance 상태 변경, 매일 정해진 시간 실행</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>CloudWatch는 Log를 자동으로 Metric Graph로 바꾸지 않습니다. AWS Service가 발행한 Metric을 Graph로 표시하거나, Log에서 Metric Filter를 만들어 필요한 수치를 별도로 발행합니다.</p>
-
-<p>CloudWatch Events 기능은 Amazon EventBridge로 확장됐습니다. 기존 Events API는 호환되지만 새로운 Event Pattern과 Schedule Rule은 EventBridge Console에서 관리합니다.</p>
-
-<h2 id="2-cloudwatch-metrics">2. CloudWatch Metrics</h2>
-
-<hr />
-
-<p>Metric은 다음 요소로 식별됩니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>요소</th>
-      <th>역할</th>
-      <th>EC2 예제</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Namespace</td>
-      <td>Metric을 묶는 범위</td>
-      <td><code class="language-plaintext highlighter-rouge">AWS/EC2</code></td>
-    </tr>
-    <tr>
-      <td>Metric Name</td>
-      <td>측정 항목</td>
-      <td><code class="language-plaintext highlighter-rouge">CPUUtilization</code></td>
-    </tr>
-    <tr>
-      <td>Dimension</td>
-      <td>Resource 식별 조건</td>
-      <td><code class="language-plaintext highlighter-rouge">InstanceId=&lt;EC2_INSTANCE_ID&gt;</code></td>
-    </tr>
-    <tr>
-      <td>Statistic</td>
-      <td>기간 내 집계 방식</td>
-      <td><code class="language-plaintext highlighter-rouge">Average</code>, <code class="language-plaintext highlighter-rouge">Maximum</code>, <code class="language-plaintext highlighter-rouge">Sum</code></td>
-    </tr>
-    <tr>
-      <td>Period</td>
-      <td>한 Data Point가 집계하는 시간</td>
-      <td>60초, 300초</td>
-    </tr>
-    <tr>
-      <td>Unit</td>
-      <td>값의 단위</td>
-      <td><code class="language-plaintext highlighter-rouge">Percent</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p><code class="language-plaintext highlighter-rouge">Average CPUUtilization</code>과 <code class="language-plaintext highlighter-rouge">Maximum CPUUtilization</code>은 같은 원본 Metric을 서로 다르게 해석합니다. Alarm 목적에 맞는 Statistic과 Period를 선택합니다.</p>
-
-<h2 id="3-ec2-기본-monitoring과-상세-monitoring">3. EC2 기본 Monitoring과 상세 Monitoring</h2>
-
-<hr />
-
-<p>EC2 Monitoring 주기는 다음과 같습니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>구분</th>
-      <th>EC2 Metric 주기</th>
-      <th>비용</th>
-      <th>용도</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Basic Monitoring</td>
-      <td>5분</td>
-      <td>추가 비용 없음</td>
-      <td>장기 추세와 완만한 변화 확인</td>
-    </tr>
-    <tr>
-      <td>Detailed Monitoring</td>
-      <td>1분</td>
-      <td>추가 비용 발생</td>
-      <td>짧은 Spike와 빠른 Alarm 판단</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Monitoring 주기는 AWS Service마다 다릅니다. EC2의 5분·1분 구분을 모든 Service에 동일하게 적용하지 않습니다.</p>
-
-<p>EC2 기본 Metric에는 CPU와 Network Traffic이 포함되지만 File System 사용률이나 Memory 사용률은 포함되지 않습니다. OS 내부 값은 CloudWatch Agent 같은 수집기를 설치해 Custom Metric으로 보내야 합니다. EBS Volume의 I/O는 <code class="language-plaintext highlighter-rouge">AWS/EBS</code> Namespace에서 확인합니다.</p>
-
-<p>현재 EC2 Instance에 Detailed Monitoring이 적용됐는지 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws ec2 describe-instances <span class="se">\</span>
-  <span class="nt">--instance-ids</span> &lt;EC2_INSTANCE_ID&gt; <span class="se">\</span>
-  <span class="nt">--query</span> <span class="s1">'Reservations[0].Instances[0].Monitoring.State'</span> <span class="se">\</span>
-  <span class="nt">--output</span> text
-</code></pre></div></div>
-
-<p>1분 주기 CPU Alarm을 검증할 때 Detailed Monitoring을 활성화합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws ec2 monitor-instances <span class="se">\</span>
-  <span class="nt">--instance-ids</span> &lt;EC2_INSTANCE_ID&gt;
-</code></pre></div></div>
-
-<p>실습 후 필요하지 않으면 추가 비용을 막기 위해 해제합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws ec2 unmonitor-instances <span class="se">\</span>
-  <span class="nt">--instance-ids</span> &lt;EC2_INSTANCE_ID&gt;
-</code></pre></div></div>
-
-<h2 id="4-cloudwatch-logs">4. CloudWatch Logs</h2>
-
-<hr />
-
-<p>CloudWatch Logs는 다음 계층으로 데이터를 관리합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Log Group
-└── Log Stream
-    └── Log Event
-</code></pre></div></div>
-
-<table>
-  <thead>
-    <tr>
-      <th>계층</th>
-      <th>역할</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Log Group</td>
-      <td>같은 Retention과 접근 정책을 적용할 Log 묶음</td>
-    </tr>
-    <tr>
-      <td>Log Stream</td>
-      <td>하나의 Instance, Container 또는 Process가 보내는 Log 흐름</td>
-    </tr>
-    <tr>
-      <td>Log Event</td>
-      <td>Timestamp와 Message로 구성된 개별 기록</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Log Group에는 Retention을 설정합니다. 기간을 지정하지 않으면 Log가 계속 보관돼 Storage 비용이 증가할 수 있습니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws logs put-retention-policy <span class="se">\</span>
-  <span class="nt">--log-group-name</span> /example/application <span class="se">\</span>
-  <span class="nt">--retention-in-days</span> 30
-</code></pre></div></div>
-
-<p>CloudWatch Logs Insights에서는 필요한 Field를 선택하고 조건을 적용해 Log를 조회합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>fields @timestamp, @message, @logStream
-| filter @message like /ERROR/
-| sort @timestamp desc
-| limit 50
-</code></pre></div></div>
-
-<p>Log Group의 일정 기간을 S3로 Export할 수 있습니다. 지속적인 Archive가 필요하면 반복 Export Task보다 Subscription을 이용해 전달하는 구성을 검토합니다.</p>
-
-<h2 id="5-dashboard">5. Dashboard</h2>
-
-<hr />
-
-<p>Dashboard는 여러 Metric과 Log Query를 한 화면에 배치합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Operations Dashboard
-├── EC2 CPUUtilization
-├── EC2 NetworkIn·NetworkOut
-├── EBS Read·Write Operations
-├── Alarm Status
-└── Application ERROR Log Query
-</code></pre></div></div>
-
-<p>Widget마다 Region, Namespace, Dimension과 Period를 확인합니다. 서로 다른 Period와 Statistic을 한 Graph에 섞으면 값의 의미를 잘못 해석할 수 있습니다.</p>
-
-<p>자동 Dashboard는 Service Resource를 빠르게 확인할 때 사용합니다. 운영 Dashboard에는 Service Level과 장애 판단에 필요한 Metric만 배치합니다.</p>
-
-<h2 id="6-alarm-상태">6. Alarm 상태</h2>
-
-<hr />
-
-<p>CloudWatch Alarm은 세 상태 중 하나입니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>상태</th>
-      <th>의미</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">OK</code></td>
-      <td>평가한 Data Point가 Alarm 조건을 충족하지 않습니다.</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">ALARM</code></td>
-      <td>설정한 수의 Data Point가 임계 조건을 충족합니다.</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">INSUFFICIENT_DATA</code></td>
-      <td>생성 직후이거나 평가할 Data Point가 부족합니다.</td>
-    </tr>
-  </tbody>
-</table>
-
-<p><code class="language-plaintext highlighter-rouge">INSUFFICIENT_DATA</code>는 항상 장애를 뜻하지 않습니다. Metric 발행 주기, Dimension, Period와 Missing Data 처리 방식을 확인해야 합니다.</p>
-
-<p>Alarm은 상태가 바뀔 때 SNS 알림, EC2 Action이나 Auto Scaling Action을 실행할 수 있습니다. Alarm 자체가 원인을 분석하거나 Instance 성능을 임의로 낮추지는 않습니다.</p>
-
-<h2 id="7-실습-resource-준비">7. 실습 Resource 준비</h2>
-
-<hr />
-
-<p>다음 Resource를 준비합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Resource</th>
-      <th>예제</th>
-      <th>목적</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>EC2 Instance</td>
-      <td>Ubuntu, <code class="language-plaintext highlighter-rouge">&lt;EC2_INSTANCE_ID&gt;</code></td>
-      <td>CPU 부하 발생 대상</td>
-    </tr>
-    <tr>
-      <td>SNS Topic</td>
-      <td><code class="language-plaintext highlighter-rouge">ec2-cpu-alarm-topic</code></td>
-      <td>Alarm 상태 변경 전달</td>
-    </tr>
-    <tr>
-      <td>Email Endpoint</td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;ALERT_EMAIL&gt;</code></td>
-      <td>알림 수신과 구독 확인</td>
-    </tr>
-    <tr>
-      <td>CloudWatch Alarm</td>
-      <td><code class="language-plaintext highlighter-rouge">ec2-high-cpu</code></td>
-      <td>CPU 임계값 평가</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>EC2 접속은 Session Manager를 우선 사용합니다. SSH가 필요한 환경에서는 Security Group의 Port 22를 관리 Client IP로 제한하고 Private Key를 Repository에 저장하지 않습니다.</p>
-
-<h2 id="8-sns-topic과-email-구독">8. SNS Topic과 Email 구독</h2>
-
-<hr />
-
-<p>SNS Topic을 생성합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws sns create-topic <span class="se">\</span>
-  <span class="nt">--name</span> ec2-cpu-alarm-topic
-</code></pre></div></div>
-
-<p>출력된 Topic ARN은 다음 형식입니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>arn:aws:sns:&lt;AWS_REGION&gt;:&lt;AWS_ACCOUNT_ID&gt;:ec2-cpu-alarm-topic
-</code></pre></div></div>
-
-<p>Email 구독을 만듭니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws sns subscribe <span class="se">\</span>
-  <span class="nt">--topic-arn</span> &lt;SNS_TOPIC_ARN&gt; <span class="se">\</span>
-  <span class="nt">--protocol</span> email <span class="se">\</span>
-  <span class="nt">--notification-endpoint</span> <span class="s1">'&lt;ALERT_EMAIL&gt;'</span>
-</code></pre></div></div>
-
-<p>AWS가 보낸 Subscription Confirmation Email에서 Confirm Link를 눌러야 알림을 받을 수 있습니다. 상태를 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws sns list-subscriptions-by-topic <span class="se">\</span>
-  <span class="nt">--topic-arn</span> &lt;SNS_TOPIC_ARN&gt;
-</code></pre></div></div>
-
-<p><code class="language-plaintext highlighter-rouge">SubscriptionArn</code>이 <code class="language-plaintext highlighter-rouge">PendingConfirmation</code>이면 아직 확인되지 않은 상태입니다.</p>
-
-<h2 id="9-ec2-cpu-alarm-생성">9. EC2 CPU Alarm 생성</h2>
-
-<hr />
-
-<p>평균 CPU 사용률이 2분 연속 70%를 초과하면 <code class="language-plaintext highlighter-rouge">ALARM</code>이 되도록 설정합니다. 이 예제는 Detailed Monitoring이 활성화된 EC2 Instance를 전제로 합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws cloudwatch put-metric-alarm <span class="se">\</span>
-  <span class="nt">--alarm-name</span> ec2-high-cpu <span class="se">\</span>
-  <span class="nt">--alarm-description</span> <span class="s1">'Average CPU exceeds 70 percent for two minutes'</span> <span class="se">\</span>
-  <span class="nt">--namespace</span> AWS/EC2 <span class="se">\</span>
-  <span class="nt">--metric-name</span> CPUUtilization <span class="se">\</span>
-  <span class="nt">--dimensions</span> <span class="nv">Name</span><span class="o">=</span>InstanceId,Value<span class="o">=</span>&lt;EC2_INSTANCE_ID&gt; <span class="se">\</span>
-  <span class="nt">--statistic</span> Average <span class="se">\</span>
-  <span class="nt">--period</span> 60 <span class="se">\</span>
-  <span class="nt">--evaluation-periods</span> 2 <span class="se">\</span>
-  <span class="nt">--datapoints-to-alarm</span> 2 <span class="se">\</span>
-  <span class="nt">--threshold</span> 70 <span class="se">\</span>
-  <span class="nt">--comparison-operator</span> GreaterThanThreshold <span class="se">\</span>
-  <span class="nt">--treat-missing-data</span> missing <span class="se">\</span>
-  <span class="nt">--alarm-actions</span> &lt;SNS_TOPIC_ARN&gt; <span class="se">\</span>
-  <span class="nt">--ok-actions</span> &lt;SNS_TOPIC_ARN&gt;
-</code></pre></div></div>
-
-<table>
-  <thead>
-    <tr>
-      <th>Option</th>
-      <th>역할</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">--period 60</code></td>
-      <td>60초 단위로 Metric을 집계합니다.</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">--evaluation-periods 2</code></td>
-      <td>최근 두 구간을 평가합니다.</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">--datapoints-to-alarm 2</code></td>
-      <td>두 Data Point가 모두 조건을 충족해야 Alarm이 됩니다.</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">--treat-missing-data missing</code></td>
-      <td>누락 값을 정상이나 장애로 임의 변환하지 않습니다.</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">--alarm-actions</code></td>
-      <td><code class="language-plaintext highlighter-rouge">ALARM</code> 전환 시 SNS Topic으로 알립니다.</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">--ok-actions</code></td>
-      <td>정상 복구 시에도 SNS Topic으로 알립니다.</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>생성한 설정과 현재 상태를 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws cloudwatch describe-alarms <span class="se">\</span>
-  <span class="nt">--alarm-names</span> ec2-high-cpu <span class="se">\</span>
-  <span class="nt">--query</span> <span class="s1">'MetricAlarms[0].{state:StateValue,reason:StateReason,period:Period,evaluationPeriods:EvaluationPeriods,threshold:Threshold}'</span>
-</code></pre></div></div>
-
-<h2 id="10-cpu-부하-발생과-검증">10. CPU 부하 발생과 검증</h2>
-
-<hr />
-
-<p>Ubuntu EC2에 접속한 뒤 CPU 수를 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [EC2]</span>
-<span class="nb">nproc</span>
-</code></pre></div></div>
-
-<p><code class="language-plaintext highlighter-rouge">stress</code> Package를 설치합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [EC2]</span>
-<span class="nb">sudo </span>apt-get update
-<span class="nb">sudo </span>apt-get <span class="nb">install</span> <span class="nt">-y</span> stress
-</code></pre></div></div>
-
-<p>두 CPU Worker에 5분 동안 부하를 발생시킵니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [EC2]</span>
-stress <span class="nt">--cpu</span> 2 <span class="nt">--timeout</span> 300
-</code></pre></div></div>
-
-<p>다음 순서로 결과를 확인합니다.</p>
-
-<ol>
-  <li>
-    <p>CloudWatch의 EC2 <code class="language-plaintext highlighter-rouge">CPUUtilization</code> Graph가 상승하는지 확인합니다.</p>
-  </li>
-  <li>
-    <p>Alarm 상태가 <code class="language-plaintext highlighter-rouge">INSUFFICIENT_DATA</code> 또는 <code class="language-plaintext highlighter-rouge">OK</code>에서 <code class="language-plaintext highlighter-rouge">ALARM</code>으로 바뀌는지 확인합니다.</p>
-  </li>
-  <li>
-    <p>SNS Email이 도착했는지 확인합니다.</p>
-  </li>
-  <li>
-    <p>부하 종료 후 Alarm이 <code class="language-plaintext highlighter-rouge">OK</code>로 돌아오고 복구 Email이 오는지 확인합니다.</p>
-  </li>
-</ol>
-
-<p>Metric 수집, Alarm 평가와 SNS 전달에는 시간이 걸립니다. <code class="language-plaintext highlighter-rouge">stress</code> 실행 직후 상태가 바뀌지 않았다고 설정 실패로 단정하지 않습니다.</p>
-
-<h2 id="11-network와-ebs-metric-확인">11. Network와 EBS Metric 확인</h2>
-
-<hr />
-
-<p>File 전송으로 Network와 EBS I/O 변화를 확인할 수 있습니다. SSH가 허용된 실습 환경에서 다음 Placeholder를 실제 경로와 Host로 교체합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-scp <span class="se">\</span>
-  <span class="nt">-i</span> &lt;PRIVATE_KEY_PATH&gt; <span class="se">\</span>
-  &lt;LOCAL_LARGE_FILE&gt; <span class="se">\</span>
-  &lt;EC2_USER&gt;@&lt;EC2_PUBLIC_DNS&gt;:/tmp/
-</code></pre></div></div>
-
-<p>전송 전후에 다음 Metric을 확인합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Namespace</th>
-      <th>Metric</th>
-      <th>의미</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">AWS/EC2</code></td>
-      <td><code class="language-plaintext highlighter-rouge">NetworkIn</code>, <code class="language-plaintext highlighter-rouge">NetworkOut</code></td>
-      <td>Instance Network Byte</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">AWS/EBS</code></td>
-      <td><code class="language-plaintext highlighter-rouge">VolumeReadOps</code>, <code class="language-plaintext highlighter-rouge">VolumeWriteOps</code></td>
-      <td>EBS I/O Operation 수</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">AWS/EBS</code></td>
-      <td><code class="language-plaintext highlighter-rouge">VolumeReadBytes</code>, <code class="language-plaintext highlighter-rouge">VolumeWriteBytes</code></td>
-      <td>EBS 전송 Byte</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>File System의 남은 용량은 기본 EC2 Metric이 아닙니다. EC2 내부에서 <code class="language-plaintext highlighter-rouge">df -h</code>로 확인하거나 CloudWatch Agent로 <code class="language-plaintext highlighter-rouge">disk_used_percent</code> Custom Metric을 발행합니다.</p>
-
-<h2 id="12-eventbridge와-schedule">12. EventBridge와 Schedule</h2>
-
-<hr />
-
-<p>AWS Resource Event나 일정에 반응하는 Rule은 EventBridge에서 생성합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>AWS Service Event 또는 Schedule
-  ↓ EventBridge Rule
-Target
-  ├── Lambda
-  ├── SNS
-  ├── SQS
-  └── Step Functions
-</code></pre></div></div>
-
-<p>Event Pattern은 Source, Detail Type과 세부 조건으로 필요한 Event만 선택합니다. Schedule은 Cron 또는 Rate 표현식으로 실행 시점을 정의합니다. CloudWatch Alarm의 Metric 평가와 EventBridge Rule의 Event Routing은 목적이 다릅니다.</p>
-
-<h2 id="13-resource-정리">13. Resource 정리</h2>
-
-<hr />
-
-<p>실습이 끝나면 Alarm, Subscription과 Topic을 정리합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [OPERATOR]</span>
-aws cloudwatch delete-alarms <span class="se">\</span>
-  <span class="nt">--alarm-names</span> ec2-high-cpu
-
-aws sns unsubscribe <span class="se">\</span>
-  <span class="nt">--subscription-arn</span> &lt;SNS_SUBSCRIPTION_ARN&gt;
-
-aws sns delete-topic <span class="se">\</span>
-  <span class="nt">--topic-arn</span> &lt;SNS_TOPIC_ARN&gt;
-</code></pre></div></div>
-
-<p>Detailed Monitoring을 유지하지 않을 경우 해제하고, 실습용 EC2 Instance도 중지 또는 종료합니다. Dashboard, Custom Metric, Log Storage, Alarm과 SNS 전송에는 항목별 비용이 발생할 수 있습니다.</p>
-
-<blockquote>
-  <p><strong>최종 정리</strong></p>
-  <ul>
-    <li>
-      <p>Metric은 수치 시계열이고 Logs는 개별 Text Event입니다.</p>
-    </li>
-    <li>
-      <p>EC2 Basic Monitoring은 5분, Detailed Monitoring은 1분 주기로 Metric을 발행합니다.</p>
-    </li>
-    <li>
-      <p>Memory와 File System 사용률은 기본 EC2 Metric이 아니므로 CloudWatch Agent가 필요합니다.</p>
-    </li>
-    <li>
-      <p>Alarm은 <code class="language-plaintext highlighter-rouge">OK</code>, <code class="language-plaintext highlighter-rouge">ALARM</code>, <code class="language-plaintext highlighter-rouge">INSUFFICIENT_DATA</code> 상태를 가지며 SNS로 상태 변경을 전달할 수 있습니다.</p>
-    </li>
-    <li>
-      <p>CloudWatch Events의 Event Routing 기능은 현재 Amazon EventBridge에서 관리합니다.</p>
-    </li>
-  </ul>
-</blockquote>
-
-<h2 id="참고-자료">참고 자료</h2>
-
-<hr />
-
-<ul>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch-metrics-basic-detailed.html">CloudWatch Basic Monitoring과 Detailed Monitoring</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html">CloudWatch Alarm 상태</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AnalyzingLogData.html">CloudWatch Logs Insights Query</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/S3Export.html">CloudWatch Logs를 S3로 Export</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html">Amazon EventBridge</a></p>
-  </li>
-</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[CloudWatch의 Metric, Logs, Dashboard와 Alarm 상태를 구분하고 EC2 Detailed Monitoring, SNS Email 알림과 CPU 부하 검증 절차를 구성합니다]]></summary></entry></feed>
+</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[On-Premise와 AWS를 연결하는 Hybrid Cloud Pattern을 구분하고 Direct Connect, Site-to-Site VPN, Outposts와 VPC Network의 Traffic 흐름을 정리합니다]]></summary></entry></feed>

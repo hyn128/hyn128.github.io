@@ -4,6 +4,21 @@
       
       
       {
+        "title": "Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동",
+        "url": "/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/",
+        "description": "Actuator와 Micrometer로 Spring Boot Metric을 노출하고 Kubernetes ServiceMonitor를 통해 수집한 뒤 Grafana에서 확인합니다",
+        "thumbnail": null,
+        "tags": ["CloudNative","AutoEverSW","Monitoring"],
+        "series_key": "cloudnative",
+        "series_title": "CloudNative",
+        "date_label": "2026년 10월 13일",
+        "reading_time_label": "9분 읽기",
+        "search": "spring boot micrometer 계측과 prometheus servicemonitor 연동 actuator와 micrometer로 spring boot metric을 노출하고 kubernetes servicemonitor를 통해 수집한 뒤 grafana에서 확인합니다 cloudnative autoeversw monitoring cloudnative"
+      },
+    
+      
+      
+      {
         "title": "kube-prometheus-stack 설치와 Grafana·Prometheus 검증",
         "url": "/cloud-native-66-kube-prometheus-stack-installation/",
         "description": "Helm으로 kube-prometheus-stack을 설치하고 Kubernetes Monitoring Component, Grafana Dashboard, Prometheus Target과 Storage 상태를 검증합니다",
