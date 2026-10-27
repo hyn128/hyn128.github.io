@@ -4,6 +4,21 @@
       
       
       {
+        "title": "노드별 네트워크를 스크립트 하나로 설정하고 장애에 대비하기",
+        "url": "/project-3-orbit-network-auto-config-and-recovery/",
+        "description": "Client Isolation 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정",
+        "thumbnail": null,
+        "tags": ["Project","Orbit","Network","Netplan","Tailscale"],
+        "series_key": "project",
+        "series_title": null,
+        "date_label": "2026년 10월 27일",
+        "reading_time_label": "14분 읽기",
+        "search": "노드별 네트워크를 스크립트 하나로 설정하고 장애에 대비하기 client isolation 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정 project orbit network netplan tailscale"
+      },
+    
+      
+      
+      {
         "title": "Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동",
         "url": "/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/",
         "description": "Actuator와 Micrometer로 Spring Boot Metric을 노출하고 Kubernetes ServiceMonitor를 통해 수집한 뒤 Grafana에서 확인합니다",
