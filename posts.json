@@ -6,14 +6,14 @@
       {
         "title": "노드별 네트워크를 스크립트 하나로 설정하고 장애에 대비하기",
         "url": "/project-3-orbit-network-auto-config-and-recovery/",
-        "description": "Client Isolation 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정",
+        "description": "강의실 와이파이 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정",
         "thumbnail": null,
         "tags": ["Project","Orbit","Network","Netplan","Tailscale"],
         "series_key": "project",
         "series_title": null,
         "date_label": "2026년 10월 27일",
         "reading_time_label": "14분 읽기",
-        "search": "노드별 네트워크를 스크립트 하나로 설정하고 장애에 대비하기 client isolation 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정 project orbit network netplan tailscale"
+        "search": "노드별 네트워크를 스크립트 하나로 설정하고 장애에 대비하기 강의실 와이파이 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정 project orbit network netplan tailscale"
       },
     
       
