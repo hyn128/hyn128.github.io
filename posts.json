@@ -10,10 +10,10 @@
         "thumbnail": null,
         "tags": ["Project","Orbit","Ansible","IaC"],
         "series_key": "project",
-        "series_title": null,
+        "series_title": "Project",
         "date_label": "2026년 10월 28일",
         "reading_time_label": "15분 읽기",
-        "search": "손으로 하던 서버 설정을 ansible 코드로 옮기기 스크립트와 수작업으로 관리하던 노드 5대의 네트워크와 모니터링 vm 구성을 ansible role로 옮기고, 실제 적용과 재실행으로 코드와 서버 상태가 같아지는지 검증한 과정 project orbit ansible iac"
+        "search": "손으로 하던 서버 설정을 ansible 코드로 옮기기 스크립트와 수작업으로 관리하던 노드 5대의 네트워크와 모니터링 vm 구성을 ansible role로 옮기고, 실제 적용과 재실행으로 코드와 서버 상태가 같아지는지 검증한 과정 project orbit ansible iac project"
       },
     
       
@@ -25,10 +25,10 @@
         "thumbnail": null,
         "tags": ["Project","Orbit","Network","Netplan","Tailscale"],
         "series_key": "project",
-        "series_title": null,
+        "series_title": "Project",
         "date_label": "2026년 10월 27일",
         "reading_time_label": "14분 읽기",
-        "search": "노드별 네트워크를 스크립트 하나로 설정하고 장애에 대비하기 강의실 와이파이 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정 project orbit network netplan tailscale"
+        "search": "노드별 네트워크를 스크립트 하나로 설정하고 장애에 대비하기 강의실 와이파이 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정 project orbit network netplan tailscale project"
       },
     
       
@@ -415,10 +415,10 @@
         "thumbnail": null,
         "tags": ["Project","Orbit","Systemd","Systemctl"],
         "series_key": "project",
-        "series_title": null,
+        "series_title": "Project",
         "date_label": "2026년 9월 24일",
         "reading_time_label": "2분 읽기",
-        "search": "systemctl을 이용한 virtual machine 자동 부팅 호스트 서버가 부팅될 때 vm 노드를 시스템 데몬으로 자동 실행하는 방법 project orbit systemd systemctl"
+        "search": "systemctl을 이용한 virtual machine 자동 부팅 호스트 서버가 부팅될 때 vm 노드를 시스템 데몬으로 자동 실행하는 방법 project orbit systemd systemctl project"
       },
     
       
@@ -430,10 +430,10 @@
         "thumbnail": null,
         "tags": ["Project","Orbit","Auditd","Webhook"],
         "series_key": "project",
-        "series_title": null,
+        "series_title": "Project",
         "date_label": "2026년 9월 24일",
         "reading_time_label": "9분 읽기",
-        "search": "ubuntu에서 계정별 명령 로그를 slack webhook으로 기록하기 develop 서버와 production서버에서 sudo와 사용자별 로그를 slack으로 기록하고 열람 가능하도록 하도록 구축하는 방법 project orbit auditd webhook"
+        "search": "ubuntu에서 계정별 명령 로그를 slack webhook으로 기록하기 develop 서버와 production서버에서 sudo와 사용자별 로그를 slack으로 기록하고 열람 가능하도록 하도록 구축하는 방법 project orbit auditd webhook project"
       },
     
       
