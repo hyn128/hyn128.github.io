@@ -26,6 +26,10 @@ TechNotes:
   title: TechNotes
   description: 학습 과정에서 생긴 궁금증과 기술 개념, 경험을 정리하는 기술 노트
 
+Project:
+  title: Project
+  description: 프로젝트를 진행하며 내린 설계 판단과 구현, 문제 해결 과정
+
 Cloud:
   title: Cloud
   description: 클라우드 컴퓨팅의 기본 개념부터 가상화, 서비스 모델과 인프라 구조
