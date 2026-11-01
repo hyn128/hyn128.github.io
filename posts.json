@@ -4,6 +4,21 @@
       
       
       {
+        "title": "ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지",
+        "url": "/project-5-orbit-phase2-week1-presentation/",
+        "description": "지난 Phase 1의 피드백과 회고를 바탕으로 프로젝트 범위를 다시 잡고, k3s와 Vault 중심으로 바꾼 설계와 첫 주의 구축 결과, 그 과정에서 겪은 장애 대응을 발표 슬라이드 순서대로 정리합니다.",
+        "thumbnail": null,
+        "tags": ["Project","Orbit","Presentation"],
+        "series_key": "project",
+        "series_title": "Project",
+        "date_label": "2026년 11월 1일",
+        "reading_time_label": "7분 읽기",
+        "search": "orbit 프로젝트 1차 발표, 회고에서 설계와 구축까지 지난 phase 1의 피드백과 회고를 바탕으로 프로젝트 범위를 다시 잡고, k3s와 vault 중심으로 바꾼 설계와 첫 주의 구축 결과, 그 과정에서 겪은 장애 대응을 발표 슬라이드 순서대로 정리합니다. project orbit presentation project"
+      },
+    
+      
+      
+      {
         "title": "손으로 하던 서버 설정을 Ansible 코드로 옮기기",
         "url": "/project-4-orbit-ansible-infrastructure-as-code/",
         "description": "스크립트와 수작업으로 관리하던 노드 5대의 네트워크와 모니터링 VM 구성을 Ansible role로 옮기고, 실제 적용과 재실행으로 코드와 서버 상태가 같아지는지 검증한 과정",

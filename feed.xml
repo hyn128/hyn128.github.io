@@ -1,4 +1,201 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-10-31T18:41:21+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">손으로 하던 서버 설정을 Ansible 코드로 옮기기</title><link href="https://hyn128.site/project-4-orbit-ansible-infrastructure-as-code/" rel="alternate" type="text/html" title="손으로 하던 서버 설정을 Ansible 코드로 옮기기" /><published>2026-10-28T00:00:00+09:00</published><updated>2026-10-28T00:00:00+09:00</updated><id>https://hyn128.site/project-4-orbit-ansible-infrastructure-as-code</id><content type="html" xml:base="https://hyn128.site/project-4-orbit-ansible-infrastructure-as-code/"><![CDATA[<h2 id="1-아이디어">1. 아이디어</h2>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-11-01T16:58:14+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지</title><link href="https://hyn128.site/project-5-orbit-phase2-week1-presentation/" rel="alternate" type="text/html" title="ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지" /><published>2026-11-01T00:00:00+09:00</published><updated>2026-11-01T00:00:00+09:00</updated><id>https://hyn128.site/project-5-orbit-phase2-week1-presentation</id><content type="html" xml:base="https://hyn128.site/project-5-orbit-phase2-week1-presentation/"><![CDATA[<blockquote>
+  <p>Phase 1 발표가 끝난 뒤 받은 피드백과 팀 회고를 바탕으로 프로젝트의 범위와 초점을 다시 잡았고, 바뀐 설계로 인프라를 구축한 첫 주의 결과를 발표했습니다. 발표는 회고와 개선, 설계, 진행 상황, 트러블슈팅, 향후 계획의 다섯 부분으로 구성했고, 이 글은 그 슬라이드와 대본을 순서대로 옮긴 기록입니다.</p>
+</blockquote>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/01.webp" alt="" /></p>
+
+<p>글에서 사용하는 호스트 이름과 역할은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>호스트 이름</th>
+      <th>기기</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>polaris</td>
+      <td>ODROID-M1S (SBC)</td>
+      <td>k3s Control Plane</td>
+    </tr>
+    <tr>
+      <td>astra</td>
+      <td>데스크탑</td>
+      <td>게이트웨이(NAT), 모니터링 VM 호스트, Vault, 클러스터 밖</td>
+    </tr>
+    <tr>
+      <td>sol, terra, luna</td>
+      <td>갤럭시북</td>
+      <td>k3s Worker</td>
+    </tr>
+    <tr>
+      <td>efk, lgtm, wazuh</td>
+      <td>astra 안의 VM</td>
+      <td>모니터링 스택</td>
+    </tr>
+    <tr>
+      <td>io</td>
+      <td>홈서버</td>
+      <td>부하 발생기, 클러스터 밖</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="1-회고-및-개선">1. 회고 및 개선</h2>
+
+<h3 id="1-피드백">1) 피드백</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/02.webp" alt="" /></p>
+
+<p>OTA 도메인은 저희 팀을 포함해 세 팀이 진행했고 방향은 모두 달랐지만, 공통으로 받은 피드백은 세 가지였습니다.</p>
+
+<p>첫째로 OTA는 차량이 전 세계에 흩어져 있다는 특성상 CDN의 물리적 거리를 고려해야 한다는 점이었고, 이는 Edge와 차량에 위치 정보를 주입하는 방향으로 이어집니다.</p>
+
+<p>둘째로 다운로드 중 네트워크가 끊겼을 때 이어 받는 문제였는데, 뒤에서 확정한 범위에 따라 차량 쪽이 아니라 인프라 쪽에서 네트워크 복구를 자동화하는 문제로 받아들였습니다.</p>
+
+<p>셋째로 보안과 네트워크 단절을 설계에 포함하라는 점이었고, 이는 네트워크 장애 대응 시나리오와 검증, 그리고 침입 탐지와 대응, 감사, 시크릿 관리 같은 보안 강화로 이어집니다.</p>
+
+<h3 id="2-회고">2) 회고</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/03.webp" alt="" /></p>
+
+<p>지난 프로젝트에서는 캠페인 서버와 CDN 두 곳을 가장 중요하게 보고 CDN Origin의 부하 분산을 확인하는 테스트를 진행했는데, 실제 차량 에이전트가 아닌 k6로 부하를 만들다 보니 HTTP keep-alive라는 k6의 특성 때문에 예상과 다른 결과를 얻었습니다. 이로인해 테스트 도구의 한계가 결과를 바꿀 수 있다는 것을 체감했습니다.</p>
+
+<p>또한 팀원 사이에 작업 내용과 현황, 각자 맡은 기술에 대한 지식 공유가 거의 없었기 때문에, 코드 리뷰나 작업 검증, 계획 수립이 어려웠습니다.</p>
+
+<p>범위에 대해서도 돌아봤습니다. OTA라는 도메인은 인프라뿐 아니라 차량의 ECU와 TCU, 네트워크, OTA 매니저 같은 액터가 모두 엮여 있는데, OTA 전체를 구현하려는 목표를 가지고 있었고 지난번에 못 한 것을 이번에 구현하자는 고도화 방향으로 가고 있었습니다.</p>
+
+<p>마지막으로 서버 접근 방식입니다. 모든 작업자가 orbit이라는 공용 계정으로 서버에 접근했기 때문에 누가 무엇을 했는지 추적하기 어려웠고, AI를 활용해 작업하면서 작업자 본인도 모든 내용을 알지 못하는 상황이 생기면서 작업에 대한 책임이 비어 있다고 느꼈습니다.</p>
+
+<h3 id="3-개선-방향과-목표">3) 개선 방향과 목표</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/04.webp" alt="" /></p>
+
+<p>따라서 먼저 프로젝트의 범위를 다시 잡았습니다. OTA 자체를 구현하는 프로젝트가 아니라, OTA를 트래픽이 있는 서비스 시나리오로 삼아 클라우드 인프라의 설계와 운영 능력을 보여주는 프로젝트로 방향을 정했습니다. 즉 OTA는 도메인이고 클라우드 인프라가 본체입니다.</p>
+
+<p>그렇다면 답해야 할 질문도 “OTA 서버를 어떻게 만들었는가”가 아니라, “주어진 물리 자원으로 클라우드 네이티브 환경을 어떻게 설계하고, 트래픽 변화에 어떻게 대응하며, 장애와 성능을 어떻게 관리했는가”가 됩니다. 궁극적으로는 주어진 자원을 최대한 효율적으로 사용하는 것을 추구합니다.</p>
+
+<p>이에 따라 OTA는 시나리오로 활용하고, 모니터링과 성능 측정, 지표 분석, 성능 개선을 포함하는 관측성과, 개발 과정에서 생길 수 있는 내부와 외부의 보안 요소, 감사, 보안 대응을 챙기기로 했습니다. 뒤에 나오는 Vault와 Wazuh가 여기서 나온 선택입니다.</p>
+
+<h2 id="2-설계">2. 설계</h2>
+
+<h3 id="1-기술-스택">1) 기술 스택</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/05.webp" alt="" /></p>
+
+<p>기술 스택은 지난 프로젝트와 같은 부분은 생략하고 바뀐 것만 적습니다.</p>
+
+<p>먼저 Kubernetes는 kubeadm에서 k3s로 바꿨습니다. 지난 프로젝트에서는 한 호스트 위에 VM을 여러 대 띄워 클러스터를 만들었는데, VM마다 OS가 올라가기 때문에 그만큼 자원이 빠져나갔습니다.</p>
+
+<p>이번에는 주어진 자원을 최대한 쓰고 싶었기 때문에 VM 없이 물리 호스트를 그대로 노드로 쓰기로 했고, 이를 위해 x86 기기는 전부 워커로 써야 한다는 자체 조건을 설정해 control plane 역할에 맞는 저전력 SBC를 들여왔습니다.</p>
+
+<p>다만 이 보드는 ARM에 8GB 메모리라 kubeadm control plane을 올리기에는 부담이 있었고, etcd를 안정적으로 돌리기에도 맞지 않는 하드웨어였기 때문에, etcd 대신 SQLite를 기본 저장소로 쓰는 더 가벼운 k3s를 선택했습니다.</p>
+
+<p>CNI는 Flannel 대신 Cilium을 선택했습니다. Hubble로 파드 사이 트래픽을 눈으로 볼 수 있어서 관측성이라는 목표와 맞고, Flannel에는 없는 NetworkPolicy를 지원하기 때문입니다. polaris에 붙은 LCD에는 Hubble의 트래픽 화면을 띄울 계획입니다.</p>
+
+<p>다음으로 HashiCorp Vault를 추가했습니다. 회고에서 적은 시크릿 관리와 서버 접근 책임 문제에 대응하기 위한 선택입니다.</p>
+
+<p>모니터링은 목적에 따라 세 스택으로 분리했습니다. 로그는 EFK, 메트릭은 Prometheus와 Grafana, 보안 이벤트는 Wazuh가 맡습니다.</p>
+
+<h3 id="2-인프라-구성">2) 인프라 구성</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/06.webp" alt="" /></p>
+
+<p>물리 호스트는 총 여섯 대를 사용합니다. 사양이 완전히 같은 갤럭시북 세 대를 sol, terra, luna라는 이름으로 워커 노드로 사용하고, 싱글보드 컴퓨터인 polaris가 control plane입니다.</p>
+
+<p>데스크탑인 astra는 클러스터 밖에 두고 게이트웨이와 모니터링 호스트로 사용합니다. 모니터링 스택 세 개를 한 호스트에 두려면 최소 권장 메모리가 약 30GB인데, 32GB 노트북으로는 여유가 없고 62GB인 astra만 감당할 수 있었기 때문입니다. astra 안에는 efk, grafana와 prometheus, wazuh 세 개의 VM을 두고 스택을 하나씩 올립니다.</p>
+
+<p>모니터링 저장과 화면을 클러스터 밖에 두는 것은 지난 프로젝트와 같은 원칙입니다. 클러스터 안에 두면 측정 대상의 자원을 같이 먹어서 값이 오염되고 클러스터 장애 때 같이 죽기 때문에, 클러스터 안에는 수집기만 두고 저장과 시각화는 밖에 격리합니다.</p>
+
+<p>마지막으로 홈서버인 io는 부하 발생기로 사용합니다. 지난번 k6의 한계를 겪었기 때문에, 이번 프로젝트에서는 차량 에이전트를 사용하려 합니다.</p>
+
+<h3 id="3-실제-구성">3) 실제 구성</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/07.webp" alt="" /></p>
+
+<p>위 구성도를 실제로 구현한 모습입니다. 노트북 세 대와 control plane 보드, 데스크탑 한 대를 직접 쌓아 올리고 유선으로 묶어서, 이 장비들 위에 Kubernetes 클러스터와 모니터링 환경을 올렸습니다.</p>
+
+<h3 id="4-네트워크-설계">4) 네트워크 설계</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/08.webp" alt="" /></p>
+
+<p>모든 호스트는 강의실 와이파이에 붙을 수 있는 무선 NIC를 가지고 있지만, 와이파이는 예약된 IP가 부족했고 호스트 사이 통신도 안정적이지 않았기 때문에, 스위치로 모든 호스트를 유선으로 묶어 내부망을 따로 만들었습니다.</p>
+
+<p>이 내부망에서 astra가 게이트웨이 역할을 합니다. astra의 유선 포트를 브리지로 만들고 NAT를 설정해서, 워커 세 대와 VM 세 대가 astra의 와이파이를 통해 인터넷으로 나갑니다. VM은 astra의 브리지에 직접 붙어 내부망 IP를 받기 때문에, 노드의 수집기가 VM으로 바로 데이터를 보낼 수 있습니다.</p>
+
+<p>control plane인 polaris만 예외로 자기 와이파이를 평소 인터넷 경로로 씁니다. 이렇게 한 이유는 뒤의 트러블슈팅에서 이어집니다.</p>
+
+<h2 id="3-진행-상황">3. 진행 상황</h2>
+
+<h3 id="1-인프라와-네트워크-구축">1) 인프라와 네트워크 구축</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/09.webp" alt="" /></p>
+
+<p>먼저 각 호스트에 OS를 설치하고, 앞서 적은 네트워크 구성을 적용했습니다. 처음에는 스크립트로 노드마다 직접 적용했지만, 같은 작업을 여러 대에 반복하고 설정이 바뀔 때마다 다시 적용해야 했기 때문에 Ansible로 전환했습니다.</p>
+
+<p>네트워크, 호스트 공통 설정, VM 생성, 클러스터까지 네 개의 플레이북으로 나눠 작성했고, 모든 플레이북이 두 번째 실행에서 변경 없음으로 끝나는 것까지 확인했습니다.</p>
+
+<p>이어서 astra 안에 모니터링 VM 세 대를 만들고, 접속과 인터넷 연결을 확인했습니다. k3s 클러스터는 polaris와 워커 세 대 모두 Ready 상태이고, Cilium이 모든 노드에서 동작하는 것을 확인할 수 있었습니다.</p>
+
+<h3 id="2-vault-구축">2) Vault 구축</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/10.webp" alt="" /></p>
+
+<p>다음으로 HashiCorp Vault 구축을 시작했습니다. 보통 Vault는 서비스가 올라간 뒤에 붙이는 경우가 많지만, 인프라를 구축하는 초기에 두기로 했습니다. 회고에서 적은 것처럼 공용 계정으로 서버에 접근하면서 누가 무엇을 했는지 추적하지 못했던 문제를, 이번에는 구축 단계부터 막고 싶었기 때문입니다.</p>
+
+<p>구체적으로는 Vault의 SSH CA를 사용합니다. 이 방식은 팀원마다 짧은 TTL을 가진 SSH 인증서를 발급받아 서버에 접근하도록 합니다. 그렇게 되면 서버에 공개키를 하나씩 등록하지 않아도 되고 접근 기록이 Vault에 남기 때문에, 누가 언제 어느 서버에 들어갔는지 확인할 수 있습니다.</p>
+
+<p>그 외에 데이터베이스 접속 정보나 S3 자격 증명 같은 시크릿도 Vault에서 관리하도록 할 계획입니다.</p>
+
+<h2 id="4-트러블슈팅">4. 트러블슈팅</h2>
+
+<h3 id="1-gateway-장애-대응">1) Gateway 장애 대응</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/11.webp" alt="" /></p>
+
+<p>네트워크 구성 직후 astra가 꺼지는 일이 있었는데, 워커 세 대가 astra를 통해서만 인터넷에 나가는 구조였기 때문에, 집에서 astra뿐 아니라 나머지 호스트에도 접근할 수 없었습니다. 이로인해 게이트웨이 한 대에 모든 접근이 묶여 있다는 것을 체감했습니다.</p>
+
+<p>따라서 두 가지를 적용했습니다. 먼저 워커마다 astra를 감시하는 서비스를 제작했습니다. 10초마다 astra를 거쳐야만 닿는 주소로 ping을 보내고, 세 번 연속 실패하면 자기 와이파이로 인터넷 경로를 바꿉니다. 그 후 감시를 지속하다 astra가 돌아오면 다시 원래 경로로 복귀합니다.</p>
+
+<p>전환할 때마다 로그를 남기도록 했고, 실제로 작업 중 네트워크 장애가 생기자 자동 전환과 복귀가 동작하는 것을 로그로 확인할 수 있었습니다.</p>
+
+<p>control plane인 polaris는 처음부터 자기 와이파이를 평소 경로로 사용하도록 수정했습니다. polaris는 스위치를 통해 모든 노드와 유선으로 연결되어 있기 때문에, astra가 죽었을 때 polaris에 접근하여 유선으로 나머지 노드에 닿을 수 있고 복구 경로가 된다고 판단했습니다.</p>
+
+<h3 id="2-호스트-장애-대응">2) 호스트 장애 대응</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/12.webp" alt="" /></p>
+
+<p>두 번째는 호스트 자체가 꺼지는 장애입니다. 스위치로 모든 호스트가 연결되어 있기 때문에 각 랜 포트로 매직 패킷을 보내면 꺼진 호스트를 원격으로 켤 수 있고, 이를 이용하면 호스트끼리 서로 감시하다가 꺼진 쪽을 깨우는 방식으로 자동 복구가 가능하다고 생각했습니다.</p>
+
+<p>그래서 Wake-on-LAN을 여러 방법으로 시도했습니다. 랜카드 자체는 매직 패킷을 지원했지만, 노트북과 데스크탑이 모두 삼성 완제품이라 BIOS 단에서 완전히 지원하지 않았고, 꺼진 상태에서 보드가 랜 포트 전원을 끊는 것으로 보여 결국 켜지진 않았습니다.</p>
+
+<p>따라서 하드웨어 한계로 판단하고 Wake-on-LAN은 사용하지 않기로 했습니다. 대신 정전처럼 호스트가 통째로 내려가는 경우를 위해 BIOS의 정전 후 자동 켜기와, OS가 멈췄을 때를 위한 워치독을 알아보고 있습니다.</p>
+
+<h3 id="3-보안-이슈-대응">3) 보안 이슈 대응</h3>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/13.webp" alt="" /></p>
+
+<p>세 번째는 보안 이슈입니다. 지난 프로젝트부터 강의실의 client isolation 환경을 극복하기 위해 호스트에 접근하는 방법으로 tailscale VPN을 사용하고 있었습니다. 이 VPN은 모든 팀원 기기와 서버에 설치되어 있었고, 로그인만으로 TailNet이라는 가상 망 안의 모든 호스트에 쉽게 접속할 수 있었습니다.</p>
+
+<p>다만 tailscale이 tailnet에 속한 호스트에 너무 쉽게 길을 열어 준다고 느꼈기 때문에, 이번 프로젝트에서는 복구용 루트 정도로만 두고 의존도를 낮추려던 참이었습니다.</p>
+
+<p>그런 상황에서 10월 25일 Tailworm이라는 취약점이 공개됐습니다. 이는 인증된 SSH 세션이 허용된 권한을 넘어 다른 서버로 전파될 수 있고, SSH 세션으로 메모리를 고갈시켜 네트워크 전체를 끊을 수 있는 등, 모든 서버에 설치된 환경에서는 영향이 큰 내용이었습니다.</p>
+
+<p>물론 해당 취약점이 발현되는 조건은 아니었지만, 보안 문제를 인식하고 있던 와중에 취약점이 공개되면서 위험성이 더 크게 체감되었습니다. 따라서 27일 패치 버전이 나오자마자 모든 팀원에게 즉시 업데이트를 요청했고, 서버도 즉시 버전 업데이트를 진행했습니다.</p>
+
+<p>이를 통해 보안 이슈를 빠르게 인지하고 즉각적으로 대응하는 것도 운영의 일부라고 느꼈습니다.</p>
+
+<h2 id="5-향후-계획">5. 향후 계획</h2>
+
+<p><img src="../../assets/post/2026-11-01-project-5-orbit-phase2-week1-presentation/14.webp" alt="" /></p>
+
+<p>먼저 Vault 구축을 마무리하고, Vault 자체가 죽었을 때 어떻게 대응할지 기준과 가이드를 마련할 예정입니다. astra는 게이트웨이와 모니터링, Vault를 모두 맡고 있어서 장애 영향이 크기 때문에, Vault 데이터는 S3에 스냅샷으로 백업하도록 할 계획입니다.</p>
+
+<p>다음으로 모니터링 스택을 각 VM에 구축해서, 인프라 초반부터 개발 과정에서 생기는 문제를 모니터링할 수 있게 할 예정입니다. 지난번처럼 서비스가 올라간 뒤에 모니터링을 붙이는 것이 아니라, 구축 과정 자체를 관측 대상으로 삼으려는 생각입니다.</p>
+
+<p>이후 배포 자동화를 붙여 OTA 서버와 차량 에이전트로 테스트를 진행하고, 운영 상태를 확인하면서 성능을 개선하는 순서로 진행합니다.</p>]]></content><author><name></name></author><category term="Project" /><category term="Orbit" /><category term="Presentation" /><summary type="html"><![CDATA[지난 Phase 1의 피드백과 회고를 바탕으로 프로젝트 범위를 다시 잡고, k3s와 Vault 중심으로 바꾼 설계와 첫 주의 구축 결과, 그 과정에서 겪은 장애 대응을 발표 슬라이드 순서대로 정리합니다.]]></summary></entry><entry><title type="html">손으로 하던 서버 설정을 Ansible 코드로 옮기기</title><link href="https://hyn128.site/project-4-orbit-ansible-infrastructure-as-code/" rel="alternate" type="text/html" title="손으로 하던 서버 설정을 Ansible 코드로 옮기기" /><published>2026-10-28T00:00:00+09:00</published><updated>2026-10-28T00:00:00+09:00</updated><id>https://hyn128.site/project-4-orbit-ansible-infrastructure-as-code</id><content type="html" xml:base="https://hyn128.site/project-4-orbit-ansible-infrastructure-as-code/"><![CDATA[<h2 id="1-아이디어">1. 아이디어</h2>
 
 <blockquote>
   <p>지난 글까지 노드 설정은 전부 손으로 하거나 <code class="language-plaintext highlighter-rouge">orbit-net.sh</code> 스크립트로 했습니다. 무엇을 설치했고 무엇을 바꿨는지는 기억과 문서에만 남아 있어서, 노드를 다시 설치하거나 팀원이 같은 환경을 만들려면 문서를 보고 하나씩 따라 해야 했습니다. 앞으로 설치하는 패키지부터 네트워크, VM, k3s까지 전부 코드로 남겨서 다시 실행만 하면 같은 환경이 나오도록 하고 싶다고 생각했고, 이번에 네트워크와 모니터링 VM부터 옮겼습니다.</p>
@@ -5229,578 +5426,4 @@ curl <span class="nt">--fail</span> <span class="nt">--silent</span> <span class
   <li>
     <p><a href="https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-sessions-start.html">Session Manager 시작</a></p>
   </li>
-</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[두 Availability Zone에 Public·Private Subnet을 나누고 Internet Gateway, NAT Gateway, Route Table과 Security Group을 구성해 접속 경로를 검증합니다]]></summary></entry><entry><title type="html">AWS Site-to-Site VPN Architecture와 EC2 Router 실습</title><link href="https://hyn128.site/cloud-22-site-to-site-vpn-ec2-router/" rel="alternate" type="text/html" title="AWS Site-to-Site VPN Architecture와 EC2 Router 실습" /><published>2026-10-08T00:00:00+09:00</published><updated>2026-10-08T00:00:00+09:00</updated><id>https://hyn128.site/cloud-22-site-to-site-vpn-ec2-router</id><content type="html" xml:base="https://hyn128.site/cloud-22-site-to-site-vpn-ec2-router/"><![CDATA[<h2 id="요약">요약</h2>
-
-<hr />
-
-<blockquote>
-  <p>AWS Site-to-Site VPN은 On-Premise Customer Gateway와 AWS 측 Virtual Private Gateway 또는 Transit Gateway 사이에 두 IPsec Tunnel을 구성합니다. Static Route와 BGP Dynamic Route의 차이를 구분하고, 실제 Router 대신 Public EC2에 StrongSwan을 설치해 On-Premise Network를 모의합니다. 두 VPC는 겹치지 않는 CIDR를 사용하고 Tunnel Secret은 문서나 Repository에 저장하지 않습니다.</p>
-</blockquote>
-
-<h2 id="1-site-to-site-vpn-구성-요소">1. Site-to-Site VPN 구성 요소</h2>
-
-<hr />
-
-<p>기본 연결 구조는 다음과 같습니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>On-Premise Network
-  ↓
-Customer Gateway Device
-  ⇅ IPsec Tunnel 1·2
-Virtual Private Gateway 또는 Transit Gateway
-  ↓
-AWS VPC Private Network
-</code></pre></div></div>
-
-<table>
-  <thead>
-    <tr>
-      <th>구성 요소</th>
-      <th>역할</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Customer Gateway Device</td>
-      <td>On-Premise Router 또는 Firewall에서 VPN Tunnel 종료</td>
-    </tr>
-    <tr>
-      <td>Customer Gateway Resource</td>
-      <td>Device의 Public IP와 BGP ASN 등을 AWS에 표현</td>
-    </tr>
-    <tr>
-      <td>Site-to-Site VPN Connection</td>
-      <td>AWS와 Customer Gateway 사이의 두 Tunnel</td>
-    </tr>
-    <tr>
-      <td>Virtual Private Gateway</td>
-      <td>하나의 VPC에 Attach하는 AWS 측 VPN 종단점</td>
-    </tr>
-    <tr>
-      <td>Transit Gateway</td>
-      <td>여러 VPC와 On-Premise Network를 Hub 형태로 연결</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Customer Gateway Device에는 Internet에서 도달 가능한 고정 Public IP가 필요합니다. Device가 NAT 뒤에 있고 NAT Traversal을 지원하면 AWS Customer Gateway Resource에는 NAT Device의 Public IP를 사용합니다.</p>
-
-<h2 id="2-두-tunnel과-보안-protocol">2. 두 Tunnel과 보안 Protocol</h2>
-
-<hr />
-
-<p>AWS Site-to-Site VPN Connection은 고가용성을 위해 두 Tunnel을 제공합니다. Customer Gateway Device에 두 Tunnel을 모두 구성해야 AWS 측 Tunnel Endpoint 유지보수나 장애 시 보조 경로를 사용할 수 있습니다.</p>
-
-<p>두 Tunnel을 단순히 Primary와 Secondary로 고정하지 않습니다. Route 방식과 Target Gateway에 따라 Traffic 경로가 달라질 수 있으므로 AWS가 제공한 두 Tunnel 구성과 Route 우선순위를 함께 적용합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Protocol</th>
-      <th>역할</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>IKE</td>
-      <td>양 끝의 Security Association 협상과 Key 교환</td>
-    </tr>
-    <tr>
-      <td>IPsec ESP</td>
-      <td>IP Packet Payload의 기밀성과 무결성 보호</td>
-    </tr>
-    <tr>
-      <td>NAT-T</td>
-      <td>NAT 환경에서 IPsec Traffic을 UDP 4500으로 전달</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>방화벽에서는 AWS가 생성한 Tunnel Outside IP를 Source 또는 Destination으로 제한하고 필요한 IKE, NAT-T와 ESP Traffic만 허용합니다.</p>
-
-<h2 id="3-static-route와-bgp-dynamic-route">3. Static Route와 BGP Dynamic Route</h2>
-
-<hr />
-
-<table>
-  <thead>
-    <tr>
-      <th>구분</th>
-      <th>Static Route</th>
-      <th>BGP Dynamic Route</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>경로 등록</td>
-      <td>On-Premise CIDR를 수동 등록</td>
-      <td>BGP Peer가 경로 광고</td>
-    </tr>
-    <tr>
-      <td>Network 변경</td>
-      <td>Route를 수동 갱신</td>
-      <td>광고한 경로를 동적으로 반영</td>
-    </tr>
-    <tr>
-      <td>장애 감지</td>
-      <td>Device의 별도 Health Check 필요</td>
-      <td>BGP Liveness가 Failover 판단 지원</td>
-    </tr>
-    <tr>
-      <td>적용</td>
-      <td>소규모 Lab, BGP 미지원 Device</td>
-      <td>변경이 잦거나 복수 경로를 가진 환경</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>BGP를 지원하는 Device에는 Dynamic Routing을 우선 검토합니다. Static Routing을 선택하면 VPN Connection 생성 시 AWS에 광고할 On-Premise Prefix를 직접 입력합니다.</p>
-
-<p>Customer Gateway ASN은 지원되는 Private ASN 범위에서 선택하고 AWS 측 Gateway ASN과 다르게 설정합니다. 단순히 특정 기본 번호를 유지하는 것이 Static Routing의 조건은 아닙니다.</p>
-
-<h2 id="4-packet-왕복-흐름">4. Packet 왕복 흐름</h2>
-
-<hr />
-
-<p>On-Premise Client가 VPC EC2에 접근하는 흐름은 다음과 같습니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>On-Premise Client
-  ↓ On-Premise Route Table
-Customer Gateway에서 IPsec 암호화
-  ↓ Internet
-AWS VPN Tunnel Endpoint에서 복호화
-  ↓ Virtual Private Gateway
-VPC Route Table
-  ↓ Security Group·Network ACL
-Target EC2
-</code></pre></div></div>
-
-<p>응답은 반대 경로로 돌아가야 합니다. VPC에 On-Premise CIDR Route가 있어도 On-Premise Subnet이 VPC CIDR를 Customer Gateway로 보내지 않으면 통신할 수 없습니다.</p>
-
-<h2 id="5-lab-구성과-주의-사항">5. Lab 구성과 주의 사항</h2>
-
-<hr />
-
-<p>실제 On-Premise Router가 없는 환경에서는 두 VPC 중 하나를 On-Premise Network처럼 사용합니다. 이 구성은 VPN 학습용이며 실제 Data Center의 Firewall, 회선과 장애 조건을 대체하지 않습니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Simulated On-Premise VPC 10.10.0.0/16
-├── Public Router Subnet 10.10.1.0/24
-│   └── StrongSwan Router EC2 + Elastic IP
-└── Private Client Subnet 10.10.11.0/24
-    └── Client EC2
-
-Cloud VPC 10.20.0.0/16
-└── Private Workload Subnet 10.20.11.0/24
-    └── Target EC2
-</code></pre></div></div>
-
-<p>두 VPC가 같은 CIDR를 사용하면 Route가 겹치므로 VPN 실습을 진행할 수 없습니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>표기</th>
-      <th>실행 위치</th>
-      <th>작업</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code></td>
-      <td>AWS Management Console</td>
-      <td>VPC, VPN Resource, Route와 Security 구성</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[ROUTER-EC2]</code></td>
-      <td>On-Premise Simulation Router</td>
-      <td>StrongSwan, IP Forwarding과 Tunnel 구성</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[ONPREM-CLIENT]</code></td>
-      <td>Simulated On-Premise Private EC2</td>
-      <td>Cloud VPC 연결 검증</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[CLOUD-TARGET]</code></td>
-      <td>Cloud VPC Private EC2</td>
-      <td>Service와 반환 경로 검증</td>
-    </tr>
-  </tbody>
-</table>
-
-<h2 id="6-두-vpc와-ec2-준비">6. 두 VPC와 EC2 준비</h2>
-
-<hr />
-
-<h3 id="61-simulated-on-premise-vpc">6.1 Simulated On-Premise VPC</h3>
-
-<p>다음 Resource를 준비합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Resource</th>
-      <th>값</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>VPC</td>
-      <td><code class="language-plaintext highlighter-rouge">onprem-vpc</code>, <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code></td>
-    </tr>
-    <tr>
-      <td>Router Subnet</td>
-      <td><code class="language-plaintext highlighter-rouge">10.10.1.0/24</code>, Internet Gateway Route</td>
-    </tr>
-    <tr>
-      <td>Client Subnet</td>
-      <td><code class="language-plaintext highlighter-rouge">10.10.11.0/24</code></td>
-    </tr>
-    <tr>
-      <td>Router EC2</td>
-      <td>Ubuntu, Elastic IP, Public Subnet</td>
-    </tr>
-    <tr>
-      <td>Client EC2</td>
-      <td>Ubuntu, Public IPv4 없음</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Client Subnet Route Table에는 Cloud VPC 경로를 Router EC2의 Network Interface로 추가합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Destination</th>
-      <th>Target</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;ROUTER_EC2_NETWORK_INTERFACE_ID&gt;</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Router EC2는 다른 Instance의 Packet을 전달해야 하므로 <code class="language-plaintext highlighter-rouge">Source/destination check</code>를 비활성화합니다.</p>
-
-<h3 id="62-cloud-vpc">6.2 Cloud VPC</h3>
-
-<p>다음 Resource를 준비합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Resource</th>
-      <th>값</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>VPC</td>
-      <td><code class="language-plaintext highlighter-rouge">cloud-vpc</code>, <code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
-    </tr>
-    <tr>
-      <td>Workload Subnet</td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.11.0/24</code></td>
-    </tr>
-    <tr>
-      <td>Target EC2</td>
-      <td>Ubuntu, Public IPv4 없음</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Target EC2 Security Group은 Test Protocol을 <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code>에서만 허용합니다. 관리 접속은 Session Manager를 사용합니다.</p>
-
-<h2 id="7-router-ec2-network-설정">7. Router EC2 Network 설정</h2>
-
-<hr />
-
-<p>Router Security Group은 전체 Internet가 아니라 AWS가 할당한 두 VPN Tunnel Outside IP와 관리자 주소로 Source를 제한합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Protocol</th>
-      <th>Port 또는 Type</th>
-      <th>Source</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>UDP</td>
-      <td>500</td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;AWS_TUNNEL_1_OUTSIDE_IP&gt;/32</code>, <code class="language-plaintext highlighter-rouge">&lt;AWS_TUNNEL_2_OUTSIDE_IP&gt;/32</code></td>
-    </tr>
-    <tr>
-      <td>UDP</td>
-      <td>4500</td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;AWS_TUNNEL_1_OUTSIDE_IP&gt;/32</code>, <code class="language-plaintext highlighter-rouge">&lt;AWS_TUNNEL_2_OUTSIDE_IP&gt;/32</code></td>
-    </tr>
-    <tr>
-      <td>ESP</td>
-      <td>Protocol 50</td>
-      <td>Tunnel 구성에서 요구하는 경우 AWS Tunnel Endpoint</td>
-    </tr>
-    <tr>
-      <td>TCP</td>
-      <td>22</td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;ADMIN_PUBLIC_IP&gt;/32</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p><code class="language-plaintext highlighter-rouge">[ROUTER-EC2]</code>에서 StrongSwan을 설치하고 IP Forwarding을 영구 활성화합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ROUTER-EC2]</span>
-<span class="nb">sudo </span>apt update
-<span class="nb">sudo </span>apt <span class="nb">install</span> <span class="nt">-y</span> strongswan
-
-<span class="nb">sudo tee</span> /etc/sysctl.d/99-vpn-router.conf <span class="o">&gt;</span>/dev/null <span class="o">&lt;&lt;</span><span class="sh">'</span><span class="no">EOF</span><span class="sh">'
-net.ipv4.ip_forward=1
-</span><span class="no">EOF
-
-</span><span class="nb">sudo </span>sysctl <span class="nt">--system</span>
-sysctl net.ipv4.ip_forward
-</code></pre></div></div>
-
-<p><code class="language-plaintext highlighter-rouge">net.ipv4.ip_forward = 1</code>이 출력돼야 합니다.</p>
-
-<h2 id="8-aws-vpn-resource-구성">8. AWS VPN Resource 구성</h2>
-
-<hr />
-
-<h3 id="81-virtual-private-gateway">8.1 Virtual Private Gateway</h3>
-
-<p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>에서 Virtual Private Gateway를 만들고 <code class="language-plaintext highlighter-rouge">cloud-vpc</code>에 Attach합니다.</p>
-
-<h3 id="82-customer-gateway">8.2 Customer Gateway</h3>
-
-<p>Customer Gateway Resource에 다음 값을 설정합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>항목</th>
-      <th>값</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>IP Address</td>
-      <td>Router EC2의 Elastic IP</td>
-    </tr>
-    <tr>
-      <td>Routing</td>
-      <td>이 Lab에서는 Static</td>
-    </tr>
-    <tr>
-      <td>BGP ASN</td>
-      <td>Console이 요구하는 지원 범위의 예제 ASN</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Static Routing이어도 Customer Gateway Resource에는 ASN Field가 필요합니다. 이 값은 BGP Session을 구성하지 않으면 실제 경로 교환에 사용되지 않습니다.</p>
-
-<h3 id="83-site-to-site-vpn-connection">8.3 Site-to-Site VPN Connection</h3>
-
-<p>Target Gateway로 Virtual Private Gateway를, Customer Gateway로 앞에서 만든 Resource를 선택합니다. Static IP Prefix에는 Simulated On-Premise VPC CIDR인 <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code>을 입력합니다.</p>
-
-<p>VPN이 생성되면 Router Software에 맞는 Sample Configuration을 Download합니다. File에는 Tunnel Outside IP와 Pre-Shared Key가 있으므로 Repository, Blog, Screenshot과 협업 Chat에 올리지 않습니다.</p>
-
-<h2 id="9-strongswan-tunnel-구성">9. StrongSwan Tunnel 구성</h2>
-
-<hr />
-
-<p>AWS에서 Download한 Configuration의 IKE Version, Encryption, Integrity, Diffie-Hellman Group, Lifetime과 Tunnel별 Outside IP를 기준으로 StrongSwan을 설정합니다. 임의의 Algorithm으로 바꾸거나 두 Tunnel을 하나의 설정으로 합치지 않습니다.</p>
-
-<p><code class="language-plaintext highlighter-rouge">/etc/ipsec.secrets</code>에는 실제 값 대신 다음 구조가 들어갑니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>&lt;CUSTOMER_GATEWAY_PUBLIC_IP&gt; &lt;AWS_TUNNEL_1_OUTSIDE_IP&gt; : PSK "&lt;VPN_TUNNEL_1_PRESHARED_KEY&gt;"
-&lt;CUSTOMER_GATEWAY_PUBLIC_IP&gt; &lt;AWS_TUNNEL_2_OUTSIDE_IP&gt; : PSK "&lt;VPN_TUNNEL_2_PRESHARED_KEY&gt;"
-</code></pre></div></div>
-
-<p>Secret File 권한을 제한합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ROUTER-EC2]</span>
-<span class="nb">sudo chown </span>root:root /etc/ipsec.secrets
-<span class="nb">sudo chmod </span>600 /etc/ipsec.secrets
-</code></pre></div></div>
-
-<p>AWS Configuration File에 맞춰 <code class="language-plaintext highlighter-rouge">/etc/ipsec.conf</code>와 필요한 Tunnel별 설정을 작성한 뒤 StrongSwan을 다시 시작합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ROUTER-EC2]</span>
-<span class="nb">sudo </span>systemctl restart strongswan-starter
-<span class="nb">sudo </span>systemctl status strongswan-starter <span class="nt">--no-pager</span>
-<span class="nb">sudo </span>ipsec statusall
-</code></pre></div></div>
-
-<p>두 Tunnel의 Security Association 상태를 각각 확인합니다. Download File의 실제 Secret과 Outside IP를 Terminal History나 문서에 출력하지 않습니다.</p>
-
-<h2 id="10-cloud-route-구성">10. Cloud Route 구성</h2>
-
-<hr />
-
-<p>Cloud Workload Subnet의 Route Table에서 Virtual Private Gateway Route Propagation을 활성화합니다. VPN Connection이 <code class="language-plaintext highlighter-rouge">UP</code>이면 Static VPN Prefix인 <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code> Route가 전파됩니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Destination</th>
-      <th>Target</th>
-      <th>Origin</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
-      <td><code class="language-plaintext highlighter-rouge">local</code></td>
-      <td>Create Route Table</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">10.10.0.0/16</code></td>
-      <td>Virtual Private Gateway</td>
-      <td>Propagated</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Static Route를 직접 추가하는 경우에도 Destination은 On-Premise CIDR이고 Target은 Virtual Private Gateway입니다. 동일 Destination의 Static Route와 Propagated Route가 동시에 있으면 Route 우선순위를 확인합니다.</p>
-
-<h2 id="11-연결-검증">11. 연결 검증</h2>
-
-<hr />
-
-<p>검증 순서는 다음과 같습니다.</p>
-
-<ol>
-  <li>
-    <p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>에서 두 VPN Tunnel의 상태를 확인합니다.</p>
-  </li>
-  <li>
-    <p><code class="language-plaintext highlighter-rouge">[ROUTER-EC2]</code>에서 <code class="language-plaintext highlighter-rouge">sudo ipsec statusall</code>로 IKE와 Child SA를 확인합니다.</p>
-  </li>
-  <li>
-    <p><code class="language-plaintext highlighter-rouge">[ONPREM-CLIENT]</code>의 Route가 <code class="language-plaintext highlighter-rouge">10.20.0.0/16</code>을 Router EC2로 보내는지 확인합니다.</p>
-  </li>
-  <li>
-    <p><code class="language-plaintext highlighter-rouge">[CLOUD-TARGET]</code> Security Group이 <code class="language-plaintext highlighter-rouge">10.10.0.0/16</code>의 Test Traffic을 허용하는지 확인합니다.</p>
-  </li>
-  <li>
-    <p>On-Premise Client에서 Cloud Target Private IP로 Test합니다.</p>
-  </li>
-</ol>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [ONPREM-CLIENT]</span>
-ip route get &lt;CLOUD_TARGET_PRIVATE_IP&gt;
-ping <span class="nt">-c</span> 3 &lt;CLOUD_TARGET_PRIVATE_IP&gt;
-nc <span class="nt">-vz</span> &lt;CLOUD_TARGET_PRIVATE_IP&gt; &lt;APP_PORT&gt;
-</code></pre></div></div>
-
-<p>통신이 실패하면 Tunnel 상태만 보지 말고 다음 왕복 경로를 확인합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>On-Premise Client Route
-→ Router EC2 IP Forwarding
-→ StrongSwan Tunnel
-→ Cloud Route Table
-→ Cloud Security Group·Network ACL
-→ Return Route
-</code></pre></div></div>
-
-<h2 id="12-고가용성과-운영-설계">12. 고가용성과 운영 설계</h2>
-
-<hr />
-
-<ul>
-  <li>
-    <p>AWS가 제공하는 두 Tunnel을 모두 구성하고 Failover를 Test합니다.</p>
-  </li>
-  <li>
-    <p>On-Premise 단일 Router가 장애점이 되지 않도록 두 Customer Gateway Device와 별도 전원·회선을 검토합니다.</p>
-  </li>
-  <li>
-    <p>BGP 지원 Device는 Dynamic Routing을 사용해 경로 변경과 Tunnel 장애 감지를 자동화합니다.</p>
-  </li>
-  <li>
-    <p>Direct Connect를 Primary 경로로 사용할 때도 Site-to-Site VPN을 Backup 또는 암호화 계층으로 사용할 수 있습니다.</p>
-  </li>
-  <li>
-    <p>MTU와 TCP MSS가 Tunnel Overhead를 고려하는지 확인합니다.</p>
-  </li>
-  <li>
-    <p>CloudWatch Tunnel Metric과 VPN Log를 이용해 상태와 협상 Error를 감시합니다.</p>
-  </li>
-</ul>
-
-<h2 id="13-resource-정리">13. Resource 정리</h2>
-
-<hr />
-
-<p>실습 후 다음 순서로 제거합니다.</p>
-
-<ol>
-  <li>
-    <p>Site-to-Site VPN Connection을 삭제합니다.</p>
-  </li>
-  <li>
-    <p>Customer Gateway Resource를 삭제합니다.</p>
-  </li>
-  <li>
-    <p>Virtual Private Gateway를 Cloud VPC에서 Detach한 뒤 삭제합니다.</p>
-  </li>
-  <li>
-    <p>Router와 Client EC2를 종료하고 Elastic IP를 Release합니다.</p>
-  </li>
-  <li>
-    <p>Route, Security Group, Subnet, Internet Gateway와 두 VPC를 삭제합니다.</p>
-  </li>
-</ol>
-
-<p>VPN Connection을 삭제하면 기존 Pre-Shared Key도 사용할 수 없게 됩니다. 실제 Key가 문서나 Log에 노출됐다면 연결을 유지한 채 숨기는 것으로 끝내지 말고 Tunnel Option의 Key를 교체합니다.</p>
-
-<blockquote>
-  <p><strong>최종 정리</strong></p>
-  <ul>
-    <li>
-      <p>Site-to-Site VPN은 Customer Gateway와 AWS Gateway 사이에 두 IPsec Tunnel을 제공합니다.</p>
-    </li>
-    <li>
-      <p>BGP Dynamic Routing은 경로 광고와 Tunnel Failover 판단을 자동화하고 Static Routing은 Prefix를 수동 관리합니다.</p>
-    </li>
-    <li>
-      <p>VPN으로 연결할 Network CIDR는 서로 겹치면 안 됩니다.</p>
-    </li>
-    <li>
-      <p>EC2 Router Lab에서는 Source/Destination Check와 Kernel IP Forwarding을 함께 설정합니다.</p>
-    </li>
-    <li>
-      <p>Pre-Shared Key와 Tunnel Configuration은 Secret이므로 Repository와 게시물에 저장하지 않습니다.</p>
-    </li>
-  </ul>
-</blockquote>
-
-<h2 id="참고-자료">참고 자료</h2>
-
-<hr />
-
-<ul>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/vpn/latest/s2svpn/SetUpVPNConnections.html">AWS Site-to-Site VPN 시작</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-static-dynamic.html">Static Routing과 Dynamic Routing</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/vpn/latest/s2svpn/cgw-static-routing-examples.html">VPN Customer Gateway Device Configuration</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/vpc/latest/userguide/WorkWithRouteTables.html#route-table-propagation">Virtual Private Gateway Route Propagation</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/vpc/latest/userguide/route-tables-priority.html">VPC Route 우선순위</a></p>
-  </li>
-</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[Customer Gateway, Virtual Private Gateway와 두 IPsec Tunnel의 역할을 이해하고 서로 다른 CIDR의 두 VPC로 On-Premise 연결을 모의 구성합니다]]></summary></entry></feed>
+</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[두 Availability Zone에 Public·Private Subnet을 나누고 Internet Gateway, NAT Gateway, Route Table과 Security Group을 구성해 접속 경로를 검증합니다]]></summary></entry></feed>
