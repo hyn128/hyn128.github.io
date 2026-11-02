@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       # Apple Silicon 등 플랫폼 호환성 문제를 피하기 위한 Ruby 빌드 옵션
