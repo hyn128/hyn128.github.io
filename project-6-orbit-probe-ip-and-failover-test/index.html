@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록">
+<link rel="canonical" href="https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/">
+<meta property="og:title" content="감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록">
+<meta property="og:url" content="https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제 | renamed.log">
+<meta name="twitter:description" content="게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록">
+
+  <meta property="article:published_time" content="2026-11-02T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1793625631" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1793625631" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1793625631">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1793625631" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1793625631">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제 | renamed.log",
+    "description": "게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록",
+    "url": "https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/",
+    "datePublished": "2026-11-02T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Project</p>
+    
+    <h1 class="post-head__title">감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제</h1>
+    
+      <p class="post-head__description">게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 11월 2일 · 9분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Project">Project</a>
+        
+          <a class="tag-chip" href="/?tag=Orbit">Orbit</a>
+        
+          <a class="tag-chip" href="/?tag=Network">Network</a>
+        
+          <a class="tag-chip" href="/?tag=Troubleshooting">Troubleshooting</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="1-아이디어">1. 아이디어</h2>
+
+<blockquote>
+  <p>워커가 astra 너머로 인터넷이 되는지 10초마다 확인해서 안 되면 와이파이로 넘기는 <code class="language-plaintext highlighter-rouge">orbit-gw-watch</code>를 지난 글에서 만들었습니다. 그런데 Vault 작업 중에 워커에 접속해 보니 유선과 astra가 멀쩡한데도 워커 3대가 전부 와이파이로 나가고 있었고, 원인은 감시 대상으로 둔 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>가 어느 시점부터 응답하지 않게 된 것이었습니다. 감시 주소를 바꿔 유선으로 되돌리고, 지난 글에서 시각을 기록하지 못했던 랜선 분리 시험을 이번에는 1초 단위로 보면서 다시 했습니다.</p>
+</blockquote>
+
+<p>글에서 사용하는 호스트 이름과 역할은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>호스트 이름</th>
+      <th>기기</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>polaris</td>
+      <td>ODROID-M1S (SBC)</td>
+      <td>k3s Control Plane</td>
+    </tr>
+    <tr>
+      <td>astra</td>
+      <td>데스크탑</td>
+      <td>게이트웨이(NAT), Vault, 모니터링 VM 호스트, Ansible 실행 위치</td>
+    </tr>
+    <tr>
+      <td>sol, terra, luna</td>
+      <td>갤럭시북</td>
+      <td>k3s Worker. 이 글의 대상</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="1-감시-구조의-전제">1) 감시 구조의 전제</h3>
+
+<p>워커는 유선 기본 경로(metric 100)와 와이파이 기본 경로(metric 600)를 함께 갖고, 평소에는 metric이 낮은 유선으로 astra를 거쳐 인터넷에 나갑니다. astra가 꺼져도 워커의 랜선은 스위치에 꽂혀 있어서 리눅스는 유선이 살아 있다고 보기 때문에, <code class="language-plaintext highlighter-rouge">orbit-gw-watch</code>가 10초마다 감시 주소로 ping을 보내 3번 연속 실패하면 유선 기본 경로를 지우고, 다시 응답하면 되돌리도록 했습니다.</p>
+
+<p>감시 주소 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>는 netplan에서 <code class="language-plaintext highlighter-rouge">/32</code> 고정 경로로 항상 astra를 거치게 두었는데, 와이파이로 넘어간 뒤에도 이 주소로 가는 ping만은 계속 astra 쪽으로 가야 astra가 복구됐는지 알 수 있기 때문입니다. 즉 이 구조는 “감시 주소가 응답하지 않는다”를 “astra가 죽었다”와 같은 뜻으로 보고 있었고, 감시 주소 자체가 응답을 멈추는 경우는 전제에 없었습니다.</p>
+
+<h3 id="2-발견">2) 발견</h3>
+
+<p>Vault 관련 작업으로 sol에 들어갔다가 기본 경로를 보니 와이파이 경로만 남아 있었고, terra와 luna도 같았습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ip route show default
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>default via 192.168.200.1 dev wlo1 proto static metric 600
+</code></pre></div></div>
+
+<p>유선 <code class="language-plaintext highlighter-rouge">metric 100</code> 경로가 없다는 것은 감시 스크립트가 지웠다는 뜻이므로, 먼저 감시 주소가 실제로 응답하는지부터 확인했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ping <span class="nt">-c</span> 3 9.9.9.9
+ping <span class="nt">-c</span> 1 1.1.1.1
+ping <span class="nt">-c</span> 1 1.0.0.1
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">9.9.9.9</code>만 0% 응답이었고 <code class="language-plaintext highlighter-rouge">1.1.1.1</code>과 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>은 바로 응답했습니다. 이때 sol의 기본 경로가 와이파이였으므로 이 결과는 와이파이 경로에서의 결과이고, <code class="language-plaintext highlighter-rouge">-I wlo1</code>로 와이파이 장치를 지정해서 보내도 같았습니다. 와이파이로도 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>가 안 되므로 astra의 NAT 문제가 아니라 강의실 네트워크 바깥 어딘가에서 이 주소가 막힌 것으로 보였고, 어디서 왜 막혔는지는 확인하지 못했습니다.</p>
+
+<p>돌아보면 조짐은 있었습니다. Ansible로 옮기던 날 polaris의 <code class="language-plaintext highlighter-rouge">9.9.9.9</code> ping이 4번 실패하고 5번째에 통과한 적이 있었는데, 그때는 와이파이가 다시 붙는 시간 때문이라고 보고 재시도 횟수만 늘렸습니다. 감시 주소 하나에 복구 판단을 전부 맡겨 두고 그 주소가 멀쩡한지는 따로 보지 않았던 셈이라, 이번 일로 감시 설계의 전제가 어디까지인지 체감했습니다.</p>
+
+<h3 id="3-유선-경로에서의-확인">3) 유선 경로에서의 확인</h3>
+
+<p>새 감시 주소는 유선과 astra를 거쳐서 응답해야 의미가 있으므로, sol에 임시 고정 경로를 넣어 astra를 거치는 경로로 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>을 확인했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>ip route add 1.0.0.1/32 via 10.0.0.201 dev enp2s0
+ip route get 1.0.0.1
+ping <span class="nt">-c</span> 5 1.0.0.1
+<span class="nb">sudo </span>ip route del 1.0.0.1/32 via 10.0.0.201 dev enp2s0
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">ip route add ... /32 via 10.0.0.201 dev enp2s0</code> : 이 주소 하나만 유선으로 astra를 거치게 하는 임시 경로</li>
+  <li><code class="language-plaintext highlighter-rouge">ip route get 1.0.0.1</code> : 실제로 어느 경로를 타는지 출력. <code class="language-plaintext highlighter-rouge">via 10.0.0.201 dev enp2s0</code>이면 유선과 astra를 거침</li>
+  <li>확인이 끝나면 <code class="language-plaintext highlighter-rouge">ip route del</code>로 임시 경로를 지움</li>
+</ul>
+
+<p>5번 모두 응답했고 TTL이 48로 와이파이 경로(49)보다 1 작아서 astra를 한 번 더 거친 것도 맞았습니다. astra 자체에서도 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>이 5번 모두 응답하는 것을 확인했습니다.</p>
+
+<blockquote>
+  <p><strong>감시 주소를 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>로 정한 이유</strong></p>
+
+  <p><code class="language-plaintext highlighter-rouge">1.1.1.1</code>과 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>은 같은 공개 DNS 서비스의 주소라 둘 다 응답했지만, <code class="language-plaintext highlighter-rouge">1.1.1.1</code>은 netplan의 DNS 서버 목록에도 들어 있는 주소입니다. 감시 주소에는 항상 astra를 거치는 <code class="language-plaintext highlighter-rouge">/32</code> 고정 경로가 붙기 때문에, <code class="language-plaintext highlighter-rouge">1.1.1.1</code>을 감시 주소로 쓰면 와이파이로 넘어간 상태에서 DNS 질의까지 죽은 astra 쪽으로 가게 됩니다. 감시와 DNS가 서로 영향을 주지 않도록 DNS 목록에 없는 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>을 쓰는 것이 맞다고 판단했습니다.</p>
+</blockquote>
+
+<h2 id="2-수정">2. 수정</h2>
+
+<h3 id="1-바꾼-값">1) 바꾼 값</h3>
+
+<p>감시 주소는 Ansible 인벤토리의 <code class="language-plaintext highlighter-rouge">group_vars/all/main.yml</code>에 <code class="language-plaintext highlighter-rouge">probe_ip</code> 하나로 정의되어 있고, 워커 netplan 템플릿의 <code class="language-plaintext highlighter-rouge">/32</code> 고정 경로와 감시 스크립트 템플릿의 <code class="language-plaintext highlighter-rouge">PROBE=</code> 두 곳이 이 값을 읽습니다. 그래서 고친 것은 이 한 줄입니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">probe_ip</span><span class="pi">:</span> <span class="s">1.0.0.1</span>           <span class="c1"># 장애 감시용. 워커는 항상 게이트웨이를 거치게 고정 경로</span>
+</code></pre></div></div>
+
+<p>지난 글에서 게이트웨이 주소를 스크립트에 적지 않고 고정 경로에서 읽어오게 바꾼 것과 같은 이유로, 감시 주소도 인벤토리 한 곳만 바꾸면 netplan과 스크립트가 같이 바뀌므로 템플릿은 손대지 않았습니다. Mac에서 <code class="language-plaintext highlighter-rouge">--syntax-check</code>와 <code class="language-plaintext highlighter-rouge">ansible-lint</code>를 통과한 뒤 <code class="language-plaintext highlighter-rouge">bug/16-probe-ip</code> 브랜치로 push했습니다.</p>
+
+<h3 id="2-적용-순서">2) 적용 순서</h3>
+
+<p>network role은 감시 서비스를 netplan보다 먼저 재시작합니다. 옛 서비스가 netplan apply 도중에 경로를 되돌리는 것을 막기 위한 순서인데, 이번에는 그 사이에 새 스크립트가 <code class="language-plaintext highlighter-rouge">ip route show 1.0.0.1</code>로 게이트웨이 주소를 읽으려 해도 아직 netplan에는 <code class="language-plaintext highlighter-rouge">9.9.9.9/32</code> 경로만 있어서 빈 값이 나오고, 스크립트는 빈 값이면 아무것도 하지 않고 다음 주기를 기다리므로 문제가 없었습니다.</p>
+
+<p>적용은 astra에서 sol 한 대에 먼저 하고, 문제가 없으면 terra와 luna에 했습니다. 세 대가 같은 사양이고 같은 코드라 sol에서 확인되면 나머지는 한 번에 실행해도 되고, 워커 플레이가 <code class="language-plaintext highlighter-rouge">serial: 1</code>이라 한 번에 실행해도 한 대씩 차례로 적용되고 실패하면 다음 노드로 넘어가지 않기 때문입니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ansible-playbook playbooks/network.yml <span class="nt">-K</span> <span class="nt">--ask-vault-pass</span> <span class="nt">--check</span> <span class="nt">--diff</span> <span class="nt">--limit</span> sol
+ansible-playbook playbooks/network.yml <span class="nt">-K</span> <span class="nt">--ask-vault-pass</span> <span class="nt">--limit</span> sol
+ansible-playbook playbooks/network.yml <span class="nt">-K</span> <span class="nt">--ask-vault-pass</span> <span class="nt">--limit</span> terra,luna
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">-K</code> : sudo 비밀번호</li>
+  <li><code class="language-plaintext highlighter-rouge">--ask-vault-pass</code> : 와이파이 비밀번호가 들어 있는 <code class="language-plaintext highlighter-rouge">vault.yml</code>을 풀기 위한 암호. network 플레이북도 netplan에 와이파이 설정을 쓰므로 필요</li>
+  <li><code class="language-plaintext highlighter-rouge">--check --diff</code> : 바뀌는 줄만 보여 주고 적용하지 않음</li>
+</ul>
+
+<h2 id="3-적용과-검증">3. 적용과 검증</h2>
+
+<h3 id="1-sol">1) sol</h3>
+
+<p>적용 후 Mac에서 sol의 경로와 서비스 상태를 확인했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ssh orbit@sol <span class="s1">'ip route show default; echo ---; ip route get 1.0.0.1; echo ---; ip route show 9.9.9.9; echo ---; systemctl is-active orbit-gw-watch; grep ^PROBE /usr/local/sbin/orbit-gw-watch.sh'</span>
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">ip route show default</code> : 기본 경로 목록. 유선 <code class="language-plaintext highlighter-rouge">metric 100</code>이 돌아왔는지</li>
+  <li><code class="language-plaintext highlighter-rouge">ip route get 1.0.0.1</code> : 새 감시 주소가 유선으로 astra를 거치는지</li>
+  <li><code class="language-plaintext highlighter-rouge">ip route show 9.9.9.9</code> : 옛 감시 주소의 고정 경로가 남았는지</li>
+  <li><code class="language-plaintext highlighter-rouge">grep ^PROBE</code> : 서비스가 새 스크립트로 돌고 있는지</li>
+</ul>
+
+<p>유선 <code class="language-plaintext highlighter-rouge">metric 100</code> 기본 경로가 다시 생겼고, <code class="language-plaintext highlighter-rouge">1.0.0.1 via 10.0.0.201 dev enp2s0</code>, <code class="language-plaintext highlighter-rouge">9.9.9.9</code> 경로는 없음, 서비스 active, <code class="language-plaintext highlighter-rouge">PROBE=1.0.0.1</code>까지 모두 기대한 대로였습니다. 옛 <code class="language-plaintext highlighter-rouge">9.9.9.9/32</code> 경로는 netplan apply가 지워 주어서 따로 정리할 것이 없었습니다.</p>
+
+<p>다만 <code class="language-plaintext highlighter-rouge">journalctl -t orbit-gw</code>에는 복귀 로그가 없었습니다. netplan apply가 유선 기본 경로를 먼저 다시 만들었기 때문에 감시 스크립트 입장에서는 되돌릴 경로가 이미 있어서 복귀할 일이 없었고, 이 경우 로그가 없는 것이 정상이라고 판단했습니다.</p>
+
+<p>처음에는 이 확인 명령을 sol 안에서 그대로 실행해서 <code class="language-plaintext highlighter-rouge">ssh orbit@sol</code>이 자기 자신(<code class="language-plaintext highlighter-rouge">127.0.1.1</code>)에 접속하려고 호스트 키를 물어보는 일이 있었는데, 취소하고 Mac에서 다시 실행했습니다.</p>
+
+<h3 id="2-terra-luna">2) terra, luna</h3>
+
+<p>terra와 luna는 한 번에 적용했고, 끝난 뒤 같은 확인을 반복문으로 돌렸습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for </span>h <span class="k">in </span>terra luna<span class="p">;</span> <span class="k">do </span><span class="nb">echo</span> <span class="s2">"== </span><span class="nv">$h</span><span class="s2">"</span><span class="p">;</span> ssh orbit@<span class="nv">$h</span> <span class="s1">'ip route show default; ip route get 1.0.0.1 | head -1; ip route show 9.9.9.9; systemctl is-active orbit-gw-watch; grep ^PROBE /usr/local/sbin/orbit-gw-watch.sh'</span><span class="p">;</span> <span class="k">done</span>
+</code></pre></div></div>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/01.webp" alt="" /></p>
+
+<p>왼쪽이 astra의 플레이북 결과로 terra와 luna 모두 <code class="language-plaintext highlighter-rouge">ok=22 changed=6 failed=0</code>이고, 오른쪽이 확인 결과입니다. 첫 번째 확인 때는 luna가 아직 와이파이에 <code class="language-plaintext highlighter-rouge">PROBE=9.9.9.9</code>였는데, <code class="language-plaintext highlighter-rouge">serial: 1</code>이라 terra가 끝나고 luna 차례가 오기 전에 확인한 것이라 잠시 뒤 다시 실행하니 두 대 모두 유선 <code class="language-plaintext highlighter-rouge">metric 100</code>에 <code class="language-plaintext highlighter-rouge">PROBE=1.0.0.1</code>인 것을 확인할 수 있었습니다.</p>
+
+<h3 id="3-랜선-분리-시험">3) 랜선 분리 시험</h3>
+
+<p>지난 글에서는 랜선을 뽑은 시각을 기록하지 않아 로그의 전환 기록이 랜선 시험인지 주소 변경 작업인지 구분하지 못했습니다. 이번에는 로그 대신 세 워커의 기본 경로를 1초마다 직접 보면서 astra 쪽 랜선을 뽑았다가 다시 꽂았습니다.</p>
+
+<p>먼저 뽑기 전후를 한 번씩 확인했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for </span>h <span class="k">in </span>sol terra luna<span class="p">;</span> <span class="k">do </span><span class="nb">echo</span> <span class="s2">"== </span><span class="nv">$h</span><span class="s2">"</span><span class="p">;</span> ssh orbit@<span class="nv">$h</span> <span class="s1">'ip route show default; ip route get 1.0.0.1 | head -1; ip route show 9.9.9.9; systemctl is-active orbit-gw-watch; grep ^PROBE /usr/local/sbin/orbit-gw-watch.sh'</span><span class="p">;</span> <span class="k">done</span>
+</code></pre></div></div>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/02.webp" alt="" /></p>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/03.webp" alt="" /></p>
+
+<p>뽑은 뒤 세 대 모두 유선 기본 경로가 사라지고 와이파이 <code class="language-plaintext highlighter-rouge">metric 600</code>만 남았습니다. 그런데 <code class="language-plaintext highlighter-rouge">ip route get 1.0.0.1</code>은 여전히 <code class="language-plaintext highlighter-rouge">via 10.0.0.201 dev enp2s0</code>이어서 잠깐 그대로인 이유를 생각해 봤는데, 감시 스크립트가 지우는 것은 유선 기본 경로 하나뿐이고 감시 주소의 <code class="language-plaintext highlighter-rouge">/32</code> 고정 경로는 netplan에 있는 경로라 그대로 남는 것이 설계대로였습니다. 이 경로가 남아 있어야 와이파이로 넘어간 뒤에도 감시 ping이 astra 쪽으로 가서 복구를 알 수 있고, <code class="language-plaintext highlighter-rouge">ip route get</code>은 패킷을 보내지 않고 경로표만 보는 명령이라 선이 빠져 있어도 같은 줄이 나옵니다.</p>
+
+<p>다음으로 전환과 복귀 시점을 보기 위해 1초마다 세 대의 기본 경로를 출력하도록 했습니다. 워커는 아직 비밀번호 로그인이라 1초마다 새로 접속하면 매번 비밀번호를 물어보므로, 노드마다 연결을 한 번 열어 두고 재사용했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for </span>h <span class="k">in </span>sol terra luna<span class="p">;</span> <span class="k">do </span>ssh <span class="nt">-fNM</span> <span class="nt">-o</span> <span class="nv">ControlPath</span><span class="o">=</span>/tmp/ssh-%r@%h <span class="nt">-o</span> <span class="nv">ControlPersist</span><span class="o">=</span>15m orbit@<span class="nv">$h</span><span class="p">;</span> <span class="k">done
+while </span><span class="nb">true</span><span class="p">;</span> <span class="k">do </span>clear<span class="p">;</span> <span class="nb">date</span> <span class="s1">'+%T'</span><span class="p">;</span> <span class="k">for </span>h <span class="k">in </span>sol terra luna<span class="p">;</span> <span class="k">do </span><span class="nb">echo</span> <span class="s2">"== </span><span class="nv">$h</span><span class="s2">"</span><span class="p">;</span> ssh <span class="nt">-o</span> <span class="nv">ControlPath</span><span class="o">=</span>/tmp/ssh-%r@%h orbit@<span class="nv">$h</span> ip route show default<span class="p">;</span> <span class="k">done</span><span class="p">;</span> <span class="nb">sleep </span>1<span class="p">;</span> <span class="k">done</span>
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">-fNM</code> : 명령 없이(<code class="language-plaintext highlighter-rouge">-N</code>) 백그라운드로(<code class="language-plaintext highlighter-rouge">-f</code>) 마스터 연결(<code class="language-plaintext highlighter-rouge">-M</code>)만 열어 둠</li>
+  <li><code class="language-plaintext highlighter-rouge">ControlPath</code>, <code class="language-plaintext highlighter-rouge">ControlPersist=15m</code> : 이후 같은 호스트로의 ssh는 이 연결을 재사용하고, 마지막 사용 후 15분까지 유지</li>
+  <li>Mac에는 <code class="language-plaintext highlighter-rouge">watch</code>가 없어서 <code class="language-plaintext highlighter-rouge">while</code>과 <code class="language-plaintext highlighter-rouge">sleep 1</code>로 반복</li>
+</ul>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/04.webp" alt="" /></p>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/05.webp" alt="" /></p>
+
+<p>20:34:49에는 세 대 모두 와이파이 경로만 있었고, 20:35:35에는 세 대 모두 <code class="language-plaintext highlighter-rouge">default via 10.0.0.201 dev enp2s0 metric 100</code>이 돌아와 있는 것을 확인할 수 있었습니다. 복귀한 유선 경로에는 <code class="language-plaintext highlighter-rouge">proto static</code>이 붙어 있지 않은데, netplan이 만든 경로에는 <code class="language-plaintext highlighter-rouge">proto static</code>이 붙고 감시 스크립트가 <code class="language-plaintext highlighter-rouge">ip route replace</code>로 만든 경로에는 붙지 않으므로, 이번 복귀는 netplan이 아니라 감시 스크립트가 한 것이라는 점까지 경로 한 줄로 구분할 수 있었습니다. 지난 글에서 로그로만 보던 것을 이번에는 상태 변화로 직접 봤기 때문에 <code class="language-plaintext highlighter-rouge">orbit-gw</code> 로그는 따로 확인하지 않았습니다.</p>
+
+<h3 id="4-결과">4) 결과</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>결과</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">9.9.9.9</code> 응답</td>
+      <td>유선, 와이파이 모두 없음. 원인은 확인하지 못함</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">1.0.0.1</code> 유선과 astra 경유 응답</td>
+      <td>통과 (sol 5/5, astra 5/5)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">probe_ip</code> 변경, 문법 검사, lint</td>
+      <td>통과</td>
+    </tr>
+    <tr>
+      <td>적용</td>
+      <td>sol 후 terra, luna. <code class="language-plaintext highlighter-rouge">failed=0</code></td>
+    </tr>
+    <tr>
+      <td>유선 기본 경로 복귀</td>
+      <td>통과 (3대)</td>
+    </tr>
+    <tr>
+      <td>옛 <code class="language-plaintext highlighter-rouge">9.9.9.9/32</code> 경로</td>
+      <td>3대 모두 없음</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">orbit-gw-watch</code></td>
+      <td>active, <code class="language-plaintext highlighter-rouge">PROBE=1.0.0.1</code> (3대)</td>
+    </tr>
+    <tr>
+      <td>랜선 분리 시 와이파이 전환</td>
+      <td>통과 (3대)</td>
+    </tr>
+    <tr>
+      <td>재연결 후 유선 복귀</td>
+      <td>통과 (3대, 1분 안)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="4-다음-작업">4. 다음 작업</h2>
+
+<h3 id="1-감시-주소-하나에-의존하는-문제">1) 감시 주소 하나에 의존하는 문제</h3>
+
+<p>이번 수정은 감시 주소를 응답하는 다른 주소로 바꾼 것이라, 그 주소가 또 막히면 같은 일이 생깁니다. 감시 주소 두세 개 중 하나라도 응답하면 정상으로 보거나, astra 자체(<code class="language-plaintext highlighter-rouge">10.0.0.201</code>)와 astra 너머의 주소를 나눠서 “astra는 살아 있는데 바깥이 안 되는 경우”를 구분하는 방향을 생각하고 있습니다. 다만 지금은 팀원들이 개인 계정과 Vault로 서버에 접속해 각자 작업을 시작할 수 있게 하는 것이 먼저라, 이 부분은 재발하면 그때 후속 이슈로 다루기로 했습니다.</p>
+
+<h3 id="2-네트워크-변화를-디스코드로-받기">2) 네트워크 변화를 디스코드로 받기</h3>
+
+<p>이번 문제는 워커가 와이파이로 넘어간 지 며칠이 지나서야 sol에 들어가 보고 알았습니다. 감시 스크립트는 전환할 때마다 journal에 로그를 남기지만 그 로그는 각 워커 안에만 있어서, 누군가 접속해서 보기 전까지는 전환이 일어났는지 아무도 모르는 구조입니다. 랜선 시험 때도 Mac에서 1초마다 세 대에 ssh로 물어보는 식으로 봤는데, 이런 관찰을 매번 사람이 하지 않고 팀이 쓰는 디스코드로 받도록 하고 싶다고 생각했습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>방식</th>
+      <th>하는 일</th>
+      <th>장점</th>
+      <th>한계</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>전환 시 웹훅</td>
+      <td>감시 스크립트가 <code class="language-plaintext highlighter-rouge">logger</code>로 기록하는 자리에서 디스코드 웹훅으로도 같은 문장을 보냄</td>
+      <td>스크립트에 <code class="language-plaintext highlighter-rouge">curl</code> 한 줄이라 바로 넣을 수 있고, 전환과 복귀가 일어난 시각이 채널에 남음</td>
+      <td>이벤트만 오므로 지금 상태를 알려면 메시지를 거슬러 올라가야 하고, 전환과 복귀가 반복되면 채널이 시끄러워짐</td>
+    </tr>
+    <tr>
+      <td>상태 봇</td>
+      <td>astra에서 주기적으로 노드 5대의 기본 경로와 감시 서비스 상태를 모아 디스코드 메시지 하나를 계속 갱신</td>
+      <td>채널 상단 메시지 하나만 보면 지금 어느 노드가 유선이고 어느 노드가 와이파이인지 보임</td>
+      <td>봇 토큰과 실행 위치를 관리해야 하고, astra가 죽으면 봇도 같이 멈추므로 그 자체가 신호가 됨</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>두 가지는 역할이 달라서 하나를 고르기보다 같이 두는 쪽을 생각하고 있습니다. 전환 시 웹훅은 “언제 무슨 일이 있었는지”를 남기고, 상태 봇은 “지금 어떤 상태인지”를 보여 주므로, 먼저 웹훅을 감시 스크립트에 넣고 상태 봇은 모니터링 스택이 올라온 뒤 Loki에 모인 로그와 겹치지 않는 범위에서 만들 예정입니다. 웹훅 주소와 봇 토큰은 Vault에 두고 Ansible이 꺼내 쓰도록 하면, 지난 글에서 정한 “비밀값은 저장소에 올리지 않는다”는 기준도 그대로 지킬 수 있습니다.</p>
+
+<h3 id="3-남은-것">3) 남은 것</h3>
+
+<p>이번 주는 팀원들이 각자 맡은 모니터링과 AWS 전환 작업을 시작할 수 있도록 접속 경로와 권한을 먼저 끝내야 합니다. 따라서 네트워크 쪽에서 남은 것은 아래로 좁혔습니다.</p>
+
+<ul>
+  <li>이번 변경의 PR 머지. 머지 전에 다른 브랜치에서 워커에 <code class="language-plaintext highlighter-rouge">network.yml</code>을 실행하면 감시 주소가 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>로 돌아가므로, 그 전까지 워커 network 적용은 피하도록 팀에 알림</li>
+  <li><code class="language-plaintext highlighter-rouge">ansible-lint</code>가 collection을 내려받는 <code class="language-plaintext highlighter-rouge">ansible/.ansible/</code>을 <code class="language-plaintext highlighter-rouge">.gitignore</code>에 추가. 이번에 GitHub Desktop에 586개 파일이 변경으로 떠서 확인한 것</li>
+  <li>감시 스크립트에 디스코드 웹훅 추가. 상태 봇은 모니터링 스택 이후</li>
+</ul>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/project-5-orbit-phase2-week1-presentation/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지</strong>
+          </span>
+        </a>
+      
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1793625631"></script>
+    <script src="/assets/js/code-enhancements.js?v=1793625631"></script>
+  </body>
+</html>

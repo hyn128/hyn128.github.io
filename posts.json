@@ -4,6 +4,21 @@
       
       
       {
+        "title": "감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제",
+        "url": "/project-6-orbit-probe-ip-and-failover-test/",
+        "description": "게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록",
+        "thumbnail": null,
+        "tags": ["Project","Orbit","Network","Troubleshooting"],
+        "series_key": "project",
+        "series_title": "Project",
+        "date_label": "2026년 11월 2일",
+        "reading_time_label": "9분 읽기",
+        "search": "감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제 게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록 project orbit network troubleshooting project"
+      },
+    
+      
+      
+      {
         "title": "ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지",
         "url": "/project-5-orbit-phase2-week1-presentation/",
         "description": "지난 Phase 1의 피드백과 회고를 바탕으로 프로젝트 범위를 다시 잡고, k3s와 Vault 중심으로 바꾼 설계와 첫 주의 구축 결과, 그 과정에서 겪은 장애 대응을 발표 슬라이드 순서대로 정리합니다.",

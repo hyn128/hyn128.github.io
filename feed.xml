@@ -1,4 +1,278 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-11-01T19:29:49+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지</title><link href="https://hyn128.site/project-5-orbit-phase2-week1-presentation/" rel="alternate" type="text/html" title="ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지" /><published>2026-11-01T00:00:00+09:00</published><updated>2026-11-01T00:00:00+09:00</updated><id>https://hyn128.site/project-5-orbit-phase2-week1-presentation</id><content type="html" xml:base="https://hyn128.site/project-5-orbit-phase2-week1-presentation/"><![CDATA[<blockquote>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-11-02T22:20:31+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제</title><link href="https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/" rel="alternate" type="text/html" title="감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제" /><published>2026-11-02T00:00:00+09:00</published><updated>2026-11-02T00:00:00+09:00</updated><id>https://hyn128.site/project-6-orbit-probe-ip-and-failover-test</id><content type="html" xml:base="https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/"><![CDATA[<h2 id="1-아이디어">1. 아이디어</h2>
+
+<blockquote>
+  <p>워커가 astra 너머로 인터넷이 되는지 10초마다 확인해서 안 되면 와이파이로 넘기는 <code class="language-plaintext highlighter-rouge">orbit-gw-watch</code>를 지난 글에서 만들었습니다. 그런데 Vault 작업 중에 워커에 접속해 보니 유선과 astra가 멀쩡한데도 워커 3대가 전부 와이파이로 나가고 있었고, 원인은 감시 대상으로 둔 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>가 어느 시점부터 응답하지 않게 된 것이었습니다. 감시 주소를 바꿔 유선으로 되돌리고, 지난 글에서 시각을 기록하지 못했던 랜선 분리 시험을 이번에는 1초 단위로 보면서 다시 했습니다.</p>
+</blockquote>
+
+<p>글에서 사용하는 호스트 이름과 역할은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>호스트 이름</th>
+      <th>기기</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>polaris</td>
+      <td>ODROID-M1S (SBC)</td>
+      <td>k3s Control Plane</td>
+    </tr>
+    <tr>
+      <td>astra</td>
+      <td>데스크탑</td>
+      <td>게이트웨이(NAT), Vault, 모니터링 VM 호스트, Ansible 실행 위치</td>
+    </tr>
+    <tr>
+      <td>sol, terra, luna</td>
+      <td>갤럭시북</td>
+      <td>k3s Worker. 이 글의 대상</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="1-감시-구조의-전제">1) 감시 구조의 전제</h3>
+
+<p>워커는 유선 기본 경로(metric 100)와 와이파이 기본 경로(metric 600)를 함께 갖고, 평소에는 metric이 낮은 유선으로 astra를 거쳐 인터넷에 나갑니다. astra가 꺼져도 워커의 랜선은 스위치에 꽂혀 있어서 리눅스는 유선이 살아 있다고 보기 때문에, <code class="language-plaintext highlighter-rouge">orbit-gw-watch</code>가 10초마다 감시 주소로 ping을 보내 3번 연속 실패하면 유선 기본 경로를 지우고, 다시 응답하면 되돌리도록 했습니다.</p>
+
+<p>감시 주소 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>는 netplan에서 <code class="language-plaintext highlighter-rouge">/32</code> 고정 경로로 항상 astra를 거치게 두었는데, 와이파이로 넘어간 뒤에도 이 주소로 가는 ping만은 계속 astra 쪽으로 가야 astra가 복구됐는지 알 수 있기 때문입니다. 즉 이 구조는 “감시 주소가 응답하지 않는다”를 “astra가 죽었다”와 같은 뜻으로 보고 있었고, 감시 주소 자체가 응답을 멈추는 경우는 전제에 없었습니다.</p>
+
+<h3 id="2-발견">2) 발견</h3>
+
+<p>Vault 관련 작업으로 sol에 들어갔다가 기본 경로를 보니 와이파이 경로만 남아 있었고, terra와 luna도 같았습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ip route show default
+</code></pre></div></div>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>default via 192.168.200.1 dev wlo1 proto static metric 600
+</code></pre></div></div>
+
+<p>유선 <code class="language-plaintext highlighter-rouge">metric 100</code> 경로가 없다는 것은 감시 스크립트가 지웠다는 뜻이므로, 먼저 감시 주소가 실제로 응답하는지부터 확인했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ping <span class="nt">-c</span> 3 9.9.9.9
+ping <span class="nt">-c</span> 1 1.1.1.1
+ping <span class="nt">-c</span> 1 1.0.0.1
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">9.9.9.9</code>만 0% 응답이었고 <code class="language-plaintext highlighter-rouge">1.1.1.1</code>과 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>은 바로 응답했습니다. 이때 sol의 기본 경로가 와이파이였으므로 이 결과는 와이파이 경로에서의 결과이고, <code class="language-plaintext highlighter-rouge">-I wlo1</code>로 와이파이 장치를 지정해서 보내도 같았습니다. 와이파이로도 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>가 안 되므로 astra의 NAT 문제가 아니라 강의실 네트워크 바깥 어딘가에서 이 주소가 막힌 것으로 보였고, 어디서 왜 막혔는지는 확인하지 못했습니다.</p>
+
+<p>돌아보면 조짐은 있었습니다. Ansible로 옮기던 날 polaris의 <code class="language-plaintext highlighter-rouge">9.9.9.9</code> ping이 4번 실패하고 5번째에 통과한 적이 있었는데, 그때는 와이파이가 다시 붙는 시간 때문이라고 보고 재시도 횟수만 늘렸습니다. 감시 주소 하나에 복구 판단을 전부 맡겨 두고 그 주소가 멀쩡한지는 따로 보지 않았던 셈이라, 이번 일로 감시 설계의 전제가 어디까지인지 체감했습니다.</p>
+
+<h3 id="3-유선-경로에서의-확인">3) 유선 경로에서의 확인</h3>
+
+<p>새 감시 주소는 유선과 astra를 거쳐서 응답해야 의미가 있으므로, sol에 임시 고정 경로를 넣어 astra를 거치는 경로로 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>을 확인했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>ip route add 1.0.0.1/32 via 10.0.0.201 dev enp2s0
+ip route get 1.0.0.1
+ping <span class="nt">-c</span> 5 1.0.0.1
+<span class="nb">sudo </span>ip route del 1.0.0.1/32 via 10.0.0.201 dev enp2s0
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">ip route add ... /32 via 10.0.0.201 dev enp2s0</code> : 이 주소 하나만 유선으로 astra를 거치게 하는 임시 경로</li>
+  <li><code class="language-plaintext highlighter-rouge">ip route get 1.0.0.1</code> : 실제로 어느 경로를 타는지 출력. <code class="language-plaintext highlighter-rouge">via 10.0.0.201 dev enp2s0</code>이면 유선과 astra를 거침</li>
+  <li>확인이 끝나면 <code class="language-plaintext highlighter-rouge">ip route del</code>로 임시 경로를 지움</li>
+</ul>
+
+<p>5번 모두 응답했고 TTL이 48로 와이파이 경로(49)보다 1 작아서 astra를 한 번 더 거친 것도 맞았습니다. astra 자체에서도 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>이 5번 모두 응답하는 것을 확인했습니다.</p>
+
+<blockquote>
+  <p><strong>감시 주소를 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>로 정한 이유</strong></p>
+
+  <p><code class="language-plaintext highlighter-rouge">1.1.1.1</code>과 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>은 같은 공개 DNS 서비스의 주소라 둘 다 응답했지만, <code class="language-plaintext highlighter-rouge">1.1.1.1</code>은 netplan의 DNS 서버 목록에도 들어 있는 주소입니다. 감시 주소에는 항상 astra를 거치는 <code class="language-plaintext highlighter-rouge">/32</code> 고정 경로가 붙기 때문에, <code class="language-plaintext highlighter-rouge">1.1.1.1</code>을 감시 주소로 쓰면 와이파이로 넘어간 상태에서 DNS 질의까지 죽은 astra 쪽으로 가게 됩니다. 감시와 DNS가 서로 영향을 주지 않도록 DNS 목록에 없는 <code class="language-plaintext highlighter-rouge">1.0.0.1</code>을 쓰는 것이 맞다고 판단했습니다.</p>
+</blockquote>
+
+<h2 id="2-수정">2. 수정</h2>
+
+<h3 id="1-바꾼-값">1) 바꾼 값</h3>
+
+<p>감시 주소는 Ansible 인벤토리의 <code class="language-plaintext highlighter-rouge">group_vars/all/main.yml</code>에 <code class="language-plaintext highlighter-rouge">probe_ip</code> 하나로 정의되어 있고, 워커 netplan 템플릿의 <code class="language-plaintext highlighter-rouge">/32</code> 고정 경로와 감시 스크립트 템플릿의 <code class="language-plaintext highlighter-rouge">PROBE=</code> 두 곳이 이 값을 읽습니다. 그래서 고친 것은 이 한 줄입니다.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">probe_ip</span><span class="pi">:</span> <span class="s">1.0.0.1</span>           <span class="c1"># 장애 감시용. 워커는 항상 게이트웨이를 거치게 고정 경로</span>
+</code></pre></div></div>
+
+<p>지난 글에서 게이트웨이 주소를 스크립트에 적지 않고 고정 경로에서 읽어오게 바꾼 것과 같은 이유로, 감시 주소도 인벤토리 한 곳만 바꾸면 netplan과 스크립트가 같이 바뀌므로 템플릿은 손대지 않았습니다. Mac에서 <code class="language-plaintext highlighter-rouge">--syntax-check</code>와 <code class="language-plaintext highlighter-rouge">ansible-lint</code>를 통과한 뒤 <code class="language-plaintext highlighter-rouge">bug/16-probe-ip</code> 브랜치로 push했습니다.</p>
+
+<h3 id="2-적용-순서">2) 적용 순서</h3>
+
+<p>network role은 감시 서비스를 netplan보다 먼저 재시작합니다. 옛 서비스가 netplan apply 도중에 경로를 되돌리는 것을 막기 위한 순서인데, 이번에는 그 사이에 새 스크립트가 <code class="language-plaintext highlighter-rouge">ip route show 1.0.0.1</code>로 게이트웨이 주소를 읽으려 해도 아직 netplan에는 <code class="language-plaintext highlighter-rouge">9.9.9.9/32</code> 경로만 있어서 빈 값이 나오고, 스크립트는 빈 값이면 아무것도 하지 않고 다음 주기를 기다리므로 문제가 없었습니다.</p>
+
+<p>적용은 astra에서 sol 한 대에 먼저 하고, 문제가 없으면 terra와 luna에 했습니다. 세 대가 같은 사양이고 같은 코드라 sol에서 확인되면 나머지는 한 번에 실행해도 되고, 워커 플레이가 <code class="language-plaintext highlighter-rouge">serial: 1</code>이라 한 번에 실행해도 한 대씩 차례로 적용되고 실패하면 다음 노드로 넘어가지 않기 때문입니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ansible-playbook playbooks/network.yml <span class="nt">-K</span> <span class="nt">--ask-vault-pass</span> <span class="nt">--check</span> <span class="nt">--diff</span> <span class="nt">--limit</span> sol
+ansible-playbook playbooks/network.yml <span class="nt">-K</span> <span class="nt">--ask-vault-pass</span> <span class="nt">--limit</span> sol
+ansible-playbook playbooks/network.yml <span class="nt">-K</span> <span class="nt">--ask-vault-pass</span> <span class="nt">--limit</span> terra,luna
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">-K</code> : sudo 비밀번호</li>
+  <li><code class="language-plaintext highlighter-rouge">--ask-vault-pass</code> : 와이파이 비밀번호가 들어 있는 <code class="language-plaintext highlighter-rouge">vault.yml</code>을 풀기 위한 암호. network 플레이북도 netplan에 와이파이 설정을 쓰므로 필요</li>
+  <li><code class="language-plaintext highlighter-rouge">--check --diff</code> : 바뀌는 줄만 보여 주고 적용하지 않음</li>
+</ul>
+
+<h2 id="3-적용과-검증">3. 적용과 검증</h2>
+
+<h3 id="1-sol">1) sol</h3>
+
+<p>적용 후 Mac에서 sol의 경로와 서비스 상태를 확인했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ssh orbit@sol <span class="s1">'ip route show default; echo ---; ip route get 1.0.0.1; echo ---; ip route show 9.9.9.9; echo ---; systemctl is-active orbit-gw-watch; grep ^PROBE /usr/local/sbin/orbit-gw-watch.sh'</span>
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">ip route show default</code> : 기본 경로 목록. 유선 <code class="language-plaintext highlighter-rouge">metric 100</code>이 돌아왔는지</li>
+  <li><code class="language-plaintext highlighter-rouge">ip route get 1.0.0.1</code> : 새 감시 주소가 유선으로 astra를 거치는지</li>
+  <li><code class="language-plaintext highlighter-rouge">ip route show 9.9.9.9</code> : 옛 감시 주소의 고정 경로가 남았는지</li>
+  <li><code class="language-plaintext highlighter-rouge">grep ^PROBE</code> : 서비스가 새 스크립트로 돌고 있는지</li>
+</ul>
+
+<p>유선 <code class="language-plaintext highlighter-rouge">metric 100</code> 기본 경로가 다시 생겼고, <code class="language-plaintext highlighter-rouge">1.0.0.1 via 10.0.0.201 dev enp2s0</code>, <code class="language-plaintext highlighter-rouge">9.9.9.9</code> 경로는 없음, 서비스 active, <code class="language-plaintext highlighter-rouge">PROBE=1.0.0.1</code>까지 모두 기대한 대로였습니다. 옛 <code class="language-plaintext highlighter-rouge">9.9.9.9/32</code> 경로는 netplan apply가 지워 주어서 따로 정리할 것이 없었습니다.</p>
+
+<p>다만 <code class="language-plaintext highlighter-rouge">journalctl -t orbit-gw</code>에는 복귀 로그가 없었습니다. netplan apply가 유선 기본 경로를 먼저 다시 만들었기 때문에 감시 스크립트 입장에서는 되돌릴 경로가 이미 있어서 복귀할 일이 없었고, 이 경우 로그가 없는 것이 정상이라고 판단했습니다.</p>
+
+<p>처음에는 이 확인 명령을 sol 안에서 그대로 실행해서 <code class="language-plaintext highlighter-rouge">ssh orbit@sol</code>이 자기 자신(<code class="language-plaintext highlighter-rouge">127.0.1.1</code>)에 접속하려고 호스트 키를 물어보는 일이 있었는데, 취소하고 Mac에서 다시 실행했습니다.</p>
+
+<h3 id="2-terra-luna">2) terra, luna</h3>
+
+<p>terra와 luna는 한 번에 적용했고, 끝난 뒤 같은 확인을 반복문으로 돌렸습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for </span>h <span class="k">in </span>terra luna<span class="p">;</span> <span class="k">do </span><span class="nb">echo</span> <span class="s2">"== </span><span class="nv">$h</span><span class="s2">"</span><span class="p">;</span> ssh orbit@<span class="nv">$h</span> <span class="s1">'ip route show default; ip route get 1.0.0.1 | head -1; ip route show 9.9.9.9; systemctl is-active orbit-gw-watch; grep ^PROBE /usr/local/sbin/orbit-gw-watch.sh'</span><span class="p">;</span> <span class="k">done</span>
+</code></pre></div></div>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/01.webp" alt="" /></p>
+
+<p>왼쪽이 astra의 플레이북 결과로 terra와 luna 모두 <code class="language-plaintext highlighter-rouge">ok=22 changed=6 failed=0</code>이고, 오른쪽이 확인 결과입니다. 첫 번째 확인 때는 luna가 아직 와이파이에 <code class="language-plaintext highlighter-rouge">PROBE=9.9.9.9</code>였는데, <code class="language-plaintext highlighter-rouge">serial: 1</code>이라 terra가 끝나고 luna 차례가 오기 전에 확인한 것이라 잠시 뒤 다시 실행하니 두 대 모두 유선 <code class="language-plaintext highlighter-rouge">metric 100</code>에 <code class="language-plaintext highlighter-rouge">PROBE=1.0.0.1</code>인 것을 확인할 수 있었습니다.</p>
+
+<h3 id="3-랜선-분리-시험">3) 랜선 분리 시험</h3>
+
+<p>지난 글에서는 랜선을 뽑은 시각을 기록하지 않아 로그의 전환 기록이 랜선 시험인지 주소 변경 작업인지 구분하지 못했습니다. 이번에는 로그 대신 세 워커의 기본 경로를 1초마다 직접 보면서 astra 쪽 랜선을 뽑았다가 다시 꽂았습니다.</p>
+
+<p>먼저 뽑기 전후를 한 번씩 확인했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for </span>h <span class="k">in </span>sol terra luna<span class="p">;</span> <span class="k">do </span><span class="nb">echo</span> <span class="s2">"== </span><span class="nv">$h</span><span class="s2">"</span><span class="p">;</span> ssh orbit@<span class="nv">$h</span> <span class="s1">'ip route show default; ip route get 1.0.0.1 | head -1; ip route show 9.9.9.9; systemctl is-active orbit-gw-watch; grep ^PROBE /usr/local/sbin/orbit-gw-watch.sh'</span><span class="p">;</span> <span class="k">done</span>
+</code></pre></div></div>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/02.webp" alt="" /></p>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/03.webp" alt="" /></p>
+
+<p>뽑은 뒤 세 대 모두 유선 기본 경로가 사라지고 와이파이 <code class="language-plaintext highlighter-rouge">metric 600</code>만 남았습니다. 그런데 <code class="language-plaintext highlighter-rouge">ip route get 1.0.0.1</code>은 여전히 <code class="language-plaintext highlighter-rouge">via 10.0.0.201 dev enp2s0</code>이어서 잠깐 그대로인 이유를 생각해 봤는데, 감시 스크립트가 지우는 것은 유선 기본 경로 하나뿐이고 감시 주소의 <code class="language-plaintext highlighter-rouge">/32</code> 고정 경로는 netplan에 있는 경로라 그대로 남는 것이 설계대로였습니다. 이 경로가 남아 있어야 와이파이로 넘어간 뒤에도 감시 ping이 astra 쪽으로 가서 복구를 알 수 있고, <code class="language-plaintext highlighter-rouge">ip route get</code>은 패킷을 보내지 않고 경로표만 보는 명령이라 선이 빠져 있어도 같은 줄이 나옵니다.</p>
+
+<p>다음으로 전환과 복귀 시점을 보기 위해 1초마다 세 대의 기본 경로를 출력하도록 했습니다. 워커는 아직 비밀번호 로그인이라 1초마다 새로 접속하면 매번 비밀번호를 물어보므로, 노드마다 연결을 한 번 열어 두고 재사용했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for </span>h <span class="k">in </span>sol terra luna<span class="p">;</span> <span class="k">do </span>ssh <span class="nt">-fNM</span> <span class="nt">-o</span> <span class="nv">ControlPath</span><span class="o">=</span>/tmp/ssh-%r@%h <span class="nt">-o</span> <span class="nv">ControlPersist</span><span class="o">=</span>15m orbit@<span class="nv">$h</span><span class="p">;</span> <span class="k">done
+while </span><span class="nb">true</span><span class="p">;</span> <span class="k">do </span>clear<span class="p">;</span> <span class="nb">date</span> <span class="s1">'+%T'</span><span class="p">;</span> <span class="k">for </span>h <span class="k">in </span>sol terra luna<span class="p">;</span> <span class="k">do </span><span class="nb">echo</span> <span class="s2">"== </span><span class="nv">$h</span><span class="s2">"</span><span class="p">;</span> ssh <span class="nt">-o</span> <span class="nv">ControlPath</span><span class="o">=</span>/tmp/ssh-%r@%h orbit@<span class="nv">$h</span> ip route show default<span class="p">;</span> <span class="k">done</span><span class="p">;</span> <span class="nb">sleep </span>1<span class="p">;</span> <span class="k">done</span>
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">-fNM</code> : 명령 없이(<code class="language-plaintext highlighter-rouge">-N</code>) 백그라운드로(<code class="language-plaintext highlighter-rouge">-f</code>) 마스터 연결(<code class="language-plaintext highlighter-rouge">-M</code>)만 열어 둠</li>
+  <li><code class="language-plaintext highlighter-rouge">ControlPath</code>, <code class="language-plaintext highlighter-rouge">ControlPersist=15m</code> : 이후 같은 호스트로의 ssh는 이 연결을 재사용하고, 마지막 사용 후 15분까지 유지</li>
+  <li>Mac에는 <code class="language-plaintext highlighter-rouge">watch</code>가 없어서 <code class="language-plaintext highlighter-rouge">while</code>과 <code class="language-plaintext highlighter-rouge">sleep 1</code>로 반복</li>
+</ul>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/04.webp" alt="" /></p>
+
+<p><img src="../../assets/post/2026-11-02-project-6-orbit-probe-ip-and-failover-test/05.webp" alt="" /></p>
+
+<p>20:34:49에는 세 대 모두 와이파이 경로만 있었고, 20:35:35에는 세 대 모두 <code class="language-plaintext highlighter-rouge">default via 10.0.0.201 dev enp2s0 metric 100</code>이 돌아와 있는 것을 확인할 수 있었습니다. 복귀한 유선 경로에는 <code class="language-plaintext highlighter-rouge">proto static</code>이 붙어 있지 않은데, netplan이 만든 경로에는 <code class="language-plaintext highlighter-rouge">proto static</code>이 붙고 감시 스크립트가 <code class="language-plaintext highlighter-rouge">ip route replace</code>로 만든 경로에는 붙지 않으므로, 이번 복귀는 netplan이 아니라 감시 스크립트가 한 것이라는 점까지 경로 한 줄로 구분할 수 있었습니다. 지난 글에서 로그로만 보던 것을 이번에는 상태 변화로 직접 봤기 때문에 <code class="language-plaintext highlighter-rouge">orbit-gw</code> 로그는 따로 확인하지 않았습니다.</p>
+
+<h3 id="4-결과">4) 결과</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>결과</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">9.9.9.9</code> 응답</td>
+      <td>유선, 와이파이 모두 없음. 원인은 확인하지 못함</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">1.0.0.1</code> 유선과 astra 경유 응답</td>
+      <td>통과 (sol 5/5, astra 5/5)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">probe_ip</code> 변경, 문법 검사, lint</td>
+      <td>통과</td>
+    </tr>
+    <tr>
+      <td>적용</td>
+      <td>sol 후 terra, luna. <code class="language-plaintext highlighter-rouge">failed=0</code></td>
+    </tr>
+    <tr>
+      <td>유선 기본 경로 복귀</td>
+      <td>통과 (3대)</td>
+    </tr>
+    <tr>
+      <td>옛 <code class="language-plaintext highlighter-rouge">9.9.9.9/32</code> 경로</td>
+      <td>3대 모두 없음</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">orbit-gw-watch</code></td>
+      <td>active, <code class="language-plaintext highlighter-rouge">PROBE=1.0.0.1</code> (3대)</td>
+    </tr>
+    <tr>
+      <td>랜선 분리 시 와이파이 전환</td>
+      <td>통과 (3대)</td>
+    </tr>
+    <tr>
+      <td>재연결 후 유선 복귀</td>
+      <td>통과 (3대, 1분 안)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="4-다음-작업">4. 다음 작업</h2>
+
+<h3 id="1-감시-주소-하나에-의존하는-문제">1) 감시 주소 하나에 의존하는 문제</h3>
+
+<p>이번 수정은 감시 주소를 응답하는 다른 주소로 바꾼 것이라, 그 주소가 또 막히면 같은 일이 생깁니다. 감시 주소 두세 개 중 하나라도 응답하면 정상으로 보거나, astra 자체(<code class="language-plaintext highlighter-rouge">10.0.0.201</code>)와 astra 너머의 주소를 나눠서 “astra는 살아 있는데 바깥이 안 되는 경우”를 구분하는 방향을 생각하고 있습니다. 다만 지금은 팀원들이 개인 계정과 Vault로 서버에 접속해 각자 작업을 시작할 수 있게 하는 것이 먼저라, 이 부분은 재발하면 그때 후속 이슈로 다루기로 했습니다.</p>
+
+<h3 id="2-네트워크-변화를-디스코드로-받기">2) 네트워크 변화를 디스코드로 받기</h3>
+
+<p>이번 문제는 워커가 와이파이로 넘어간 지 며칠이 지나서야 sol에 들어가 보고 알았습니다. 감시 스크립트는 전환할 때마다 journal에 로그를 남기지만 그 로그는 각 워커 안에만 있어서, 누군가 접속해서 보기 전까지는 전환이 일어났는지 아무도 모르는 구조입니다. 랜선 시험 때도 Mac에서 1초마다 세 대에 ssh로 물어보는 식으로 봤는데, 이런 관찰을 매번 사람이 하지 않고 팀이 쓰는 디스코드로 받도록 하고 싶다고 생각했습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>방식</th>
+      <th>하는 일</th>
+      <th>장점</th>
+      <th>한계</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>전환 시 웹훅</td>
+      <td>감시 스크립트가 <code class="language-plaintext highlighter-rouge">logger</code>로 기록하는 자리에서 디스코드 웹훅으로도 같은 문장을 보냄</td>
+      <td>스크립트에 <code class="language-plaintext highlighter-rouge">curl</code> 한 줄이라 바로 넣을 수 있고, 전환과 복귀가 일어난 시각이 채널에 남음</td>
+      <td>이벤트만 오므로 지금 상태를 알려면 메시지를 거슬러 올라가야 하고, 전환과 복귀가 반복되면 채널이 시끄러워짐</td>
+    </tr>
+    <tr>
+      <td>상태 봇</td>
+      <td>astra에서 주기적으로 노드 5대의 기본 경로와 감시 서비스 상태를 모아 디스코드 메시지 하나를 계속 갱신</td>
+      <td>채널 상단 메시지 하나만 보면 지금 어느 노드가 유선이고 어느 노드가 와이파이인지 보임</td>
+      <td>봇 토큰과 실행 위치를 관리해야 하고, astra가 죽으면 봇도 같이 멈추므로 그 자체가 신호가 됨</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>두 가지는 역할이 달라서 하나를 고르기보다 같이 두는 쪽을 생각하고 있습니다. 전환 시 웹훅은 “언제 무슨 일이 있었는지”를 남기고, 상태 봇은 “지금 어떤 상태인지”를 보여 주므로, 먼저 웹훅을 감시 스크립트에 넣고 상태 봇은 모니터링 스택이 올라온 뒤 Loki에 모인 로그와 겹치지 않는 범위에서 만들 예정입니다. 웹훅 주소와 봇 토큰은 Vault에 두고 Ansible이 꺼내 쓰도록 하면, 지난 글에서 정한 “비밀값은 저장소에 올리지 않는다”는 기준도 그대로 지킬 수 있습니다.</p>
+
+<h3 id="3-남은-것">3) 남은 것</h3>
+
+<p>이번 주는 팀원들이 각자 맡은 모니터링과 AWS 전환 작업을 시작할 수 있도록 접속 경로와 권한을 먼저 끝내야 합니다. 따라서 네트워크 쪽에서 남은 것은 아래로 좁혔습니다.</p>
+
+<ul>
+  <li>이번 변경의 PR 머지. 머지 전에 다른 브랜치에서 워커에 <code class="language-plaintext highlighter-rouge">network.yml</code>을 실행하면 감시 주소가 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>로 돌아가므로, 그 전까지 워커 network 적용은 피하도록 팀에 알림</li>
+  <li><code class="language-plaintext highlighter-rouge">ansible-lint</code>가 collection을 내려받는 <code class="language-plaintext highlighter-rouge">ansible/.ansible/</code>을 <code class="language-plaintext highlighter-rouge">.gitignore</code>에 추가. 이번에 GitHub Desktop에 586개 파일이 변경으로 떠서 확인한 것</li>
+  <li>감시 스크립트에 디스코드 웹훅 추가. 상태 봇은 모니터링 스택 이후</li>
+</ul>]]></content><author><name></name></author><category term="Project" /><category term="Orbit" /><category term="Network" /><category term="Troubleshooting" /><summary type="html"><![CDATA[게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록]]></summary></entry><entry><title type="html">ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지</title><link href="https://hyn128.site/project-5-orbit-phase2-week1-presentation/" rel="alternate" type="text/html" title="ORBIT 프로젝트 1차 발표, 회고에서 설계와 구축까지" /><published>2026-11-01T00:00:00+09:00</published><updated>2026-11-01T00:00:00+09:00</updated><id>https://hyn128.site/project-5-orbit-phase2-week1-presentation</id><content type="html" xml:base="https://hyn128.site/project-5-orbit-phase2-week1-presentation/"><![CDATA[<blockquote>
   <p>Phase 1 발표가 끝난 뒤 받은 피드백과 팀 회고를 바탕으로 프로젝트의 범위와 초점을 다시 잡았고, 바뀐 설계로 인프라를 구축한 첫 주의 결과를 발표했습니다. 발표는 회고와 개선, 설계, 진행 상황, 트러블슈팅, 향후 계획의 다섯 부분으로 구성했고, 이 글은 그 슬라이드와 대본을 순서대로 옮긴 기록입니다.</p>
 </blockquote>
 
@@ -4881,549 +5155,4 @@ Prometheus가 새 Target Scrape·Rule 평가
   <li>
     <p><a href="https://prometheus.io/docs/practices/pushing/">Pushgateway 사용 기준</a></p>
   </li>
-</ul>]]></content><author><name></name></author><category term="CloudNative" /><category term="AutoEverSW" /><category term="Monitoring" /><summary type="html"><![CDATA[Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다]]></summary></entry><entry><title type="html">2-AZ VPC Public·Private Network 구축</title><link href="https://hyn128.site/cloud-21-vpc-public-private-network/" rel="alternate" type="text/html" title="2-AZ VPC Public·Private Network 구축" /><published>2026-10-08T00:00:00+09:00</published><updated>2026-10-08T00:00:00+09:00</updated><id>https://hyn128.site/cloud-21-vpc-public-private-network</id><content type="html" xml:base="https://hyn128.site/cloud-21-vpc-public-private-network/"><![CDATA[<h2 id="요약">요약</h2>
-
-<hr />
-
-<blockquote>
-  <p>하나의 Amazon VPC를 두 Availability Zone으로 나누고 각 Zone에 Public Subnet과 Private Subnet을 구성합니다. Public Subnet은 Internet Gateway를 통해 외부 Traffic을 받고, Private Subnet은 같은 Zone의 NAT Gateway를 통해 Outbound Internet에 접근합니다. Route Table과 Security Group을 역할별로 분리하고 Session Manager 또는 제한된 Bastion 경로로 Private EC2 접속을 검증합니다.</p>
-</blockquote>
-
-<h2 id="1-목표-architecture">1. 목표 Architecture</h2>
-
-<hr />
-
-<p>이 실습에서 만드는 Network는 다음과 같습니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>VPC 10.20.0.0/16
-├── AZ-A
-│   ├── Public Subnet A  10.20.1.0/24
-│   │   ├── Internet-facing Web 또는 Bastion
-│   │   └── NAT Gateway A
-│   └── Private Subnet A 10.20.11.0/24
-│       └── Application EC2
-└── AZ-B
-    ├── Public Subnet B  10.20.2.0/24
-    │   ├── Internet-facing Web
-    │   └── NAT Gateway B
-    └── Private Subnet B 10.20.12.0/24
-        └── Application EC2
-</code></pre></div></div>
-
-<table>
-  <thead>
-    <tr>
-      <th>표기</th>
-      <th>실행 위치</th>
-      <th>작업</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code></td>
-      <td>AWS Management Console</td>
-      <td>VPC, Subnet, Gateway, Route와 Security Group 생성</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[LOCAL]</code></td>
-      <td>관리자 PC</td>
-      <td>AWS Session Manager 또는 제한된 SSH 접속</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[PUBLIC-EC2]</code></td>
-      <td>Public Subnet의 EC2</td>
-      <td>Public 접속과 Private EC2 경로 검증</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">[PRIVATE-EC2]</code></td>
-      <td>Private Subnet의 EC2</td>
-      <td>NAT Gateway를 통한 Outbound 검증</td>
-    </tr>
-  </tbody>
-</table>
-
-<blockquote>
-  <p><strong>CIDR</strong>
-Classless Inter-Domain Routing의 약자입니다. <code class="language-plaintext highlighter-rouge">10.20.0.0/16</code>처럼 Network 주소와 Prefix 길이로 IP 범위를 표현합니다.</p>
-</blockquote>
-
-<h2 id="2-resource와-cidr-계획">2. Resource와 CIDR 계획</h2>
-
-<hr />
-
-<table>
-  <thead>
-    <tr>
-      <th>Resource</th>
-      <th>Name Tag</th>
-      <th>CIDR 또는 연결 대상</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>VPC</td>
-      <td><code class="language-plaintext highlighter-rouge">lab-vpc</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
-    </tr>
-    <tr>
-      <td>Public Subnet A</td>
-      <td><code class="language-plaintext highlighter-rouge">public-subnet-a</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.1.0/24</code></td>
-    </tr>
-    <tr>
-      <td>Public Subnet B</td>
-      <td><code class="language-plaintext highlighter-rouge">public-subnet-b</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.2.0/24</code></td>
-    </tr>
-    <tr>
-      <td>Private Subnet A</td>
-      <td><code class="language-plaintext highlighter-rouge">private-subnet-a</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.11.0/24</code></td>
-    </tr>
-    <tr>
-      <td>Private Subnet B</td>
-      <td><code class="language-plaintext highlighter-rouge">private-subnet-b</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.12.0/24</code></td>
-    </tr>
-    <tr>
-      <td>Internet Gateway</td>
-      <td><code class="language-plaintext highlighter-rouge">lab-igw</code></td>
-      <td><code class="language-plaintext highlighter-rouge">lab-vpc</code>에 Attach</td>
-    </tr>
-    <tr>
-      <td>NAT Gateway A</td>
-      <td><code class="language-plaintext highlighter-rouge">nat-gateway-a</code></td>
-      <td>Public Subnet A와 Elastic IP</td>
-    </tr>
-    <tr>
-      <td>NAT Gateway B</td>
-      <td><code class="language-plaintext highlighter-rouge">nat-gateway-b</code></td>
-      <td>Public Subnet B와 Elastic IP</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>VPC CIDR는 On-Premise, Client VPN과 다른 VPC의 CIDR와 겹치지 않아야 합니다. 이후 VPN이나 VPC Peering을 연결할 계획이면 생성 전에 전체 주소 계획을 확인합니다.</p>
-
-<h2 id="3-vpc와-subnet-생성">3. VPC와 Subnet 생성</h2>
-
-<hr />
-
-<h3 id="31-vpc-생성">3.1 VPC 생성</h3>
-
-<p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>의 VPC 화면에서 <code class="language-plaintext highlighter-rouge">Create VPC</code>를 누르고 <code class="language-plaintext highlighter-rouge">VPC only</code>를 선택합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>항목</th>
-      <th>값</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Name tag</td>
-      <td><code class="language-plaintext highlighter-rouge">lab-vpc</code></td>
-    </tr>
-    <tr>
-      <td>IPv4 CIDR</td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p>DNS 기반 Service Discovery를 사용할 수 있도록 <code class="language-plaintext highlighter-rouge">DNS resolution</code>과 <code class="language-plaintext highlighter-rouge">DNS hostnames</code>가 활성화됐는지 확인합니다.</p>
-
-<h3 id="32-네-subnet-생성">3.2 네 Subnet 생성</h3>
-
-<p><code class="language-plaintext highlighter-rouge">lab-vpc</code>를 선택하고 두 Availability Zone에 네 Subnet을 만듭니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Subnet</th>
-      <th>Availability Zone</th>
-      <th>IPv4 CIDR</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">public-subnet-a</code></td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;AZ_A&gt;</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.1.0/24</code></td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">public-subnet-b</code></td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;AZ_B&gt;</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.2.0/24</code></td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">private-subnet-a</code></td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;AZ_A&gt;</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.11.0/24</code></td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">private-subnet-b</code></td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;AZ_B&gt;</code></td>
-      <td><code class="language-plaintext highlighter-rouge">10.20.12.0/24</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Public Subnet 두 개는 <code class="language-plaintext highlighter-rouge">Edit subnet settings</code>에서 <code class="language-plaintext highlighter-rouge">Enable auto-assign public IPv4 address</code>를 필요한 경우 활성화합니다. 이 설정만으로 Public Subnet이 되는 것은 아닙니다. Internet Gateway로 향하는 Route가 있어야 합니다.</p>
-
-<p>Private Subnet에서는 Public IPv4 자동 할당을 비활성화합니다.</p>
-
-<h2 id="4-internet-gateway와-public-route">4. Internet Gateway와 Public Route</h2>
-
-<hr />
-
-<p><code class="language-plaintext highlighter-rouge">[AWS-CONSOLE]</code>에서 <code class="language-plaintext highlighter-rouge">lab-igw</code> Internet Gateway를 생성해 <code class="language-plaintext highlighter-rouge">lab-vpc</code>에 Attach합니다.</p>
-
-<p>Public Route Table <code class="language-plaintext highlighter-rouge">public-rt</code>를 만들고 다음 Route를 확인하거나 추가합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Destination</th>
-      <th>Target</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
-      <td><code class="language-plaintext highlighter-rouge">local</code></td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">0.0.0.0/0</code></td>
-      <td><code class="language-plaintext highlighter-rouge">lab-igw</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p><code class="language-plaintext highlighter-rouge">Subnet associations</code>에서 <code class="language-plaintext highlighter-rouge">public-subnet-a</code>, <code class="language-plaintext highlighter-rouge">public-subnet-b</code>를 연결합니다.</p>
-
-<p>Internet Gateway의 Stateful 여부를 Security Group처럼 해석하지 않습니다. Internet Gateway는 Route Target과 Public IPv4 NAT 기능을 제공하고, Stateful Traffic 허용은 Security Group이 담당합니다.</p>
-
-<h2 id="5-nat-gateway와-private-route">5. NAT Gateway와 Private Route</h2>
-
-<hr />
-
-<p>NAT Gateway는 반드시 Public Subnet에 생성합니다. Private Subnet의 Default Route가 NAT Gateway를 가리키도록 구성합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>NAT Gateway</th>
-      <th>Subnet</th>
-      <th>Elastic IP</th>
-      <th>사용하는 Private Subnet</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">nat-gateway-a</code></td>
-      <td><code class="language-plaintext highlighter-rouge">public-subnet-a</code></td>
-      <td>새 Elastic IP</td>
-      <td><code class="language-plaintext highlighter-rouge">private-subnet-a</code></td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">nat-gateway-b</code></td>
-      <td><code class="language-plaintext highlighter-rouge">public-subnet-b</code></td>
-      <td>새 Elastic IP</td>
-      <td><code class="language-plaintext highlighter-rouge">private-subnet-b</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p>각 NAT Gateway가 <code class="language-plaintext highlighter-rouge">Available</code> 상태가 된 뒤 Zone별 Private Route Table을 만듭니다.</p>
-
-<p><code class="language-plaintext highlighter-rouge">private-rt-a</code>의 Route는 다음과 같습니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Destination</th>
-      <th>Target</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">10.20.0.0/16</code></td>
-      <td><code class="language-plaintext highlighter-rouge">local</code></td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">0.0.0.0/0</code></td>
-      <td><code class="language-plaintext highlighter-rouge">nat-gateway-a</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p><code class="language-plaintext highlighter-rouge">private-subnet-a</code>를 <code class="language-plaintext highlighter-rouge">private-rt-a</code>에 연결합니다. <code class="language-plaintext highlighter-rouge">private-rt-b</code>도 같은 방식으로 만들되 Default Route의 Target은 <code class="language-plaintext highlighter-rouge">nat-gateway-b</code>로 지정하고 <code class="language-plaintext highlighter-rouge">private-subnet-b</code>를 연결합니다.</p>
-
-<p>실습 비용을 줄이려고 NAT Gateway 하나만 만들 수 있지만 다른 Zone의 Private Subnet이 해당 Gateway를 사용하면 Zone 장애에 취약하고 Cross-AZ Data 처리 비용이 생길 수 있습니다. 운영 환경에서는 Zone별 NAT Gateway와 Route를 사용합니다.</p>
-
-<h2 id="6-security-group-설계">6. Security Group 설계</h2>
-
-<hr />
-
-<p>Source를 VPC 전체 CIDR보다 역할별 Security Group으로 지정합니다.</p>
-
-<h3 id="61-public-web-security-group">6.1 Public Web Security Group</h3>
-
-<p><code class="language-plaintext highlighter-rouge">web-sg</code>의 Inbound Rule은 다음과 같습니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Protocol</th>
-      <th>Port</th>
-      <th>Source</th>
-      <th>목적</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>TCP</td>
-      <td>80</td>
-      <td><code class="language-plaintext highlighter-rouge">0.0.0.0/0</code></td>
-      <td>HTTP Service 공개</td>
-    </tr>
-    <tr>
-      <td>TCP</td>
-      <td>443</td>
-      <td><code class="language-plaintext highlighter-rouge">0.0.0.0/0</code></td>
-      <td>HTTPS Service 공개</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Web Server가 아니라 Bastion 용도로만 사용하는 EC2에는 HTTP와 HTTPS를 열지 않습니다.</p>
-
-<h3 id="62-bastion-security-group">6.2 Bastion Security Group</h3>
-
-<p><code class="language-plaintext highlighter-rouge">bastion-sg</code>에는 관리자 주소만 SSH를 허용합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Protocol</th>
-      <th>Port</th>
-      <th>Source</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>TCP</td>
-      <td>22</td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;ADMIN_PUBLIC_IP&gt;/32</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p>관리자 주소가 바뀐다는 이유로 <code class="language-plaintext highlighter-rouge">0.0.0.0/0</code>에 SSH를 공개하지 않습니다. 고정 접속 주소가 없다면 Systems Manager Session Manager를 우선 사용합니다.</p>
-
-<h3 id="63-private-application-security-group">6.3 Private Application Security Group</h3>
-
-<p><code class="language-plaintext highlighter-rouge">app-sg</code>는 실제 Source 역할만 허용합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Protocol</th>
-      <th>Port</th>
-      <th>Source</th>
-      <th>목적</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>TCP</td>
-      <td>22</td>
-      <td><code class="language-plaintext highlighter-rouge">bastion-sg</code></td>
-      <td>Bastion을 사용하는 경우 관리 접속</td>
-    </tr>
-    <tr>
-      <td>TCP</td>
-      <td><code class="language-plaintext highlighter-rouge">&lt;APP_PORT&gt;</code></td>
-      <td><code class="language-plaintext highlighter-rouge">web-sg</code></td>
-      <td>Web Tier에서 Application 호출</td>
-    </tr>
-    <tr>
-      <td>ICMP</td>
-      <td>필요한 Type만</td>
-      <td><code class="language-plaintext highlighter-rouge">bastion-sg</code></td>
-      <td>선택적 Network Test</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>관리 접속을 Session Manager로 통일하면 <code class="language-plaintext highlighter-rouge">app-sg</code>의 SSH Rule을 제거할 수 있습니다.</p>
-
-<h2 id="7-ec2-배치와-관리-경로">7. EC2 배치와 관리 경로</h2>
-
-<hr />
-
-<table>
-  <thead>
-    <tr>
-      <th>EC2</th>
-      <th>Subnet</th>
-      <th>Public IPv4</th>
-      <th>Security Group</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Bastion 또는 Web</td>
-      <td><code class="language-plaintext highlighter-rouge">public-subnet-a</code></td>
-      <td>활성화</td>
-      <td><code class="language-plaintext highlighter-rouge">bastion-sg</code> 또는 <code class="language-plaintext highlighter-rouge">web-sg</code></td>
-    </tr>
-    <tr>
-      <td>Application A</td>
-      <td><code class="language-plaintext highlighter-rouge">private-subnet-a</code></td>
-      <td>비활성화</td>
-      <td><code class="language-plaintext highlighter-rouge">app-sg</code></td>
-    </tr>
-    <tr>
-      <td>Application B</td>
-      <td><code class="language-plaintext highlighter-rouge">private-subnet-b</code></td>
-      <td>비활성화</td>
-      <td><code class="language-plaintext highlighter-rouge">app-sg</code></td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Private EC2에는 <code class="language-plaintext highlighter-rouge">AmazonSSMManagedInstanceCore</code> 권한을 가진 Instance Profile을 연결하고 SSM Agent와 Outbound 경로를 준비하면 Session Manager로 접속할 수 있습니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [LOCAL]</span>
-aws ssm start-session <span class="se">\</span>
-  <span class="nt">--target</span> &lt;PRIVATE_INSTANCE_ID&gt;
-</code></pre></div></div>
-
-<p>SSH 경로를 학습해야 한다면 Private Key를 Bastion에 복사하지 않고 Local Client에서 ProxyJump를 사용합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [LOCAL]</span>
-ssh <span class="nt">-i</span> &lt;PRIVATE_KEY_PATH&gt; <span class="se">\</span>
-  <span class="nt">-J</span> ubuntu@&lt;BASTION_PUBLIC_IP&gt; <span class="se">\</span>
-  ubuntu@&lt;PRIVATE_INSTANCE_IP&gt;
-</code></pre></div></div>
-
-<p>Amazon DocumentDB 같은 VPC 내부 Managed Database는 Public Internet에 직접 노출하지 않습니다. 관리 접속이 필요하면 Session Manager Port Forwarding 또는 제한된 관리 Host를 사용하고 Database Security Group에는 Application이나 관리 Host의 Security Group만 허용합니다.</p>
-
-<h2 id="8-network-검증">8. Network 검증</h2>
-
-<hr />
-
-<h3 id="81-public-ec2-접속">8.1 Public EC2 접속</h3>
-
-<p>Public EC2의 Public IPv4와 Security Group을 확인한 뒤 제한된 관리 주소에서 접속합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [LOCAL]</span>
-ssh <span class="nt">-i</span> &lt;PRIVATE_KEY_PATH&gt; <span class="se">\</span>
-  ubuntu@&lt;PUBLIC_INSTANCE_IP&gt;
-</code></pre></div></div>
-
-<h3 id="82-vpc-내부-경로">8.2 VPC 내부 경로</h3>
-
-<p><code class="language-plaintext highlighter-rouge">[PUBLIC-EC2]</code>에서 Private EC2의 Private IP로 ICMP 또는 Application Port를 확인합니다. ICMP는 양쪽 Security Group에서 필요한 경우에만 허용합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [PUBLIC-EC2]</span>
-ping <span class="nt">-c</span> 3 &lt;PRIVATE_INSTANCE_IP&gt;
-
-nc <span class="nt">-vz</span> &lt;PRIVATE_INSTANCE_IP&gt; &lt;APP_PORT&gt;
-</code></pre></div></div>
-
-<h3 id="83-private-subnet-outbound">8.3 Private Subnet Outbound</h3>
-
-<p><code class="language-plaintext highlighter-rouge">[PRIVATE-EC2]</code>에서 HTTPS 요청으로 NAT Gateway 경로를 확인합니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [PRIVATE-EC2]</span>
-curl <span class="nt">--fail</span> <span class="nt">--silent</span> <span class="nt">--show-error</span> <span class="se">\</span>
-  https://checkip.amazonaws.com
-</code></pre></div></div>
-
-<p>출력 주소가 같은 Zone의 NAT Gateway Elastic IP인지 확인합니다. 실패하면 다음 순서로 점검합니다.</p>
-
-<ol>
-  <li>
-    <p>Private Subnet의 Default Route가 같은 Zone의 NAT Gateway를 가리키는지 확인합니다.</p>
-  </li>
-  <li>
-    <p>NAT Gateway가 Public Subnet에 있고 <code class="language-plaintext highlighter-rouge">Available</code> 상태인지 확인합니다.</p>
-  </li>
-  <li>
-    <p>Public Subnet Route Table에 Internet Gateway Default Route가 있는지 확인합니다.</p>
-  </li>
-  <li>
-    <p>EC2 Security Group의 Outbound와 두 Subnet의 Network ACL을 확인합니다.</p>
-  </li>
-  <li>
-    <p>VPC Flow Logs로 Reject Traffic을 확인합니다.</p>
-  </li>
-</ol>
-
-<h2 id="9-resource-정리">9. Resource 정리</h2>
-
-<hr />
-
-<p>NAT Gateway와 Public IPv4에는 비용이 발생할 수 있습니다. 실습 후 다음 순서로 제거합니다.</p>
-
-<ol>
-  <li>
-    <p>EC2 Instance를 종료합니다.</p>
-  </li>
-  <li>
-    <p>NAT Gateway 두 개를 삭제하고 해제 가능한 Elastic IP를 Release합니다.</p>
-  </li>
-  <li>
-    <p>Custom Route Table과 Security Group을 삭제합니다.</p>
-  </li>
-  <li>
-    <p>Internet Gateway를 VPC에서 Detach한 뒤 삭제합니다.</p>
-  </li>
-  <li>
-    <p>Subnet과 VPC를 삭제합니다.</p>
-  </li>
-</ol>
-
-<blockquote>
-  <p><strong>최종 정리</strong></p>
-  <ul>
-    <li>
-      <p>Public Subnet은 Internet Gateway Route로 결정되고 Public IPv4가 있어야 IPv4 Internet 통신이 가능합니다.</p>
-    </li>
-    <li>
-      <p>NAT Gateway는 Public Subnet에 만들고 Private Subnet의 Default Route Target으로 사용합니다.</p>
-    </li>
-    <li>
-      <p>운영 환경에서는 Zone별 NAT Gateway를 배치해 장애 범위와 Cross-AZ Traffic을 줄입니다.</p>
-    </li>
-    <li>
-      <p>Private EC2 관리에는 Session Manager를 우선하고 SSH가 필요하면 Source 주소와 경로를 제한합니다.</p>
-    </li>
-    <li>
-      <p>Route는 경로를 결정하고 Security Group과 Network ACL은 허용 범위를 결정합니다.</p>
-    </li>
-  </ul>
-</blockquote>
-
-<h2 id="참고-자료">참고 자료</h2>
-
-<hr />
-
-<ul>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/vpc/latest/userguide/vpc-example-private-subnets-nat.html">Private Subnet과 NAT Gateway VPC 예제</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-troubleshooting.html">NAT Gateway 문제 해결</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html">VPC Route Table 구성</a></p>
-  </li>
-  <li>
-    <p><a href="https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-sessions-start.html">Session Manager 시작</a></p>
-  </li>
-</ul>]]></content><author><name></name></author><category term="Cloud" /><category term="AWS" /><category term="AutoEverSW" /><summary type="html"><![CDATA[두 Availability Zone에 Public·Private Subnet을 나누고 Internet Gateway, NAT Gateway, Route Table과 Security Group을 구성해 접속 경로를 검증합니다]]></summary></entry></feed>
+</ul>]]></content><author><name></name></author><category term="CloudNative" /><category term="AutoEverSW" /><category term="Monitoring" /><summary type="html"><![CDATA[Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다]]></summary></entry></feed>
