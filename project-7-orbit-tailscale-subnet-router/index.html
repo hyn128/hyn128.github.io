@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff" data-theme-color>
+<meta name="apple-mobile-web-app-status-bar-style" content="default" data-apple-status-bar>
+<title>네트워크 진입점을 하나로 사용하기 위해 호스트를 Tailscale subnet router로 전환하기 | renamed.log</title>
+<meta name="generator" content="Jekyll v4.3.3">
+<meta name="description" content="노드마다 Tailscale 주소로 들어가고 VM은 astra를 거쳐 다시 접속하던 경로를, astra가 내부망을 Tailscale에 광고하는 subnet router 구성으로 바꿔 팀원이 내부망 주소와 이름 하나로 노드와 VM, Vault에 닿게 하고, 접근 정책으로 팀원의 범위를 좁힌 과정">
+<link rel="canonical" href="https://hyn128.site/project-7-orbit-tailscale-subnet-router/">
+<meta property="og:title" content="네트워크 진입점을 하나로 사용하기 위해 호스트를 Tailscale subnet router로 전환하기 | renamed.log">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:description" content="노드마다 Tailscale 주소로 들어가고 VM은 astra를 거쳐 다시 접속하던 경로를, astra가 내부망을 Tailscale에 광고하는 subnet router 구성으로 바꿔 팀원이 내부망 주소와 이름 하나로 노드와 VM, Vault에 닿게 하고, 접근 정책으로 팀원의 범위를 좁힌 과정">
+<meta property="og:url" content="https://hyn128.site/project-7-orbit-tailscale-subnet-router/">
+<meta property="og:site_name" content="renamed.log">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="네트워크 진입점을 하나로 사용하기 위해 호스트를 Tailscale subnet router로 전환하기 | renamed.log">
+<meta name="twitter:description" content="노드마다 Tailscale 주소로 들어가고 VM은 astra를 거쳐 다시 접속하던 경로를, astra가 내부망을 Tailscale에 광고하는 subnet router 구성으로 바꿔 팀원이 내부망 주소와 이름 하나로 노드와 VM, Vault에 닿게 하고, 접근 정책으로 팀원의 범위를 좁힌 과정">
+
+  <meta property="article:published_time" content="2026-11-03T00:00:00+09:00">
+
+
+<link rel="icon" href="/assets/images/favicon.svg?v=1793710531" type="image/png" sizes="256x256">
+<link rel="shortcut icon" href="/assets/images/favicon.svg?v=1793710531" type="image/png">
+<link rel="apple-touch-icon" href="/assets/images/favicon.svg?v=1793710531">
+<link rel="mask-icon" href="/assets/images/profile.svg?v=1793710531" color="#495057">
+<link rel="alternate" type="application/atom+xml" href="/feed.xml" title="renamed.log">
+
+<link rel="stylesheet" href="/assets/css/main.css?v=1793710531">
+<script>
+  (function () {
+    function applyTheme(theme) {
+      var safeTheme = theme === "dark" ? "dark" : "light";
+      var color = safeTheme === "dark" ? "#121212" : "#ffffff";
+      var themeColorMeta = document.querySelector("[data-theme-color]");
+      var appleStatusMeta = document.querySelector("[data-apple-status-bar]");
+
+      document.documentElement.setAttribute("data-theme", safeTheme);
+
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute("content", color);
+      }
+
+      if (appleStatusMeta) {
+        appleStatusMeta.setAttribute("content", safeTheme === "dark" ? "black" : "default");
+      }
+    }
+
+    try {
+      var storedTheme = localStorage.getItem("velog-theme");
+      var hasStoredTheme = storedTheme === "light" || storedTheme === "dark";
+      var theme = hasStoredTheme
+        ? storedTheme
+        : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+      applyTheme(theme);
+    } catch (error) {
+      applyTheme(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
+  })();
+</script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZPEH9XZP5P"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-ZPEH9XZP5P");
+  </script>
+
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "name": "renamed.log",
+    "headline": "네트워크 진입점을 하나로 사용하기 위해 호스트를 Tailscale subnet router로 전환하기 | renamed.log",
+    "description": "노드마다 Tailscale 주소로 들어가고 VM은 astra를 거쳐 다시 접속하던 경로를, astra가 내부망을 Tailscale에 광고하는 subnet router 구성으로 바꿔 팀원이 내부망 주소와 이름 하나로 노드와 VM, Vault에 닿게 하고, 접근 정책으로 팀원의 범위를 좁힌 과정",
+    "url": "https://hyn128.site/project-7-orbit-tailscale-subnet-router/",
+    "datePublished": "2026-11-03T00:00:00+09:00"
+  }
+</script>
+
+  </head>
+  <body>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <header class="site-header">
+  <div class="site-header__inner">
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    <a class="header-logo" href="/" aria-label="renamed.log">
+      
+        <img
+          class="header-logo__mark header-logo__mark--avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt=""
+          width="36"
+          height="36"
+        >
+      
+      <span class="header-logo__text">renamed.log</span>
+    </a>
+
+    
+    
+    
+    
+      <nav class="header-actions" aria-label="바로가기">
+        
+          <a
+            class="icon-button"
+            href="https://github.com/hyn128"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.71.08-.71 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.14 1.18a10.9 10.9 0 0 1 5.72 0c2.18-1.49 3.14-1.18 3.14-1.18.62 1.58.23 2.75.12 3.04.73.8 1.17 1.83 1.17 3.09 0 4.42-2.69 5.39-5.25 5.67.41.36.78 1.08.78 2.18 0 1.57-.01 2.84-.01 3.23 0 .31.2.67.8.56A11.52 11.52 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <a class="icon-button" href="/feed.xml" aria-label="RSS" title="RSS">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 3.5a1.5 1.5 0 0 0 0 3c6.9 0 12.5 5.6 12.5 12.5a1.5 1.5 0 0 0 3 0C20.5 10.44 13.56 3.5 5 3.5Zm0 6a1.5 1.5 0 0 0 0 3c3.58 0 6.5 2.92 6.5 6.5a1.5 1.5 0 0 0 3 0c0-5.24-4.26-9.5-9.5-9.5Zm.5 7.75A2.25 2.25 0 1 0 5.5 21.5a2.25 2.25 0 0 0 0-4.25Z"
+              ></path>
+            </svg>
+          </a>
+        
+        
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="테마 전환" title="테마 전환">
+            <span class="theme-toggle__sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 17.5A5.5 5.5 0 1 0 12 6.5a5.5 5.5 0 0 0 0 11Zm0-15a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V3.5a1 1 0 0 1 1-1Zm0 16a1 1 0 0 1 1 1V21a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1Zm8.5-7.5a1 1 0 1 1 0 2H19a1 1 0 1 1 0-2h1.5ZM5 12a1 1 0 0 1-1 1H2.5a1 1 0 1 1 0-2H4a1 1 0 0 1 1 1Zm11.36 5.95a1 1 0 0 1 1.42 0l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 0-1.42ZM6.58 7.64a1 1 0 0 1 0-1.42L7.64 5.16a1 1 0 1 1 1.42 1.42L8 7.64a1 1 0 0 1-1.42 0Zm10.2-1.42a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06Zm-10.2 10.2a1 1 0 0 1 1.42 0L9.06 17.5a1 1 0 0 1-1.42 1.42L6.58 17.86a1 1 0 0 1 0-1.42Z"
+                ></path>
+              </svg>
+            </span>
+            <span class="theme-toggle__moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M14.55 2.2a1 1 0 0 1 1.11 1.3 8.5 8.5 0 1 0 10.84 10.84 1 1 0 0 1 1.3 1.11A10.5 10.5 0 1 1 14.55 2.2Z"
+                  transform="translate(-3 -3)"
+                ></path>
+              </svg>
+            </span>
+          </button>
+        
+      </nav>
+    
+  </div>
+</header>
+
+    <main>
+      
+
+
+
+
+
+
+
+
+<article class="post-view">
+  <a class="post-view__back" href="/">글 목록으로 돌아가기</a>
+
+  <header class="post-head">
+    
+      <p class="post-head__series">Project</p>
+    
+    <h1 class="post-head__title">네트워크 진입점을 하나로 사용하기 위해 호스트를 Tailscale subnet router로 전환하기</h1>
+    
+      <p class="post-head__description">노드마다 Tailscale 주소로 들어가고 VM은 astra를 거쳐 다시 접속하던 경로를, astra가 내부망을 Tailscale에 광고하는 subnet router 구성으로 바꿔 팀원이 내부망 주소와 이름 하나로 노드와 VM, Vault에 닿게 하고, 접근 정책으로 팀원의 범위를 좁힌 과정</p>
+    
+
+    <div class="post-head__author">
+      
+        <img
+          class="post-head__avatar"
+          src="https://avatars.githubusercontent.com/u/74182629?v=4"
+          alt="Dohyeon Kim"
+          width="48"
+          height="48"
+        >
+      
+      <div class="post-head__meta-block">
+        <strong>Dohyeon Kim</strong>
+        <span>
+          2026년 11월 3일 · 10분 읽기
+        </span>
+      </div>
+    </div>
+
+    
+      <div class="post-head__tags">
+        
+          <a class="tag-chip" href="/?tag=Project">Project</a>
+        
+          <a class="tag-chip" href="/?tag=Orbit">Orbit</a>
+        
+          <a class="tag-chip" href="/?tag=Network">Network</a>
+        
+          <a class="tag-chip" href="/?tag=Tailscale">Tailscale</a>
+        
+      </div>
+    
+
+    
+  </header>
+
+  <section class="prose">
+    <h2 id="1-아이디어">1. 아이디어</h2>
+
+<blockquote>
+  <p>개인 계정과 Vault SSH 인증서로 서버에 접속하는 구성이 끝나가면서, 팀원이 서버에 닿는 길 자체를 정리해야 했습니다. 지금까지는 노드 5대에 각각 설치한 Tailscale 주소로 들어가고, Tailscale이 없는 VM 3대는 astra에 먼저 들어간 뒤 다시 접속했으며, Vault와 접속 스크립트도 astra의 Tailscale 주소를 바라보고 있었습니다. astra가 내부망 전체를 Tailscale에 광고하는 subnet router가 되면 팀원은 Tailscale만 켠 채 내부망 주소 하나로 전부 닿을 수 있다고 판단했고, 이번에 그 구성과 접근 정책까지 적용했습니다.</p>
+</blockquote>
+
+<p>글에서 사용하는 호스트 이름과 역할은 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>호스트 이름</th>
+      <th>기기</th>
+      <th>역할</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>polaris</td>
+      <td>ODROID-M1S (SBC)</td>
+      <td>k3s Control Plane</td>
+    </tr>
+    <tr>
+      <td>astra</td>
+      <td>데스크탑</td>
+      <td>게이트웨이(NAT), Vault, 모니터링 VM 호스트. 이번에 subnet router</td>
+    </tr>
+    <tr>
+      <td>sol, terra, luna</td>
+      <td>갤럭시북</td>
+      <td>k3s Worker</td>
+    </tr>
+    <tr>
+      <td>efk, lgtm, wazuh</td>
+      <td>astra 안의 VM</td>
+      <td>모니터링 스택. Tailscale 없음</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>최종적으로 완성하려는 구조는 다음 그림과 같습니다. 왼쪽이 망 구성이고 오른쪽이 요청 흐름 세 가지입니다.</p>
+
+<p><img src="../../assets/post/2026-11-03-project-7-orbit-tailscale-subnet-router/01.webp" alt="" /></p>
+
+<ul>
+  <li>망은 세 겹입니다. 인터넷, 강의실 와이파이 <code class="language-plaintext highlighter-rouge">192.168.200.0/22</code>, 그 안의 ORBIT 내부망 <code class="language-plaintext highlighter-rouge">10.0.0.0/24</code>입니다. 내부망에는 k3s 클러스터(polaris와 워커 3대)와 astra가 같은 스위치에 유선으로 묶여 있고, astra만 와이파이에도 붙어 있어 바깥과의 접점이 됩니다. 모니터링 VM 3대는 astra 안에 있지만 astra의 가상 스위치 <code class="language-plaintext highlighter-rouge">br0</code>를 거쳐 같은 내부망에 직접 붙어 있어서, 노드가 보기에는 스위치에 꽂힌 다른 장비와 같습니다. 부하 발생기 io는 그림에서는 내부망에 두었지만 지금은 클러스터 밖 홈서버에서 돌고 있습니다.</li>
+  <li>흐름 ①은 누구나 쓰는 웹 서비스입니다. Cloudflare가 외부 포트로 강의실 공유기에 보내고, 공유기가 astra nginx로 넘기면 nginx가 이름을 보고 모니터링 서버나 클러스터의 Gateway API로 나눕니다.</li>
+  <li>흐름 ②는 팀원의 관리 접속입니다. Tailscale로 astra까지 온 뒤 내부망으로 SSH와 kubectl을 씁니다. 이 글은 이 흐름을 만드는 작업입니다.</li>
+  <li>흐름 ③은 워커가 인터넷으로 나가는 길로, astra NAT를 거쳐 강의실 공유기로 나갑니다. 지난 글들의 게이트웨이 장애 전환이 여기에 해당합니다.</li>
+</ul>
+
+<h3 id="1-지금까지의-접속-경로">1) 지금까지의 접속 경로</h3>
+
+<p>내부망 <code class="language-plaintext highlighter-rouge">10.0.0.0/24</code>는 강의실 와이파이에서 격리되어 있어서 밖에서는 바로 닿지 않습니다. 그래서 노드 5대에 Tailscale을 설치해 두고 각 노드의 Tailscale 주소로 접속했는데, 이 방식에는 세 가지 불편이 있었습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>대상</th>
+      <th>지금까지</th>
+      <th>문제</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>노드 5대</td>
+      <td>노드마다 다른 Tailscale 주소</td>
+      <td>저장소와 인벤토리는 내부망 주소를 쓰는데 사람만 다른 주소 체계를 씀</td>
+    </tr>
+    <tr>
+      <td>VM 3대</td>
+      <td><code class="language-plaintext highlighter-rouge">ssh -J orbit@astra 10.0.0.205</code>처럼 astra를 거쳐 다시 접속</td>
+      <td>개인 계정 인증서로는 경유가 허용되지 않아 경유 구간만 공용 <code class="language-plaintext highlighter-rouge">orbit</code>을 써야 함</td>
+    </tr>
+    <tr>
+      <td>Vault</td>
+      <td>astra의 Tailscale 주소 <code class="language-plaintext highlighter-rouge">:8200</code></td>
+      <td>접속 스크립트와 문서에 Tailscale 주소가 들어가고, 공개 저장소에는 두지 않기로 한 값이라 관리가 번거로움</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>개인 계정 작업(<code class="language-plaintext highlighter-rouge">#15</code>)이 끝나면 서버별 로그인 권한은 Vault 인증서와 개인 계정이 맡게 되므로, 경로는 하나로 단순해도 된다고 생각했습니다.</p>
+
+<h3 id="2-subnet-router">2) subnet router</h3>
+
+<p>Tailscale의 subnet router는 tailnet의 한 기기가 “이 대역은 나를 거쳐 가라”고 알리고, 다른 기기가 그 대역으로 보내는 패킷을 대신 전달하는 기능입니다. 대역 안의 서버에는 Tailscale이 없어도 되므로 VM 3대가 그대로 닿습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>팀원 기기 --Tailscale 터널--&gt; astra (subnet router, 전달만 함) --내부망--&gt; 노드, VM
+</code></pre></div></div>
+
+<p>이때 라우팅을 Tailscale이 하는지 astra가 하는지가 헷갈렸는데, 둘이 나눠서 합니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>하는 일</th>
+      <th>누가</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>“<code class="language-plaintext highlighter-rouge">10.0.0.0/24</code>는 astra로 보내라”를 팀원 기기에 알림 (광고, 승인, 받기)</td>
+      <td>Tailscale</td>
+    </tr>
+    <tr>
+      <td>팀원 기기에서 astra까지 암호화 터널로 운반</td>
+      <td>Tailscale (<code class="language-plaintext highlighter-rouge">tailscale0</code>)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">tailscale0</code>로 들어온 패킷을 <code class="language-plaintext highlighter-rouge">br0</code>(내부망)로 넘김</td>
+      <td>astra 리눅스 커널 (<code class="language-plaintext highlighter-rouge">ip_forward=1</code>, iptables FORWARD)</td>
+    </tr>
+    <tr>
+      <td>출발지를 astra 주소로 바꿔 노드가 응답을 astra로 돌려주게 함</td>
+      <td>astra 커널의 iptables. 규칙은 Tailscale이 넣음</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>길을 알려 주고 실어 나르는 것은 Tailscale이고 실제로 넘겨 주는 것은 astra 커널이기 때문에, Tailscale 설정이 맞아도 astra의 <code class="language-plaintext highlighter-rouge">ip_forward</code>가 꺼져 있거나 FORWARD에서 막히면 내부망에 닿지 않습니다. 워커가 인터넷으로 나갈 때 쓰는 내부망에서 와이파이로의 NAT는 Tailscale 없이 astra 혼자 하고 있었으므로, 이번에는 반대 방향인 들어오는 길을 추가하면서 경로를 알리는 일만 Tailscale에 맡기는 셈입니다.</p>
+
+<blockquote>
+  <p><strong>Tailscale 없이 astra 혼자 하지 않은 이유</strong></p>
+
+  <p>팀원 기기마다 <code class="language-plaintext highlighter-rouge">10.0.0.0/24</code>를 astra로 보내는 경로를 직접 넣고, 밖에서 astra까지 닿는 터널(WireGuard, OpenVPN 등)을 따로 운영해야 합니다. 팀원 모두 이미 Tailscale을 쓰고 있어서 그 역할을 다시 만들 이유가 없다고 판단했습니다.</p>
+</blockquote>
+
+<h3 id="3-접속-주소와-이름">3) 접속 주소와 이름</h3>
+
+<p>접속 주소는 Tailscale 주소가 아니라 내부망 <code class="language-plaintext highlighter-rouge">10.0.0.200</code>~<code class="language-plaintext highlighter-rouge">.207</code>로 통일했습니다.</p>
+
+<blockquote>
+  <p><strong>내부망 주소로 통일한 이유</strong></p>
+
+  <p>저장소, 인벤토리, 문서가 이미 내부망 주소를 기준으로 하고 있어서 팀원도 같은 주소를 쓰면 주소 체계가 하나가 됩니다. VM 3대는 Tailscale이 없어 tailnet 주소 자체가 없고, Tailscale 주소는 기기를 다시 등록하면 바뀔 수 있으며 공개 저장소에 적지 않기로 한 값이기 때문에 사람이 쓰는 주소로는 맞지 않다고 판단했습니다.</p>
+</blockquote>
+
+<p>이름은 이미 가진 도메인 <code class="language-plaintext highlighter-rouge">orbit-labs.space</code>에 노드와 VM 8개를 내부망 주소로 가리키는 A 레코드로 등록했습니다. <code class="language-plaintext highlighter-rouge">sol.orbit-labs.space</code>를 물으면 공개 DNS가 <code class="language-plaintext highlighter-rouge">10.0.0.202</code>를 알려 주고, 경로를 받은 기기는 그 주소로 astra를 거쳐 접속합니다. 이름은 누구나 조회할 수 있지만 <code class="language-plaintext highlighter-rouge">10.0.0.x</code>에 실제로 닿는 것은 tailnet에 들어와 경로를 받은 기기뿐입니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. 이름 묻기:  팀원 기기 --DNS--&gt; Cloudflare  ("sol.orbit-labs.space는 10.0.0.202")
+2. 접속:      팀원 기기 --Tailscale 터널--&gt; astra --내부망--&gt; sol
+</code></pre></div></div>
+
+<p><img src="../../assets/post/2026-11-03-project-7-orbit-tailscale-subnet-router/02.webp" alt="" /></p>
+
+<p>등록한 레코드 8개입니다. 레코드는 반드시 회색 구름(DNS only)이어야 합니다. 주황 구름(프록시)으로 두면 Cloudflare 주소가 대신 나와서 SSH가 되지 않습니다. 나중에 붙일 웹 서비스 이름(<code class="language-plaintext highlighter-rouge">grafana</code>, <code class="language-plaintext highlighter-rouge">kibana</code>, <code class="language-plaintext highlighter-rouge">hubble</code> 등)은 주황 구름으로 공인 IP를 가리키고 astra nginx를 거치는 다른 경로라, 이름마다 레코드가 따로 있어서 서로 영향을 주지 않습니다.</p>
+
+<h2 id="2-구성">2. 구성</h2>
+
+<h3 id="1-경로-광고와-승인">1) 경로 광고와 승인</h3>
+
+<p>astra에서 경로를 광고합니다. <code class="language-plaintext highlighter-rouge">ip_forward</code>는 게이트웨이 role이 이미 켜 두었습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>sysctl net.ipv4.ip_forward
+<span class="nb">sudo </span>tailscale <span class="nb">set</span> <span class="nt">--advertise-routes</span><span class="o">=</span>10.0.0.0/24
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">tailscale set</code> : 이 옵션 하나만 바꿉니다. 설계 문서에 적어 두었던 <code class="language-plaintext highlighter-rouge">tailscale up --advertise-routes</code>는 이미 <code class="language-plaintext highlighter-rouge">up</code> 된 기기에서 다른 옵션을 전부 다시 적지 않으면 거부되기 때문에 <code class="language-plaintext highlighter-rouge">set</code>을 썼습니다.</li>
+</ul>
+
+<p>광고한 경로는 관리 콘솔에서 승인해야 다른 기기에 보입니다. Machines에서 astra의 Edit route settings를 열어 <code class="language-plaintext highlighter-rouge">10.0.0.0/24</code>를 켭니다.</p>
+
+<p><img src="../../assets/post/2026-11-03-project-7-orbit-tailscale-subnet-router/03.webp" alt="" /></p>
+
+<p>창을 열어 보니 이미 체크되어 있고 Save가 비활성이었는데, 광고와 동시에 승인된 상태라 그대로 닫았습니다. 창 위의 Key expiry 경고는 astra의 기기 키가 만료되면 다시 로그인할 때까지 팀원 전원의 경로가 끊긴다는 뜻이라, 뒤에서 태그를 붙여 만료를 끄는 쪽으로 처리했습니다.</p>
+
+<h3 id="2-내부망-전달-확인">2) 내부망 전달 확인</h3>
+
+<p>설계 문서에는 Docker가 FORWARD 기본 정책을 DROP으로 바꿔 두므로 <code class="language-plaintext highlighter-rouge">DOCKER-USER</code>에 <code class="language-plaintext highlighter-rouge">tailscale0</code>와 <code class="language-plaintext highlighter-rouge">br0</code> 사이를 허용하는 두 줄이 필요하다고 적어 두었습니다. 그런데 Tailscale이 경로를 광고할 때 FORWARD 맨 앞에 <code class="language-plaintext highlighter-rouge">ts-forward</code> 체인을 직접 넣어 <code class="language-plaintext highlighter-rouge">tailscale0</code>에서 온 패킷과 돌아가는 패킷을 허용하기 때문에, 먼저 확인하고 안 될 때만 넣기로 했습니다. 결과는 아래 검증처럼 추가 없이 동작했습니다.</p>
+
+<h3 id="3-접속-스크립트">3) 접속 스크립트</h3>
+
+<p>Vault SSH 인증서를 자동으로 받는 설정 스크립트와 갱신 스크립트에서 astra의 Tailscale 주소를 쓰던 곳을 내부망 주소로 바꿨습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>파일</th>
+      <th>바꾼 것</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">scripts/orbit-ssh-setup.sh</code></td>
+      <td><code class="language-plaintext highlighter-rouge">ASTRA</code>(CA 인증서를 받아 오는 주소)를 <code class="language-plaintext highlighter-rouge">10.0.0.201</code>로. 자동 갱신 대상 <code class="language-plaintext highlighter-rouge">MATCH_HOSTS</code>에서 <code class="language-plaintext highlighter-rouge">astra</code>, <code class="language-plaintext highlighter-rouge">sol</code> 같은 짧은 이름을 빼고 <code class="language-plaintext highlighter-rouge">*.orbit-labs.space</code>를 추가</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">scripts/orbit-ssh-refresh.sh</code></td>
+      <td>Vault 주소 <code class="language-plaintext highlighter-rouge">V_ADDR</code>을 <code class="language-plaintext highlighter-rouge">https://10.0.0.201:8200</code>으로</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">docs/vault.md</code></td>
+      <td>주소 표, scp와 <code class="language-plaintext highlighter-rouge">VAULT_ADDR</code> 예시, 자동 갱신 설명</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">MATCH_HOSTS</code>는 <code class="language-plaintext highlighter-rouge">~/.ssh/config</code>의 <code class="language-plaintext highlighter-rouge">Match host</code> 조건이 되어, 이 목록에 맞는 곳으로 <code class="language-plaintext highlighter-rouge">ssh</code>할 때만 인증서 갱신 스크립트가 돌고 개인 계정명이 <code class="language-plaintext highlighter-rouge">User</code>로 붙습니다. 짧은 이름을 빼면 <code class="language-plaintext highlighter-rouge">ssh sol</code>은 Tailscale 주소로 연결은 되지만 갱신도 계정명도 붙지 않아 사실상 쓰지 않게 되고, 이름은 <code class="language-plaintext highlighter-rouge">sol.orbit-labs.space</code>로 통일됩니다. 노드의 Tailscale 주소 5개는 astra가 죽었을 때 관리자가 쓰는 예비 경로라 목록에 남겼습니다.</p>
+
+<blockquote>
+  <p><strong>스크립트의 Vault 주소를 이름이 아니라 IP로 둔 이유</strong></p>
+
+  <p><code class="language-plaintext highlighter-rouge">astra.orbit-labs.space</code>로 통일하는 것도 생각했지만, Vault TLS 인증서에 들어 있는 이름은 <code class="language-plaintext highlighter-rouge">astra</code>, <code class="language-plaintext highlighter-rouge">localhost</code>, <code class="language-plaintext highlighter-rouge">127.0.0.1</code>, <code class="language-plaintext highlighter-rouge">10.0.0.201</code>, Tailscale IP뿐이라 이름으로 접속하면 인증서가 맞지 않아 거부됩니다. 이름은 사람이 입력할 때 쓰고 스크립트처럼 기계가 쓰는 곳은 IP가 낫다고 판단했고, 이름으로 바꾸려면 인증서 SAN에 추가하고 서버 인증서를 다시 만드는 별도 작업이 필요합니다.</p>
+</blockquote>
+
+<p>이 세 파일은 개인 계정 작업(<code class="language-plaintext highlighter-rouge">#15</code>)의 PR #20이 크게 고친 파일과 같았습니다. 지현의 브랜치에 들어가 주소만 같이 고치는 것도 검토했지만, 하나의 브랜치에 다른 이슈 작업을 넣지 않는다는 팀 규칙과 push가 엇갈릴 위험 때문에 #20이 먼저 머지된 뒤 <code class="language-plaintext highlighter-rouge">develop</code> 위에서 주소 줄만 고쳤습니다. 커밋 3개가 메시지와 내용이 어긋나 있어서 PR은 Squash merge로 합쳤습니다.</p>
+
+<h3 id="4-tailscale-정책">4) Tailscale 정책</h3>
+
+<p>경로를 열면 tailnet의 모든 기기가 내부망 전체에 닿게 되므로, 팀원의 범위를 함께 좁혔습니다. 노드 5대가 전부 관리자 계정 소유라 정책에서 노드만 가리킬 수 없었기 때문에 먼저 <code class="language-plaintext highlighter-rouge">tag:server</code> 태그를 붙였고, 태그가 붙은 기기는 키 만료가 자동으로 꺼져서 앞의 Key expiry 경고도 같이 해결됐습니다. 노드의 Tailscale 이름은 <code class="language-plaintext highlighter-rouge">sol-ts</code>처럼 <code class="language-plaintext highlighter-rouge">-ts</code>를 붙여 내부망 이름 <code class="language-plaintext highlighter-rouge">sol.orbit-labs.space</code>와 구분했습니다.</p>
+
+<p>정책은 기본값인 모두 허용 규칙 하나뿐이었고, 백업해 둔 뒤 <code class="language-plaintext highlighter-rouge">grants</code> 형식으로 바꿨습니다.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nl">"grants"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+  </span><span class="p">{</span><span class="nl">"src"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"group:admin"</span><span class="p">],</span><span class="w"> </span><span class="nl">"dst"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">],</span><span class="w"> </span><span class="nl">"ip"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]},</span><span class="w">
+  </span><span class="p">{</span><span class="nl">"src"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"group:team"</span><span class="p">],</span><span class="w"> </span><span class="nl">"dst"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"10.0.0.0/24"</span><span class="p">],</span><span class="w"> </span><span class="nl">"ip"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"tcp:22"</span><span class="p">,</span><span class="w"> </span><span class="s2">"tcp:8200"</span><span class="p">]},</span><span class="w">
+  </span><span class="p">{</span><span class="nl">"src"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"autogroup:member"</span><span class="p">],</span><span class="w"> </span><span class="nl">"dst"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"autogroup:self"</span><span class="p">],</span><span class="w"> </span><span class="nl">"ip"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]}</span><span class="w">
+</span><span class="p">]</span><span class="err">,</span><span class="w">
+</span><span class="nl">"ssh"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="err">,</span><span class="w">
+</span></code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">group:admin</code> : 관리자 계정. 노드 Tailscale 주소를 포함해 전부 허용해서 예비 접속을 남깁니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">group:team</code> : 팀원 4명. astra를 거친 내부망의 SSH(22)와 Vault(8200)만 허용합니다. 팀원이 <code class="language-plaintext highlighter-rouge">sol-ts</code>로 접속하면 막힙니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">autogroup:self</code> : 각자 자기 기기끼리는 허용합니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">"ssh": []</code> : Tailscale 자체 SSH 기능은 쓰지 않습니다. 기본 정책에는 각자 자기 기기에 Tailscale SSH를 <code class="language-plaintext highlighter-rouge">check</code> 모드로 허용하는 규칙이 있었는데, 열려 있으면 Vault 인증서와 개인 계정을 거치지 않고 Tailscale 계정만으로 들어오는 길이 생기기 때문에 지웠습니다. 노드 쪽에서도 Tailscale SSH는 꺼져 있습니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">tests</code> : 저장할 때 Tailscale이 규칙을 시험하고 기대와 다르면 저장을 거부합니다. 팀원 계정이 내부망 22번에는 닿고 Tailscale 주소 22번에는 닿지 않는 조건을 넣었습니다.</li>
+</ul>
+
+<p><img src="../../assets/post/2026-11-03-project-7-orbit-tailscale-subnet-router/04.webp" alt="" /></p>
+
+<p>저장한 뒤 콘솔의 General access rules에 규칙 세 개가 설명과 함께 보입니다. 정책을 저장한 뒤 내 Mac에서 <code class="language-plaintext highlighter-rouge">ssh orbit@luna-ts</code>가 그대로 되는 것을 보고 잠깐 의아했는데, 내 계정이 <code class="language-plaintext highlighter-rouge">group:admin</code>이라 되는 것이 맞았습니다. 막혔는지는 팀원 계정으로 봐야 합니다.</p>
+
+<h2 id="3-검증">3. 검증</h2>
+
+<h3 id="1-경로와-내부망-전달">1) 경로와 내부망 전달</h3>
+
+<p>astra에서 <code class="language-plaintext highlighter-rouge">tailscale status --json</code>으로 astra의 경로를 찾으니 <code class="language-plaintext highlighter-rouge">[]</code>가 나와서 당황했는데, 자기 자신은 다른 기기 목록에 없어서 그런 것이었고 astra의 <code class="language-plaintext highlighter-rouge">netstat</code>에는 <code class="language-plaintext highlighter-rouge">br0</code>에 직접 붙은 <code class="language-plaintext highlighter-rouge">10.0.0.0</code>이 원래부터 보여 확인 용도가 아니었습니다. 경로를 받았는지는 Mac에서 봐야 했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tailscale status <span class="nt">--json</span> | python3 <span class="nt">-c</span> <span class="s2">"import json,sys;d=json.load(sys.stdin);print([p['PrimaryRoutes'] for p in d['Peer'].values() if p['HostName']=='astra'])"</span>
+netstat <span class="nt">-rn</span> <span class="nt">-f</span> inet | <span class="nb">grep</span> <span class="nt">-E</span> <span class="s1">'^10[./]'</span>
+route <span class="nt">-n</span> get 10.0.0.202 | <span class="nb">grep </span>interface
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">PrimaryRoutes</code> : astra가 광고하고 승인된 경로. <code class="language-plaintext highlighter-rouge">['10.0.0.0/24']</code></li>
+  <li><code class="language-plaintext highlighter-rouge">netstat</code> : macOS는 <code class="language-plaintext highlighter-rouge">10.0.0/24</code>를 <code class="language-plaintext highlighter-rouge">10/24</code>로 줄여 표시해서, 처음 쓴 <code class="language-plaintext highlighter-rouge">grep '^10\.0\.0'</code>으로는 아무것도 잡히지 않았습니다. <code class="language-plaintext highlighter-rouge">10/24 ... utun6</code>로 Tailscale 인터페이스에 경로가 들어온 것을 확인할 수 있었습니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">route get</code> : <code class="language-plaintext highlighter-rouge">10.0.0.202</code>로 가는 인터페이스가 <code class="language-plaintext highlighter-rouge">utun6</code>인 것을 확인했습니다.</li>
+</ul>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ping <span class="nt">-c</span> 3 10.0.0.200
+ping <span class="nt">-c</span> 3 10.0.0.205
+</code></pre></div></div>
+
+<p><img src="../../assets/post/2026-11-03-project-7-orbit-tailscale-subnet-router/05.webp" alt="" /></p>
+
+<p>polaris와 VM efk 모두 응답했고 ttl이 63이었습니다. Linux는 64로 출발하므로 astra 하나를 지나 1이 줄어든 것이고, Tailscale 터널 구간은 라우터로 세지 않으므로 중간 장비가 astra뿐인 것을 확인할 수 있었습니다. <code class="language-plaintext highlighter-rouge">traceroute -n 10.0.0.205</code>도 astra와 efk 두 줄만 나왔습니다. 응답 시간이 80~160ms인 것은 Mac과 astra가 둘 다 강의실 와이파이에 있어 client isolation 때문에 Tailscale 중계 서버를 거치기 때문입니다.</p>
+
+<p>비교로 astra에서 같은 ping을 보내면 ttl 64에 1ms 미만이었는데, astra는 같은 스위치에 직접 붙어 있어 중간 라우터가 없기 때문입니다.</p>
+
+<p><img src="../../assets/post/2026-11-03-project-7-orbit-tailscale-subnet-router/06.webp" alt="" /></p>
+
+<h3 id="2-ssh와-vault">2) SSH와 Vault</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ssh hyn128@10.0.0.202 <span class="nb">hostname
+</span>ssh hyn128@10.0.0.205 <span class="nb">hostname
+</span>curl <span class="nt">-s</span> <span class="nt">--cacert</span> ~/.orbit/vault-ca.crt https://10.0.0.201:8200/v1/sys/health | python3 <span class="nt">-m</span> json.tool
+</code></pre></div></div>
+
+<p>sol과 efk 모두 개인 계정 인증서로 비밀번호 없이 들어갔고, Vault는 <code class="language-plaintext highlighter-rouge">sealed: false</code>로 인증서 오류 없이 응답했습니다. sol의 호스트 키는 전에 Tailscale 주소로 접속할 때 알려진 키와 같다고 나와서 같은 서버임을 확인할 수 있었습니다. 스크립트를 바꾼 뒤 <code class="language-plaintext highlighter-rouge">scripts/orbit-ssh-setup.sh</code>를 다시 실행하고 <code class="language-plaintext highlighter-rouge">ssh -v sol.orbit-labs.space true</code>에서 <code class="language-plaintext highlighter-rouge">ED25519-CERT</code>가 나오는 것도 확인했습니다.</p>
+
+<h3 id="3-결과">3) 결과</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>결과</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>astra 경로 광고와 승인</td>
+      <td>통과. Mac <code class="language-plaintext highlighter-rouge">PrimaryRoutes ['10.0.0.0/24']</code></td>
+    </tr>
+    <tr>
+      <td>Mac에서 내부망 ping</td>
+      <td>통과 (<code class="language-plaintext highlighter-rouge">.200</code>, <code class="language-plaintext highlighter-rouge">.201</code>, <code class="language-plaintext highlighter-rouge">.202</code>, <code class="language-plaintext highlighter-rouge">.205</code>, ttl 63)</td>
+    </tr>
+    <tr>
+      <td>astra 전달 규칙 추가</td>
+      <td>필요 없음</td>
+    </tr>
+    <tr>
+      <td>Cloudflare DNS 이름 8개</td>
+      <td>통과 (<code class="language-plaintext highlighter-rouge">dig +short astra.orbit-labs.space</code>가 <code class="language-plaintext highlighter-rouge">10.0.0.201</code>)</td>
+    </tr>
+    <tr>
+      <td>개인 계정 SSH (노드, VM), Vault</td>
+      <td>통과</td>
+    </tr>
+    <tr>
+      <td>접속 스크립트와 문서</td>
+      <td>PR #22 머지</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">tag:server</code>, <code class="language-plaintext highlighter-rouge">-ts</code> 이름, 정책</td>
+      <td>적용. 팀원 기기에서 차단 확인은 남음</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="4-다음-작업">4. 다음 작업</h2>
+
+<h3 id="1-남은-것">1) 남은 것</h3>
+
+<p>이번 주는 팀원들이 각자 맡은 모니터링과 AWS 작업을 시작할 수 있게 접속과 권한을 끝내는 것이 먼저라, 남은 것을 아래로 좁혔습니다.</p>
+
+<ul>
+  <li>팀원 전원이 <code class="language-plaintext highlighter-rouge">develop</code>에서 <code class="language-plaintext highlighter-rouge">scripts/orbit-ssh-setup.sh</code>를 다시 실행. 설치된 갱신 스크립트 사본은 아직 astra의 Tailscale 주소 8200을 보기 때문에 정책에 막혀 인증서 갱신이 실패하고, 설정 스크립트는 서버에 SSH하지 않고 Vault에서 바로 새 인증서를 받으므로 정책을 끄지 않아도 됩니다</li>
+  <li>팀원 기기에서 <code class="language-plaintext highlighter-rouge">sol-ts</code> 22번이 막히고 <code class="language-plaintext highlighter-rouge">sol.orbit-labs.space</code>가 되는지 확인</li>
+  <li>subnet router는 기본으로 출발지를 astra 주소로 바꿔 전달하므로 노드와 Wazuh 로그에는 모든 팀원이 <code class="language-plaintext highlighter-rouge">10.0.0.201</code>로 찍힙니다. 사용자별 출발지가 필요하면 SNAT를 끄고 노드 쪽 되돌아가는 경로를 넣어야 해서, 개인 계정 작업의 Wazuh 확인 때 정하기로 했습니다</li>
+  <li>공용 <code class="language-plaintext highlighter-rouge">orbit</code> 접속 회수와 Phase 1 때 남은 <code class="language-plaintext highlighter-rouge">jenkins-libvirt</code> 계정 정리</li>
+  <li>접속 이름이 <code class="language-plaintext highlighter-rouge">sol.orbit-labs.space</code>로 길어져서 팀원이 오히려 불편해할 수 있습니다. 주소를 직접 적는 대신 도메인은 그대로 쓰면서 도메인에 짧은 별칭을 두면 <code class="language-plaintext highlighter-rouge">ssh sol</code>로 쓸 수 있겠다고 생각했습니다. <code class="language-plaintext highlighter-rouge">~/.ssh/config</code>에 <code class="language-plaintext highlighter-rouge">Host sol</code>과 <code class="language-plaintext highlighter-rouge">HostName sol.orbit-labs.space</code>를 두는 방식인데, ssh의 <code class="language-plaintext highlighter-rouge">Match host</code>는 <code class="language-plaintext highlighter-rouge">HostName</code>으로 바뀐 뒤의 이름을 보므로 <code class="language-plaintext highlighter-rouge">*.orbit-labs.space</code> 조건에 그대로 걸려 인증서 자동 갱신도 됩니다. 다만 <code class="language-plaintext highlighter-rouge">ssh -G</code>로 확인해 보니 <code class="language-plaintext highlighter-rouge">Host</code> 블록이 <code class="language-plaintext highlighter-rouge">Match</code> 블록보다 앞에 있을 때만 그렇고, 지금 설정 스크립트는 <code class="language-plaintext highlighter-rouge">Match</code> 블록만 쓰고 별칭은 만들지 않으므로, 스크립트가 관리하는 블록 안에서 <code class="language-plaintext highlighter-rouge">Match</code> 앞에 노드와 VM 8개의 별칭을 넣어 주는 쪽으로 정하려고 합니다</li>
+</ul>
+
+<h3 id="2-wazuh에서-할-수-있는-것">2) Wazuh에서 할 수 있는 것</h3>
+
+<p>이번 주 팀원이 Wazuh를 구축하면 이 접속 경로 위에서 무엇을 볼 수 있을지도 생각해 봤습니다. 지금까지 만든 것을 모으면 사람과 경로를 구분할 근거가 로그에 이미 남고 있기 때문입니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>보고 싶은 것</th>
+      <th>근거가 남는 곳</th>
+      <th>Wazuh에서</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>누가 어느 서버에 들어왔는지</td>
+      <td>노드 sshd 로그. 개인 계정명과 인증서 ID <code class="language-plaintext highlighter-rouge">github-&lt;아이디&gt;</code>가 한 줄에 남음</td>
+      <td>계정별 로그인 집계. 출발지는 subnet router의 SNAT 때문에 전부 <code class="language-plaintext highlighter-rouge">10.0.0.201</code>이라 사람 구분은 계정과 인증서 ID로</td>
+    </tr>
+    <tr>
+      <td>정한 경로를 벗어난 접속</td>
+      <td>출발지가 <code class="language-plaintext highlighter-rouge">10.0.0.201</code>이 아닌 SSH 로그인 (노드 Tailscale 주소로 직접 들어온 경우), 공용 <code class="language-plaintext highlighter-rouge">orbit</code> 계정 로그인</td>
+      <td>관리자 예비 경로나 공용 계정 사용을 알림으로. 공용 접속 회수 뒤에는 <code class="language-plaintext highlighter-rouge">orbit</code> 로그인 자체가 이상 신호</td>
+    </tr>
+    <tr>
+      <td>누가 인증서를 받아 갔는지</td>
+      <td>astra의 Vault 감사 로그 (<code class="language-plaintext highlighter-rouge">ssh-client-signer/sign/personal-&lt;계정명&gt;</code> 요청)</td>
+      <td>서명 요청과 sshd 로그인을 사람 단위로 맞춰 보기</td>
+    </tr>
+    <tr>
+      <td>sudo 사용</td>
+      <td>노드 journal의 sudo 기록 (실행한 사람과 명령)</td>
+      <td>계정별 sudo 명령 집계, 실패 반복 알림</td>
+    </tr>
+    <tr>
+      <td>설정이 손으로 바뀌었는지</td>
+      <td><code class="language-plaintext highlighter-rouge">/etc/netplan</code>, <code class="language-plaintext highlighter-rouge">/etc/ssh/sshd_config.d</code>, <code class="language-plaintext highlighter-rouge">/etc/sudoers.d</code></td>
+      <td>파일 무결성 감시. Ansible이 관리하는 파일이라 플레이북 실행 시각 밖의 변경은 이상</td>
+    </tr>
+    <tr>
+      <td>네트워크 전환</td>
+      <td>워커 <code class="language-plaintext highlighter-rouge">orbit-gw</code> 로그 (와이파이 전환, 유선 복귀)</td>
+      <td>지난 글에서 디스코드로 보내려던 전환 알림을 Wazuh 쪽으로 모을 수도 있음</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>이 중 출발지가 전부 astra로 찍히는 것은 subnet router의 기본 동작이라, Wazuh에서 출발지로 사람을 나누고 싶다면 SNAT를 끄는 결정이 먼저 필요합니다. 어느 쪽이 나은지는 Wazuh 담당 팀원이 실제 로그를 본 뒤에 같이 정하려고 합니다.</p>
+
+<p>네트워크 경로를 바꾸는 작업인데도 접속을 한 번도 잃지 않고 끝난 것은, 경로 광고가 기존 Tailscale 접속을 건드리지 않고 정책에 관리자 규칙을 맨 위에 둔 덕이었습니다. 다만 astra에서 확인 명령을 돌려 놓고 <code class="language-plaintext highlighter-rouge">[]</code>를 보고 잠깐 헤맨 것처럼, 어디서 확인해야 의미가 있는지를 먼저 생각하지 않은 것은 아쉬웠습니다.</p>
+
+  </section>
+
+  
+    <nav class="post-navigation" aria-label="이전 다음 글">
+      
+        <a class="post-navigation__item" href="/project-6-orbit-probe-ip-and-failover-test/">
+          <span class="post-navigation__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11H7.83l5.58-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" fill="currentColor"></path>
+            </svg>
+          </span>
+          <span class="post-navigation__content">
+            <span class="post-navigation__label">이전 포스트</span>
+            <strong class="post-navigation__title">감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제</strong>
+          </span>
+        </a>
+      
+      
+    </nav>
+  
+
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+  <section
+    class="comments-section"
+    aria-label="댓글"
+    data-comments-provider="giscus"
+    data-giscus-theme-light="https://hyn128.site/assets/css/giscus-velog-light.css"
+    data-giscus-theme-dark="https://hyn128.site/assets/css/giscus-velog-dark.css"
+  >
+    <h2 class="comments-section__title">댓글</h2>
+    <div class="giscus"></div>
+    <script>
+      (function () {
+        var container = document.currentScript.parentElement;
+        var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var resolvedTheme = container.getAttribute(currentTheme === "dark" ? "data-giscus-theme-dark" : "data-giscus-theme-light")
+          || "preferred_color_scheme";
+        var script = document.createElement("script");
+
+        script.src = "https://giscus.app/client.js";
+        script.setAttribute("data-repo", "hyn128/hyn128.github.io");
+        script.setAttribute("data-repo-id", "R_kgDOToIqkw");
+        script.setAttribute("data-category", "Announcements");
+        script.setAttribute("data-category-id", "DIC_kwDOToIqk84DCiaL");
+        script.setAttribute("data-mapping", "pathname");
+        script.setAttribute("data-strict", "1");
+        script.setAttribute("data-reactions-enabled", "1");
+        script.setAttribute("data-emit-metadata", "0");
+        script.setAttribute("data-input-position", "top");
+        script.setAttribute("data-theme", resolvedTheme);
+        script.setAttribute("data-lang", "ko");
+        script.setAttribute("data-loading", "lazy");
+        script.setAttribute("crossorigin", "anonymous");
+        script.async = true;
+
+        container.appendChild(script);
+      })();
+    </script>
+    <noscript>JavaScript를 활성화해야 댓글을 볼 수 있습니다.</noscript>
+  </section>
+
+
+  
+
+
+</article>
+
+    </main>
+    <footer class="site-footer">
+  <div class="site-footer__inner">
+    <p>Copyright &copy; 2026 renamed.log</p>
+    <p>Notes on Software Engineering, Backend and Cloud</p>
+  </div>
+</footer>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="/assets/js/site.js?v=1793710531"></script>
+    <script src="/assets/js/code-enhancements.js?v=1793710531"></script>
+  </body>
+</html>

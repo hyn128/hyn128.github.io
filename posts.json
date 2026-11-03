@@ -4,6 +4,21 @@
       
       
       {
+        "title": "네트워크 진입점을 하나로 사용하기 위해 호스트를 Tailscale subnet router로 전환하기",
+        "url": "/project-7-orbit-tailscale-subnet-router/",
+        "description": "노드마다 Tailscale 주소로 들어가고 VM은 astra를 거쳐 다시 접속하던 경로를, astra가 내부망을 Tailscale에 광고하는 subnet router 구성으로 바꿔 팀원이 내부망 주소와 이름 하나로 노드와 VM, Vault에 닿게 하고, 접근 정책으로 팀원의 범위를 좁힌 과정",
+        "thumbnail": null,
+        "tags": ["Project","Orbit","Network","Tailscale"],
+        "series_key": "project",
+        "series_title": "Project",
+        "date_label": "2026년 11월 3일",
+        "reading_time_label": "10분 읽기",
+        "search": "네트워크 진입점을 하나로 사용하기 위해 호스트를 tailscale subnet router로 전환하기 노드마다 tailscale 주소로 들어가고 vm은 astra를 거쳐 다시 접속하던 경로를, astra가 내부망을 tailscale에 광고하는 subnet router 구성으로 바꿔 팀원이 내부망 주소와 이름 하나로 노드와 vm, vault에 닿게 하고, 접근 정책으로 팀원의 범위를 좁힌 과정 project orbit network tailscale project"
+      },
+    
+      
+      
+      {
         "title": "감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제",
         "url": "/project-6-orbit-probe-ip-and-failover-test/",
         "description": "게이트웨이 장애 감시가 보던 주소 하나가 응답하지 않게 되면서 유선이 멀쩡한 워커 3대가 와이파이로 전환된 원인을 확인하고, 감시 주소를 바꿔 유선으로 되돌린 뒤 랜선을 실제로 뽑아 장애 전환과 복귀를 검증한 기록",
