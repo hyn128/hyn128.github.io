@@ -64,6 +64,21 @@
       
       
       {
+        "title": "설치가 중간에 끊긴 Ubuntu Server를 라이브 USB에서 복구하기",
+        "url": "/notes-12-troubleshooting-ubuntu-install-chroot-recovery/",
+        "description": "갤럭시북에 Ubuntu 24.04 Server를 설치하다 설치기가 중간에 멈춘 뒤, 다시 설치하지 않고 설치 USB의 셸에서 디스크로 들어가 계정과 호스트 이름, 네트워크를 채우고, 빠진 와이파이 패키지를 USB로 옮겨 설치해 살린 기록",
+        "thumbnail": null,
+        "tags": ["TroubleShooting","Ubuntu","Linux"],
+        "series_key": "technotes",
+        "series_title": "TechNotes",
+        "date_label": "2026년 10월 26일",
+        "reading_time_label": "7분 읽기",
+        "search": "설치가 중간에 끊긴 ubuntu server를 라이브 usb에서 복구하기 갤럭시북에 ubuntu 24.04 server를 설치하다 설치기가 중간에 멈춘 뒤, 다시 설치하지 않고 설치 usb의 셸에서 디스크로 들어가 계정과 호스트 이름, 네트워크를 채우고, 빠진 와이파이 패키지를 usb로 옮겨 설치해 살린 기록 troubleshooting ubuntu linux technotes"
+      },
+    
+      
+      
+      {
         "title": "Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동",
         "url": "/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/",
         "description": "Actuator와 Micrometer로 Spring Boot Metric을 노출하고 Kubernetes ServiceMonitor를 통해 수집한 뒤 Grafana에서 확인합니다",

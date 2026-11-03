@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-11-02T22:20:31+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제</title><link href="https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/" rel="alternate" type="text/html" title="감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제" /><published>2026-11-02T00:00:00+09:00</published><updated>2026-11-02T00:00:00+09:00</updated><id>https://hyn128.site/project-6-orbit-probe-ip-and-failover-test</id><content type="html" xml:base="https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/"><![CDATA[<h2 id="1-아이디어">1. 아이디어</h2>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko-KR"><generator uri="https://jekyllrb.com/" version="4.3.3">Jekyll</generator><link href="https://hyn128.site/feed.xml" rel="self" type="application/atom+xml" /><link href="https://hyn128.site/" rel="alternate" type="text/html" hreflang="ko-KR" /><updated>2026-11-03T15:45:41+09:00</updated><id>https://hyn128.site/feed.xml</id><title type="html">renamed.log</title><subtitle>키보드가 망가지도록 공부하기</subtitle><entry><title type="html">감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제</title><link href="https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/" rel="alternate" type="text/html" title="감시 주소가 응답을 멈추자 워커가 전부 와이파이로 넘어간 문제" /><published>2026-11-02T00:00:00+09:00</published><updated>2026-11-02T00:00:00+09:00</updated><id>https://hyn128.site/project-6-orbit-probe-ip-and-failover-test</id><content type="html" xml:base="https://hyn128.site/project-6-orbit-probe-ip-and-failover-test/"><![CDATA[<h2 id="1-아이디어">1. 아이디어</h2>
 
 <blockquote>
   <p>워커가 astra 너머로 인터넷이 되는지 10초마다 확인해서 안 되면 와이파이로 넘기는 <code class="language-plaintext highlighter-rouge">orbit-gw-watch</code>를 지난 글에서 만들었습니다. 그런데 Vault 작업 중에 워커에 접속해 보니 유선과 astra가 멀쩡한데도 워커 3대가 전부 와이파이로 나가고 있었고, 원인은 감시 대상으로 둔 <code class="language-plaintext highlighter-rouge">9.9.9.9</code>가 어느 시점부터 응답하지 않게 된 것이었습니다. 감시 주소를 바꿔 유선으로 되돌리고, 지난 글에서 시각을 기록하지 못했던 랜선 분리 시험을 이번에는 1초 단위로 보면서 다시 했습니다.</p>
@@ -1924,7 +1924,294 @@ ssh <span class="nt">-t</span> orbit@astra <span class="s1">'sudo iptables -t na
   <li>astra가 부팅되면 netplan과 NAT 설정이 재부팅 후에도 유지되도록 해 두었으므로 게이트웨이 역할이 자동으로 복구되고, 워커는 기존 복귀 조건에 따라 astra 경로로 돌아옵니다.</li>
 </ol>
 
-<p>같은 방식으로 astra에서 워커나 polaris를 깨우는 것도 가능합니다. 먼저 각 노드의 BIOS와 네트워크 장치에서 WoL이 켜져 있는지, 전원이 꺼진 상태에서도 유선 포트에 대기 전원이 들어오는지 확인해야 하고, 단순히 응답이 없는 것과 전원이 꺼진 것을 구분하는 기준도 정해야 합니다. 홈서버에서 이미 WoL로 원격 부팅을 사용하고 있으므로 같은 방식을 ORBIT 노드에 적용해 볼 예정입니다.</p>]]></content><author><name></name></author><category term="Project" /><category term="Orbit" /><category term="Network" /><category term="Netplan" /><category term="Tailscale" /><summary type="html"><![CDATA[강의실 와이파이 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정]]></summary></entry><entry><title type="html">Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동</title><link href="https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/" rel="alternate" type="text/html" title="Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동" /><published>2026-10-13T00:00:00+09:00</published><updated>2026-10-13T00:00:00+09:00</updated><id>https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor</id><content type="html" xml:base="https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/"><![CDATA[<h2 id="요약">요약</h2>
+<p>같은 방식으로 astra에서 워커나 polaris를 깨우는 것도 가능합니다. 먼저 각 노드의 BIOS와 네트워크 장치에서 WoL이 켜져 있는지, 전원이 꺼진 상태에서도 유선 포트에 대기 전원이 들어오는지 확인해야 하고, 단순히 응답이 없는 것과 전원이 꺼진 것을 구분하는 기준도 정해야 합니다. 홈서버에서 이미 WoL로 원격 부팅을 사용하고 있으므로 같은 방식을 ORBIT 노드에 적용해 볼 예정입니다.</p>]]></content><author><name></name></author><category term="Project" /><category term="Orbit" /><category term="Network" /><category term="Netplan" /><category term="Tailscale" /><summary type="html"><![CDATA[강의실 와이파이 제약 속에서 노드 5대의 네트워크를 하나의 스크립트로 관리하고, 게이트웨이 장애와 원격 작업 실패에 대비한 복구 경로를 구성하고 검증한 과정]]></summary></entry><entry><title type="html">설치가 중간에 끊긴 Ubuntu Server를 라이브 USB에서 복구하기</title><link href="https://hyn128.site/notes-12-troubleshooting-ubuntu-install-chroot-recovery/" rel="alternate" type="text/html" title="설치가 중간에 끊긴 Ubuntu Server를 라이브 USB에서 복구하기" /><published>2026-10-26T00:00:00+09:00</published><updated>2026-10-26T00:00:00+09:00</updated><id>https://hyn128.site/notes-12-troubleshooting-ubuntu-install-chroot-recovery</id><content type="html" xml:base="https://hyn128.site/notes-12-troubleshooting-ubuntu-install-chroot-recovery/"><![CDATA[<h2 id="요약">요약</h2>
+
+<blockquote>
+  <p>프로젝트 클러스터의 워커 노드로 쓸 갤럭시북에 Ubuntu 24.04 Server를 설치하는데, 설치기가 마지막 단계 근처에서 멈추는 일이 두 대에서 있었습니다. 다시 설치해도 같은 자리에서 멈췄기 때문에, 설치기가 디스크에 이미 넣어 둔 파일은 그대로 두고 빠진 것만 직접 채우는 쪽으로 방향을 바꿨습니다.</p>
+
+  <p>설치 USB의 셸에서 <code class="language-plaintext highlighter-rouge">chroot</code>로 디스크 안의 시스템에 들어가 계정과 호스트 이름, 네트워크 설정을 만들었고, 부팅 뒤 와이파이가 붙지 않는 문제는 설치가 끊기면서 빠진 <code class="language-plaintext highlighter-rouge">wpasupplicant</code> 패키지를 Mac에서 받아 USB로 옮겨 설치하는 것으로 해결했습니다.</p>
+</blockquote>
+
+<p>짧게 줄이면 이렇습니다.</p>
+
+<ol>
+  <li>설치기가 중간에 멈추고, USB를 빼고 부팅하면 <code class="language-plaintext highlighter-rouge">localhost login:</code>만 나옴</li>
+  <li>설치 USB로 다시 부팅해 tty2에서 계정을 만들었지만 재부팅하니 사라짐. USB 라이브 환경에 만든 것이었음</li>
+  <li><code class="language-plaintext highlighter-rouge">chroot /target</code>으로 디스크 안에 들어가 계정, 호스트 이름, 임시 netplan을 작성</li>
+  <li>부팅은 되지만 와이파이가 안 붙음. <code class="language-plaintext highlighter-rouge">wpasupplicant</code>가 설치되지 않은 상태</li>
+  <li>인터넷이 없으므로 Mac에서 deb 파일을 받아 USB로 옮겨 <code class="language-plaintext highlighter-rouge">dpkg -i</code>로 설치</li>
+  <li>와이파이가 붙은 뒤 <code class="language-plaintext highlighter-rouge">openssh-server</code>, <code class="language-plaintext highlighter-rouge">tailscale</code>을 설치해 평소대로 접속</li>
+</ol>
+
+<h2 id="1-문제-상황">1. 문제 상황</h2>
+
+<p>갤럭시북 세 대를 Ubuntu 24.04 Server로 설치해 클러스터 워커로 쓰려고 했습니다. 이 중 두 대에서 설치기가 끝까지 가지 못했고, 증상은 조금 달랐습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>기기</th>
+      <th>시점</th>
+      <th>증상</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>io (처음 워커 후보)</td>
+      <td>10/22</td>
+      <td>설치 마지막 GRUB 단계에서 매번 <code class="language-plaintext highlighter-rouge">grub-install: error: failed to register the EFI boot entry: Cannot allocate memory</code>로 실패</td>
+    </tr>
+    <tr>
+      <td>terra</td>
+      <td>10/26</td>
+      <td>설치 중 에러로 멈춤. USB를 빼고 부팅하면 <code class="language-plaintext highlighter-rouge">localhost login:</code> 화면만 나오고 만든 적 없는 계정으로는 들어갈 수 없음</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>terra는 부팅까지는 됐기 때문에 GRUB은 설치된 상태였고, 설치기가 계정과 호스트 이름을 넣는 단계 전에 끊긴 것으로 보였습니다. io는 GRUB 설치 자체가 실패해서 부팅부터 되지 않았습니다.</p>
+
+<p>두 경우 모두 다시 설치하면 같은 자리에서 다시 멈췄기 때문에, 설치를 반복하는 대신 설치기가 어디까지 했는지 확인하고 나머지를 직접 채우기로 했습니다.</p>
+
+<h2 id="2-설치기가-남긴-것과-빠진-것">2. 설치기가 남긴 것과 빠진 것</h2>
+
+<p>Ubuntu 설치기는 설치 대상 디스크를 <code class="language-plaintext highlighter-rouge">/target</code>에 연결해 두고 그 안에 파일을 복사합니다. 설치 화면에서 <code class="language-plaintext highlighter-rouge">Ctrl + Alt + F2</code>를 누르면 tty2 셸이 열리는데, 여기서 <code class="language-plaintext highlighter-rouge">/target</code> 안을 보면 설치기가 어디까지 진행했는지 알 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo</span> <span class="nt">-i</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">sudo -i</code>는 다른 명령과 함께 붙여 넣지 않고 단독으로 실행합니다. 새 셸이 열리면서 뒤에 붙인 명령은 버려지기 때문입니다. tty2에 처음 붙은 사용자는 일반 사용자라 <code class="language-plaintext highlighter-rouge">chroot</code>가 <code class="language-plaintext highlighter-rouge">Operation not permitted</code>로 막히므로, root 셸로 먼저 바꿔야 합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>lsblk <span class="nt">-f</span> | <span class="nb">grep</span> <span class="nt">-v</span> loop
+<span class="nb">cat</span> /target/etc/hostname
+<span class="nb">grep </span>orbit /target/etc/passwd
+<span class="nb">ls</span> /target/boot/efi/EFI
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">lsblk -f</code> : <code class="language-plaintext highlighter-rouge">/target</code>과 <code class="language-plaintext highlighter-rouge">/target/boot/efi</code>에 연결된 파티션이 보여야 합니다. <code class="language-plaintext highlighter-rouge">grep -v loop</code>은 라이브 환경의 squashfs 장치를 숨깁니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">/target/etc/hostname</code> : <code class="language-plaintext highlighter-rouge">localhost.localdomain</code>이면 호스트 이름을 넣기 전에 끊긴 것입니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">/target/etc/passwd</code> : 만들려던 계정이 없으면 계정 단계 전에 끊긴 것입니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">/target/boot/efi/EFI</code> : <code class="language-plaintext highlighter-rouge">BOOT</code>와 <code class="language-plaintext highlighter-rouge">ubuntu</code>가 있으면 GRUB은 설치된 것입니다.</li>
+</ul>
+
+<p>terra는 OS 파일과 GRUB까지 있었고 계정, 호스트 이름, <code class="language-plaintext highlighter-rouge">/etc/netplan</code> 설정이 비어 있었습니다. 설치가 끊기면서 패키지 설치도 끝까지 가지 못해, 당연히 있을 것으로 생각한 <code class="language-plaintext highlighter-rouge">wpasupplicant</code>와 <code class="language-plaintext highlighter-rouge">openssh-server</code>도 빠져 있었는데 이것은 부팅한 뒤에야 알았습니다.</p>
+
+<h2 id="3-첫-실수-라이브-환경에-계정을-만듦">3. 첫 실수: 라이브 환경에 계정을 만듦</h2>
+
+<p>tty2에서 바로 <code class="language-plaintext highlighter-rouge">adduser orbit</code>을 실행하고 재부팅했는데, 로그인 화면은 그대로 <code class="language-plaintext highlighter-rouge">localhost</code>였고 만든 계정으로 들어갈 수 없었습니다. tty2의 <code class="language-plaintext highlighter-rouge">/</code>는 디스크가 아니라 설치 USB의 라이브 환경이기 때문에, 거기서 만든 계정은 USB 메모리의 임시 영역에만 생기고 재부팅하면 사라집니다.</p>
+
+<p>지금 어느 환경에 있는지는 루트 파일시스템을 보면 알 수 있습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">df</span> <span class="nt">-h</span> /
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">/</code>가 <code class="language-plaintext highlighter-rouge">/cow</code>로 나오면 USB 라이브 환경입니다. 여기에 설치하거나 만든 것은 전부 재부팅과 함께 없어집니다. io 때는 같은 이유로 라이브 환경에 tailscale을 설치했다가 재부팅 뒤 사라지는 일도 있었습니다.</p>
+
+<blockquote>
+  <p><strong>디스크를 고칠 때 반드시 chroot를 쓰는 이유</strong></p>
+
+  <p>라이브 환경에서 <code class="language-plaintext highlighter-rouge">adduser</code>나 <code class="language-plaintext highlighter-rouge">apt install</code>을 실행하면 명령은 성공하지만 대상이 USB입니다. 디스크에 설치된 시스템을 바꾸려면 그 시스템의 루트 디렉터리를 현재 루트로 바꾼 뒤 명령을 실행해야 하고, 그 역할을 <code class="language-plaintext highlighter-rouge">chroot</code>가 합니다. 그래서 설치 USB에서 디스크를 손보는 작업은 전부 <code class="language-plaintext highlighter-rouge">chroot /target</code> 안에서 하기로 했습니다.</p>
+</blockquote>
+
+<h2 id="4-디스크-안으로-들어가기">4. 디스크 안으로 들어가기</h2>
+
+<p>설치기가 <code class="language-plaintext highlighter-rouge">/target</code>을 연결해 둔 상태를 그대로 쓰되, 설치기를 다시 부팅해서 <code class="language-plaintext highlighter-rouge">/target</code>이 비어 있으면 루트 파티션을 찾아 직접 연결합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>lsblk <span class="nt">-f</span> | <span class="nb">grep</span> <span class="nt">-v</span> loop
+mount /dev/nvme0n1p2 /target
+mount /dev/nvme0n1p1 /target/boot/efi
+</code></pre></div></div>
+
+<ul>
+  <li>terra는 LVM 없이 <code class="language-plaintext highlighter-rouge">nvme0n1p2</code> ext4 하나와 <code class="language-plaintext highlighter-rouge">nvme0n1p1</code> EFI 파티션으로 설치했습니다.</li>
+  <li>LVM으로 설치했다면 <code class="language-plaintext highlighter-rouge">vgchange -ay</code>로 볼륨 그룹을 켠 뒤 <code class="language-plaintext highlighter-rouge">/dev/ubuntu-vg/ubuntu-lv</code>를 연결합니다.</li>
+</ul>
+
+<p>다음으로 커널과 장치 정보를 디스크 쪽에도 보이게 연결하고 <code class="language-plaintext highlighter-rouge">chroot</code>로 들어갑니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for </span>d <span class="k">in </span>dev proc sys run<span class="p">;</span> <span class="k">do </span>mount <span class="nt">--rbind</span> /<span class="nv">$d</span> /target/<span class="nv">$d</span><span class="p">;</span> <span class="k">done
+</span><span class="nb">chroot</span> /target
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">--rbind</code> : <code class="language-plaintext highlighter-rouge">/dev</code>, <code class="language-plaintext highlighter-rouge">/proc</code>, <code class="language-plaintext highlighter-rouge">/sys</code>, <code class="language-plaintext highlighter-rouge">/run</code>을 하위 마운트까지 함께 <code class="language-plaintext highlighter-rouge">/target</code> 아래에 겹쳐 연결합니다. 이것이 없으면 <code class="language-plaintext highlighter-rouge">chroot</code> 안에서 장치를 찾지 못해 <code class="language-plaintext highlighter-rouge">adduser</code>나 <code class="language-plaintext highlighter-rouge">grub-install</code> 같은 명령이 실패합니다.</li>
+</ul>
+
+<p><code class="language-plaintext highlighter-rouge">chroot</code> 안에서 계정과 호스트 이름을 만듭니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>adduser orbit
+usermod <span class="nt">-aG</span> <span class="nb">sudo </span>orbit
+<span class="nb">echo </span>terra <span class="o">&gt;</span> /etc/hostname
+nano /etc/hosts
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">/etc/hosts</code>에는 다음 내용을 넣었습니다.</p>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>127.0.0.1 localhost
+127.0.1.1 terra
+
+::1 localhost ip6-localhost ip6-loopback
+</code></pre></div></div>
+
+<p>처음에는 <code class="language-plaintext highlighter-rouge">/etc/hosts</code>에 <code class="language-plaintext highlighter-rouge">127.0.0.1 terra</code>만 넣고 재부팅했는데 로그인 화면은 여전히 <code class="language-plaintext highlighter-rouge">localhost.localdomain</code>이었습니다. <code class="language-plaintext highlighter-rouge">/etc/hosts</code>는 이름을 주소로 바꾸는 조회용 파일이고, 화면에 나오는 호스트 이름은 <code class="language-plaintext highlighter-rouge">/etc/hostname</code>이 정하기 때문에 둘 다 써야 했습니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">/etc/netplan</code>이 비어 있었으므로 부팅 뒤 인터넷에 붙을 수 있도록 와이파이 DHCP 설정을 임시로 만들었습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>nano /etc/netplan/50-temp.yaml
+<span class="nb">chmod </span>600 /etc/netplan/50-temp.yaml
+</code></pre></div></div>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">network</span><span class="pi">:</span>
+  <span class="na">version</span><span class="pi">:</span> <span class="m">2</span>
+  <span class="na">wifis</span><span class="pi">:</span>
+    <span class="na">wlo1</span><span class="pi">:</span>
+      <span class="na">dhcp4</span><span class="pi">:</span> <span class="no">true</span>
+      <span class="na">access-points</span><span class="pi">:</span>
+        <span class="s2">"</span><span class="s">&lt;와이파이</span><span class="nv"> </span><span class="s">SSID&gt;"</span><span class="err">:</span>
+          <span class="na">password</span><span class="pi">:</span> <span class="s2">"</span><span class="s">&lt;와이파이</span><span class="nv"> </span><span class="s">비밀번호&gt;"</span>
+</code></pre></div></div>
+
+<p>netplan 파일에 비밀번호가 들어가므로 권한을 <code class="language-plaintext highlighter-rouge">600</code>으로 줄였습니다. 이 설정은 복구용이고, 노드의 실제 네트워크는 이후 Ansible이 관리하는 netplan으로 바꿨습니다.</p>
+
+<p><code class="language-plaintext highlighter-rouge">chroot</code>를 나와 디스크에 쓰고 재부팅합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">exit
+sync
+</span>reboot
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">umount -R /target</code>을 먼저 실행하면 <code class="language-plaintext highlighter-rouge">/target/run/user/1000: target is busy</code>가 나오는데, <code class="language-plaintext highlighter-rouge">/run</code>을 겹쳐 연결해서 생기는 경고라 무시하고 <code class="language-plaintext highlighter-rouge">sync</code> 뒤 재부팅해도 문제가 없었습니다. 재부팅할 때 USB는 뽑습니다.</p>
+
+<h2 id="5-부팅-자체가-안-될-때-grub을-따로-설치-io">5. 부팅 자체가 안 될 때: GRUB을 따로 설치 (io)</h2>
+
+<p>io는 설치기가 GRUB을 NVRAM에 등록하는 단계에서 <code class="language-plaintext highlighter-rouge">Cannot allocate memory</code>로 매번 실패했습니다. 메모리 부족이 아니라 펌웨어가 EFI 변수 쓰기를 거부했다는 뜻이었고, 기존 부팅 항목을 지우거나 BIOS 기본값으로 되돌려도 같았습니다. UEFI 셸 USB로 부팅해 <code class="language-plaintext highlighter-rouge">bcfg boot rm 0</code>을 실행하니 펌웨어에 쓰기는 됐기 때문에, 펌웨어 고장이 아니라 리눅스에서 들어오는 쓰기만 거부되는 것으로 범위를 좁힐 수 있었습니다.</p>
+
+<p>NVRAM에 쓰지 않고 부팅하도록 GRUB을 기본 경로에 설치했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo</span> <span class="nt">-i</span>
+<span class="k">for </span>d <span class="k">in </span>dev proc sys run<span class="p">;</span> <span class="k">do </span>mount <span class="nt">--bind</span> /<span class="nv">$d</span> /target/<span class="nv">$d</span><span class="p">;</span> <span class="k">done
+</span><span class="nb">chroot</span> /target grub-install <span class="nt">--target</span><span class="o">=</span>x86_64-efi <span class="nt">--efi-directory</span><span class="o">=</span>/boot/efi <span class="nt">--removable</span> <span class="nt">--no-nvram</span>
+<span class="nb">chroot</span> /target update-grub
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">--no-nvram</code> : 펌웨어의 부팅 항목 목록에 Ubuntu를 등록하지 않습니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">--removable</code> : GRUB을 <code class="language-plaintext highlighter-rouge">\EFI\BOOT\BOOTX64.EFI</code>에 설치합니다. 펌웨어가 기본으로 갖고 있는 <code class="language-plaintext highlighter-rouge">UEFI OS</code> 항목이 이 경로를 가리키므로 등록 없이도 부팅됩니다. 부팅 메뉴 이름이 Ubuntu 대신 UEFI OS로 나오는 것 말고는 차이가 없었습니다.</li>
+</ul>
+
+<p>이 방법으로 부팅은 됐지만 계정, 호스트 이름, 네트워크, locale이 전부 빠져 있어서 4절과 같은 작업을 거쳐야 했습니다. 설치기 쪽에서 NVRAM 쓰기를 건너뛰도록 curtin 설정을 고치는 시도도 했는데, 설치기가 쓰는 <code class="language-plaintext highlighter-rouge">grub-multi-install</code>은 curtin 설정이 아니라 설치 대상 시스템의 debconf 값을 따르기 때문에 통하지 않았습니다.</p>
+
+<blockquote>
+  <p><strong>io를 클러스터에서 뺀 이유</strong></p>
+
+  <p>같은 모델, 같은 BIOS 버전의 다른 갤럭시북은 정상이었고 삼성 BIOS는 Windows에서만 업데이트할 수 있어 펌웨어 쪽에서 더 해 볼 것이 없었습니다. UEFI 셸의 <code class="language-plaintext highlighter-rouge">dmpstore -d</code>로 변수를 전부 지우거나 커널 옵션 <code class="language-plaintext highlighter-rouge">efi_no_storage_paranoia</code>로 안전장치를 끄는 방법은 삼성 노트북이 벽돌이 된 사례가 있어 하지 않았습니다. 재설치할 때마다 이 과정을 반복해야 하므로 io는 노드에서 제외했고, 이 이름은 이후 홈서버의 부하 발생기가 쓰고 있습니다.</p>
+</blockquote>
+
+<h2 id="6-와이파이가-안-붙음-빠진-패키지를-usb로-설치">6. 와이파이가 안 붙음: 빠진 패키지를 USB로 설치</h2>
+
+<p>재부팅 뒤 만든 계정으로 로그인은 됐지만 와이파이가 붙지 않았습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ip <span class="nt">-br</span> a
+systemctl status netplan-wpa-wlo1 <span class="nt">--no-pager</span> | <span class="nb">head</span> <span class="nt">-5</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">wlo1</code>이 <code class="language-plaintext highlighter-rouge">NO-CARRIER</code>였고 <code class="language-plaintext highlighter-rouge">netplan-wpa-wlo1</code> 서비스가 <code class="language-plaintext highlighter-rouge">203/EXEC</code>로 실패해 있었습니다. <code class="language-plaintext highlighter-rouge">203/EXEC</code>는 systemd가 실행할 프로그램을 찾지 못했다는 뜻이라, 확인해 보니 와이파이 인증을 맡는 <code class="language-plaintext highlighter-rouge">wpasupplicant</code>가 설치되어 있지 않았습니다. 처음에는 5GHz 대역 문제를 의심했는데 원인은 패키지 부재였습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dpkg <span class="nt">-l</span> wpasupplicant openssh-server | <span class="nb">grep</span> ^ii
+</code></pre></div></div>
+
+<p>인터넷이 없어서 <code class="language-plaintext highlighter-rouge">apt install</code>을 쓸 수 없으므로 Mac에서 패키지 파일을 받아 USB로 옮겼습니다. <code class="language-plaintext highlighter-rouge">wpasupplicant</code>는 <code class="language-plaintext highlighter-rouge">libpcsclite1</code>에 의존하기 때문에 두 파일이 필요했습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>파일</th>
+      <th>받는 곳</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">wpasupplicant_2.10-21build4_amd64.deb</code></td>
+      <td><code class="language-plaintext highlighter-rouge">http://archive.ubuntu.com/ubuntu/pool/main/w/wpa/</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">libpcsclite1_2.0.3-1build1_amd64.deb</code></td>
+      <td><code class="language-plaintext highlighter-rouge">http://archive.ubuntu.com/ubuntu/pool/main/p/pcsc-lite/</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>노드에서 USB를 연결해 설치합니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>lsblk <span class="nt">-f</span> | <span class="nb">grep</span> <span class="nt">-v</span> loop
+<span class="nb">sudo mkdir</span> <span class="nt">-p</span> /mnt/usb <span class="o">&amp;&amp;</span> <span class="nb">sudo </span>mount /dev/sda1 /mnt/usb
+<span class="nb">sudo </span>dpkg <span class="nt">-i</span> /mnt/usb/libpcsclite1<span class="k">*</span>.deb /mnt/usb/wpasupplicant<span class="k">*</span>.deb
+<span class="nb">cd</span> ~ <span class="o">&amp;&amp;</span> <span class="nb">sudo </span>umount /mnt/usb
+<span class="nb">sudo </span>netplan apply
+ip <span class="nt">-br</span> a
+</code></pre></div></div>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">lsblk -f</code> : USB가 어느 장치로 잡혔는지 확인합니다. 여기서는 <code class="language-plaintext highlighter-rouge">sda1</code>이었습니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">dpkg -i</code> : 의존 패키지를 먼저 적어야 순서대로 설치됩니다.</li>
+  <li><code class="language-plaintext highlighter-rouge">cd ~</code> : USB 안에 있는 채로 <code class="language-plaintext highlighter-rouge">umount</code>하면 바쁘다고 거부되므로 먼저 빠져나옵니다.</li>
+</ul>
+
+<p><code class="language-plaintext highlighter-rouge">netplan apply</code> 뒤 <code class="language-plaintext highlighter-rouge">wlo1</code>에 <code class="language-plaintext highlighter-rouge">192.168.200.x</code> 주소가 붙으면서 인터넷이 됐습니다. 이어서 <code class="language-plaintext highlighter-rouge">apt update</code>를 실행하니 <code class="language-plaintext highlighter-rouge">file:/cdrom ... no longer has a Release file</code> 경고가 나왔는데, 설치기가 USB를 패키지 저장소로 등록해 둔 줄이 남은 것이라 지우고 나머지 패키지를 설치했습니다.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo sed</span> <span class="nt">-i</span> <span class="s1">'/cdrom/d'</span> /etc/apt/sources.list /etc/apt/sources.list.d/<span class="k">*</span>.sources /etc/apt/sources.list.d/<span class="k">*</span>.list 2&gt;/dev/null
+<span class="nb">sudo </span>apt update
+<span class="nb">sudo </span>apt <span class="nb">install</span> <span class="nt">-y</span> openssh-server tailscale
+<span class="nb">sudo </span>tailscale up <span class="nt">--ssh</span>
+</code></pre></div></div>
+
+<p>tailscale을 설치하기 전에 <code class="language-plaintext highlighter-rouge">could not resolve tailscale.com</code>이 나온 적이 있는데, curl 문제가 아니라 와이파이가 아직 안 붙어 DNS 조회가 안 되는 상태였습니다. 인터넷만 되면 tailscale은 24.04 저장소에 있어서 <code class="language-plaintext highlighter-rouge">apt install</code>로 바로 설치됐습니다.</p>
+
+<h2 id="7-결론">7. 결론</h2>
+
+<p>설치기가 멈췄다고 디스크가 비어 있는 것은 아니었고, 어디까지 진행됐는지 확인한 뒤 빠진 것만 채우는 쪽이 재설치보다 빨랐습니다. 이번에 확인한 것을 정리하면 다음과 같습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>확인할 것</th>
+      <th>방법</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>지금 라이브 환경인지 디스크인지</td>
+      <td><code class="language-plaintext highlighter-rouge">df -h /</code>가 <code class="language-plaintext highlighter-rouge">/cow</code>면 USB. 디스크 작업은 <code class="language-plaintext highlighter-rouge">chroot /target</code> 안에서</td>
+    </tr>
+    <tr>
+      <td>설치기가 어디까지 했는지</td>
+      <td><code class="language-plaintext highlighter-rouge">/target/etc/hostname</code>, <code class="language-plaintext highlighter-rouge">/target/etc/passwd</code>, <code class="language-plaintext highlighter-rouge">/target/boot/efi/EFI</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">/target</code>이 비어 있을 때</td>
+      <td><code class="language-plaintext highlighter-rouge">lsblk -f</code>로 루트 파티션을 찾아 직접 <code class="language-plaintext highlighter-rouge">mount</code></td>
+    </tr>
+    <tr>
+      <td>호스트 이름</td>
+      <td><code class="language-plaintext highlighter-rouge">/etc/hostname</code>이 정함. <code class="language-plaintext highlighter-rouge">/etc/hosts</code>는 조회용</td>
+    </tr>
+    <tr>
+      <td>부팅 항목 등록이 안 될 때</td>
+      <td><code class="language-plaintext highlighter-rouge">grub-install --removable --no-nvram</code></td>
+    </tr>
+    <tr>
+      <td>와이파이가 <code class="language-plaintext highlighter-rouge">203/EXEC</code>로 실패</td>
+      <td><code class="language-plaintext highlighter-rouge">wpasupplicant</code> 부재. deb를 USB로 옮겨 <code class="language-plaintext highlighter-rouge">dpkg -i</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">apt update</code>의 cdrom 경고</td>
+      <td>sources에서 cdrom 줄 삭제</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>설치가 끊기면 <code class="language-plaintext highlighter-rouge">wpasupplicant</code>나 <code class="language-plaintext highlighter-rouge">openssh-server</code>처럼 당연히 있을 것 같은 패키지도 빠질 수 있다는 것을 알았기 때문에, 인터넷이 없을 때를 대비해 amd64용 <code class="language-plaintext highlighter-rouge">wpasupplicant</code>와 <code class="language-plaintext highlighter-rouge">libpcsclite1</code> deb를 설치 USB에 같이 넣어 두기로 했습니다. 다음 노트북을 설치할 때는 같은 상황이 와도 바로 넘어갈 수 있을 것 같습니다.</p>]]></content><author><name></name></author><category term="TroubleShooting" /><category term="Ubuntu" /><category term="Linux" /><summary type="html"><![CDATA[갤럭시북에 Ubuntu 24.04 Server를 설치하다 설치기가 중간에 멈춘 뒤, 다시 설치하지 않고 설치 USB의 셸에서 디스크로 들어가 계정과 호스트 이름, 네트워크를 채우고, 빠진 와이파이 패키지를 USB로 옮겨 설치해 살린 기록]]></summary></entry><entry><title type="html">Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동</title><link href="https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/" rel="alternate" type="text/html" title="Spring Boot Micrometer 계측과 Prometheus ServiceMonitor 연동" /><published>2026-10-13T00:00:00+09:00</published><updated>2026-10-13T00:00:00+09:00</updated><id>https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor</id><content type="html" xml:base="https://hyn128.site/cloud-native-67-spring-boot-micrometer-prometheus-servicemonitor/"><![CDATA[<h2 id="요약">요약</h2>
 
 <hr />
 
@@ -4680,479 +4967,4 @@ ansible-playbook <span class="se">\</span>
   <li>
     <p><a href="https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_checkmode.html">Check Mode와 Diff Mode</a></p>
   </li>
-</ul>]]></content><author><name></name></author><category term="CloudNative" /><category term="AutoEverSW" /><category term="Ansible" /><summary type="html"><![CDATA[Ansible Facts로 여러 Managed Node의 System 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 File로 저장하는 Playbook을 구성합니다]]></summary></entry><entry><title type="html">Kubernetes Monitoring과 Prometheus Architecture</title><link href="https://hyn128.site/cloud-native-64-kubernetes-prometheus-monitoring-architecture/" rel="alternate" type="text/html" title="Kubernetes Monitoring과 Prometheus Architecture" /><published>2026-10-09T00:00:00+09:00</published><updated>2026-10-09T00:00:00+09:00</updated><id>https://hyn128.site/cloud-native-64-kubernetes-prometheus-monitoring-architecture</id><content type="html" xml:base="https://hyn128.site/cloud-native-64-kubernetes-prometheus-monitoring-architecture/"><![CDATA[<h2 id="요약">요약</h2>
-
-<hr />
-
-<blockquote>
-  <p>Kubernetes Pod와 IP는 계속 생성·교체되므로 고정 Host 목록보다 API 기반 Service Discovery와 선언형 Monitoring 구성이 필요합니다. Metrics Server는 HPA와 <code class="language-plaintext highlighter-rouge">kubectl top</code>에 필요한 현재 CPU·Memory Resource Metric을 제공하고, Prometheus는 Exporter가 공개한 Metric을 주기적으로 수집해 시계열로 저장합니다. Grafana는 조회 결과를 시각화하고 Alertmanager는 Prometheus가 보낸 Alert를 Grouping·Deduplication·Routing합니다.</p>
-</blockquote>
-
-<h2 id="1-고정-host와-kubernetes의-차이">1. 고정 Host와 Kubernetes의 차이</h2>
-
-<hr />
-
-<table>
-  <thead>
-    <tr>
-      <th>구분</th>
-      <th>전통적인 Host 환경</th>
-      <th>Kubernetes 환경</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>대상 수명</td>
-      <td>Host가 장기간 유지</td>
-      <td>Pod가 생성·교체·삭제됨</td>
-    </tr>
-    <tr>
-      <td>주소</td>
-      <td>비교적 고정된 Host IP</td>
-      <td>Pod 재생성 시 IP 변경 가능</td>
-    </tr>
-    <tr>
-      <td>설정</td>
-      <td>Host 목록과 정적 설정 사용 가능</td>
-      <td>Label과 API 기반 Discovery 필요</td>
-    </tr>
-    <tr>
-      <td>상태</td>
-      <td>Process 중심</td>
-      <td>Node, Pod, Deployment와 Service 상태 연결</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Kubernetes Monitoring은 Control Plane의 Desired State와 Worker Node의 실제 실행 상태를 함께 봐야 합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Control Plane
-├── API Server의 Object 상태
-├── Scheduler·Controller 동작
-└── Desired Replica와 Condition
-
-Worker Node
-├── kubelet과 Container Runtime
-├── Node CPU·Memory·Disk·Network
-└── 실제 Pod Resource와 Restart
-</code></pre></div></div>
-
-<h2 id="2-resource-metrics-pipeline">2. Resource Metrics Pipeline</h2>
-
-<hr />
-
-<p>Resource Metrics Pipeline은 HPA, VPA와 <code class="language-plaintext highlighter-rouge">kubectl top</code>에 필요한 최소 CPU·Memory Metric을 제공합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Container Runtime·cgroup
-  ↓
-kubelet의 Resource Metric Endpoint
-  ↓ Pull
-Metrics Server
-  ↓ metrics.k8s.io API
-API Server
-  ├── kubectl top
-  └── HPA·VPA
-</code></pre></div></div>
-
-<table>
-  <thead>
-    <tr>
-      <th>구성 요소</th>
-      <th>역할</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>cAdvisor·CRI Metric</td>
-      <td>Container Resource 사용량 제공</td>
-    </tr>
-    <tr>
-      <td>kubelet</td>
-      <td>Node와 Pod Resource 통계를 인증된 Endpoint로 공개</td>
-    </tr>
-    <tr>
-      <td>Metrics Server</td>
-      <td>각 Node의 kubelet에서 CPU·Memory Metric 수집·집계</td>
-    </tr>
-    <tr>
-      <td>Metrics API</td>
-      <td><code class="language-plaintext highlighter-rouge">metrics.k8s.io</code>로 현재 Resource Metric 제공</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Metrics Server는 최신 값 중심의 짧은 수명 Pipeline입니다. 장기 추세 저장, 임의 Application Metric Query와 Alert를 위한 완전한 Monitoring System이 아닙니다.</p>
-
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># [CONTROL-PLANE-CLIENT]</span>
-kubectl top nodes
-kubectl top pods <span class="nt">--all-namespaces</span>
-</code></pre></div></div>
-
-<p>명령이 실패하면 Metrics Server Pod, APIService <code class="language-plaintext highlighter-rouge">v1beta1.metrics.k8s.io</code>와 kubelet 통신을 확인합니다.</p>
-
-<h2 id="3-full-monitoring-pipeline">3. Full Monitoring Pipeline</h2>
-
-<hr />
-
-<p>Prometheus 기반 Pipeline은 여러 Target의 Metric을 수집해 시계열 Database에 보관합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Worker Node ─ Node Exporter ─┐
-Kubernetes API ─ kube-state-metrics ─┤
-Application ─ /metrics ─────┤
-Batch Job ─ Pushgateway ────┘
-                              ↓ Pull
-                         Prometheus
-                         ├── PromQL
-                         ├── Recording·Alerting Rule
-                         ├── Grafana
-                         └── Alertmanager → Notification
-</code></pre></div></div>
-
-<p>Prometheus는 Target의 HTTP Metric Endpoint를 Pull 방식으로 Scrape합니다. Target은 정적 설정 또는 Kubernetes Service Discovery로 찾습니다.</p>
-
-<h2 id="4-도구의-역할">4. 도구의 역할</h2>
-
-<hr />
-
-<table>
-  <thead>
-    <tr>
-      <th>도구</th>
-      <th>중심 역할</th>
-      <th>운영 형태</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Prometheus</td>
-      <td>Metric 수집, 시계열 저장, PromQL과 Rule 평가</td>
-      <td>직접 운영 또는 Managed Service</td>
-    </tr>
-    <tr>
-      <td>Grafana</td>
-      <td>여러 Data Source의 Dashboard와 시각화</td>
-      <td>직접 운영 또는 Managed Service</td>
-    </tr>
-    <tr>
-      <td>Datadog</td>
-      <td>Infrastructure·Log·APM 통합 Observability</td>
-      <td>SaaS</td>
-    </tr>
-    <tr>
-      <td>New Relic</td>
-      <td>Application Performance와 Telemetry 분석</td>
-      <td>SaaS</td>
-    </tr>
-    <tr>
-      <td>InfluxDB</td>
-      <td>범용 시계열 Database</td>
-      <td>직접 운영, Cloud와 Enterprise</td>
-    </tr>
-    <tr>
-      <td>Kibana</td>
-      <td>Elasticsearch Data 검색과 시각화</td>
-      <td>Elastic Stack</td>
-    </tr>
-    <tr>
-      <td>Chronograf</td>
-      <td>InfluxDB Data 탐색과 시각화</td>
-      <td>InfluxDB 생태계</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>제품 기능, License와 요금은 Version과 계약에 따라 바뀝니다. 선택할 때는 다음을 비교합니다.</p>
-
-<ul>
-  <li>
-    <p>Data를 조직 외부 Service에 저장할 수 있는가</p>
-  </li>
-  <li>
-    <p>수집 대상과 Data 양에 따른 비용을 감당할 수 있는가</p>
-  </li>
-  <li>
-    <p>Metric, Log와 Trace를 하나의 Platform에서 연결해야 하는가</p>
-  </li>
-  <li>
-    <p>Monitoring Platform 자체의 Backup과 고가용성을 운영할 수 있는가</p>
-  </li>
-</ul>
-
-<h2 id="5-prometheus-server">5. Prometheus Server</h2>
-
-<hr />
-
-<p>Prometheus Server는 다음 기능을 담당합니다.</p>
-
-<ul>
-  <li>
-    <p>Service Discovery와 설정으로 Scrape Target을 찾습니다.</p>
-  </li>
-  <li>
-    <p>Target의 Metric Endpoint를 주기적으로 Pull합니다.</p>
-  </li>
-  <li>
-    <p>Sample을 Label 기반 시계열로 저장합니다.</p>
-  </li>
-  <li>
-    <p>PromQL Query, Recording Rule과 Alerting Rule을 평가합니다.</p>
-  </li>
-  <li>
-    <p>Target 상태와 Query를 확인하는 Web UI와 API를 제공합니다.</p>
-  </li>
-</ul>
-
-<p>Prometheus의 Local Storage는 각 Server가 독립적으로 동작하는 구조입니다. 장기 보관, 전역 Query와 대규모 고가용성이 필요하면 Remote Write나 별도 장기 Storage Architecture를 검토합니다.</p>
-
-<h2 id="6-node-exporter">6. Node Exporter</h2>
-
-<hr />
-
-<p>Node Exporter는 Linux Node의 <code class="language-plaintext highlighter-rouge">/proc</code>, <code class="language-plaintext highlighter-rouge">/sys</code>와 OS Interface에서 CPU, Memory, File System, Disk와 Network Metric을 읽어 HTTP <code class="language-plaintext highlighter-rouge">/metrics</code> Endpoint로 공개합니다.</p>
-
-<p>Kubernetes에서는 일반적으로 DaemonSet으로 배포해 각 Worker Node의 Host Metric을 수집합니다. Control Plane Node에도 배포하려면 해당 Node의 Taint와 Monitoring 정책에 맞는 Toleration이 필요할 수 있습니다. Managed Kubernetes에서는 Provider가 관리하는 Control Plane Host에 Node Exporter를 직접 배포할 수 없습니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Node Exporter: Host OS Resource 상태
-kube-state-metrics: Kubernetes API Object 상태
-</code></pre></div></div>
-
-<p>두 Component는 같은 정보를 중복 수집하는 것이 아닙니다.</p>
-
-<h2 id="7-kube-state-metrics">7. kube-state-metrics</h2>
-
-<hr />
-
-<p><code class="language-plaintext highlighter-rouge">kube-state-metrics</code>는 Kubernetes API Server를 Watch하고 Deployment, ReplicaSet, Pod, Node 같은 Object의 현재 상태를 Metric으로 변환해 <code class="language-plaintext highlighter-rouge">/metrics</code>로 공개합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>예시 질문</th>
-      <th>Metric 영역</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>원하는 Replica와 사용 가능한 Replica가 다른가</td>
-      <td>Deployment State</td>
-    </tr>
-    <tr>
-      <td>Pod가 반복해서 Restart됐는가</td>
-      <td>Pod Container Status</td>
-    </tr>
-    <tr>
-      <td>Node가 Ready Condition인가</td>
-      <td>Node Status</td>
-    </tr>
-    <tr>
-      <td>Resource Request와 Limit가 어떻게 설정됐는가</td>
-      <td>Pod Container Resource Spec</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Node의 실제 CPU 사용률을 읽는 Component가 아닙니다. API Object의 Spec과 Status를 Metric으로 나타냅니다.</p>
-
-<h2 id="8-alertmanager">8. Alertmanager</h2>
-
-<hr />
-
-<p>Alerting Rule은 Prometheus가 평가합니다. 조건이 충족되면 Prometheus가 Alert를 Alertmanager에 보내고 Alertmanager는 다음 작업을 수행합니다.</p>
-
-<ul>
-  <li>
-    <p>같은 원인의 Alert를 Grouping합니다.</p>
-  </li>
-  <li>
-    <p>중복 Notification을 제거합니다.</p>
-  </li>
-  <li>
-    <p>Label에 따라 Email, Chat 또는 On-call Receiver로 Routing합니다.</p>
-  </li>
-  <li>
-    <p>Maintenance 동안 Silence를 적용합니다.</p>
-  </li>
-  <li>
-    <p>상위 Alert가 발생했을 때 하위 Alert Notification을 Inhibition합니다.</p>
-  </li>
-</ul>
-
-<p>Alertmanager가 Metric을 직접 수집하거나 Alert 조건을 평가하는 것은 아닙니다.</p>
-
-<h2 id="9-pushgateway">9. Pushgateway</h2>
-
-<hr />
-
-<p>Pushgateway는 Prometheus가 실행 중에 Scrape하기 어려운 짧은 Service-level Batch Job의 결과를 임시로 노출합니다.</p>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Short-lived Batch Job
-  ↓ Push
-Pushgateway
-  ↓ Pull
-Prometheus
-</code></pre></div></div>
-
-<p>일반 Host나 장기 Service의 Metric을 Pushgateway로 보내지 않습니다. Pushgateway는 Producer가 사라져도 Series를 자동 삭제하지 않으므로 오래된 Metric 수명 주기를 별도로 관리해야 합니다. Host 단위 Batch 결과는 Node Exporter Textfile Collector가 더 적합할 수 있습니다.</p>
-
-<h2 id="10-prometheus-operator-pattern">10. Prometheus Operator Pattern</h2>
-
-<hr />
-
-<p>Prometheus Operator는 Kubernetes Custom Resource를 Watch하고 Prometheus와 Alertmanager의 배포·설정을 Desired State에 맞게 조정합니다.</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Custom Resource</th>
-      <th>역할</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">Prometheus</code></td>
-      <td>Version, Replica, Storage와 Retention 등 Instance 상태 선언</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">Alertmanager</code></td>
-      <td>Alertmanager Instance 상태 선언</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">ServiceMonitor</code></td>
-      <td>Label로 Service Endpoint를 찾아 Scrape 방법 정의</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">PodMonitor</code></td>
-      <td>Service 없이 Pod Label로 Target과 Scrape 방법 정의</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">PrometheusRule</code></td>
-      <td>Recording Rule과 Alerting Rule 정의</td>
-    </tr>
-    <tr>
-      <td><code class="language-plaintext highlighter-rouge">AlertmanagerConfig</code></td>
-      <td>Receiver, Route와 Inhibition 설정 분리</td>
-    </tr>
-  </tbody>
-</table>
-
-<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code>사용자: ServiceMonitor·PrometheusRule 생성
-  ↓
-Kubernetes API Server
-  ↓ Watch
-Prometheus Operator
-  ↓ Reconcile
-Prometheus Scrape 설정·Rule과 Workload 갱신
-  ↓
-Prometheus가 새 Target Scrape·Rule 평가
-</code></pre></div></div>
-
-<p>Operator는 Label Selector를 이용해 <code class="language-plaintext highlighter-rouge">ServiceMonitor</code>, <code class="language-plaintext highlighter-rouge">PodMonitor</code>와 Rule을 Prometheus Instance에 연결합니다. 설정이 바뀌면 필요한 구성을 Reconcile하고 Prometheus가 재시작 없이 동적으로 반영할 수 있도록 관리합니다.</p>
-
-<h2 id="11-control-plane과-worker-관점">11. Control Plane과 Worker 관점</h2>
-
-<hr />
-
-<p>Monitoring Resource를 적용했을 때 역할은 다음처럼 이어집니다.</p>
-
-<ol>
-  <li>
-    <p>관리자가 API Server에 <code class="language-plaintext highlighter-rouge">ServiceMonitor</code> 또는 <code class="language-plaintext highlighter-rouge">PrometheusRule</code>을 제출합니다.</p>
-  </li>
-  <li>
-    <p>API Server가 Desired State를 저장하고 Prometheus Operator가 변경을 감지합니다.</p>
-  </li>
-  <li>
-    <p>Operator가 Prometheus 설정과 관련 Workload를 Reconcile합니다.</p>
-  </li>
-  <li>
-    <p>Scheduler가 Monitoring Pod의 실행 Node를 선택합니다.</p>
-  </li>
-  <li>
-    <p>선택된 Worker의 kubelet이 Container Runtime을 통해 Pod를 실행합니다.</p>
-  </li>
-  <li>
-    <p>Prometheus가 Worker의 Exporter와 Application Metric Endpoint를 Scrape합니다.</p>
-  </li>
-  <li>
-    <p>Prometheus Rule이 조건을 충족하면 Alertmanager로 Alert를 전달합니다.</p>
-  </li>
-</ol>
-
-<p>Control Plane의 API Object 상태와 Worker의 Host·Container Resource Metric을 함께 봐야 <code class="language-plaintext highlighter-rouge">Pod가 원하는 수만큼 존재하지 않는 이유</code>와 <code class="language-plaintext highlighter-rouge">실행 중인 Pod가 느린 이유</code>를 구분할 수 있습니다.</p>
-
-<h2 id="12-monitoring-설계-점검">12. Monitoring 설계 점검</h2>
-
-<hr />
-
-<ul>
-  <li>
-    <p>Metrics Server와 Prometheus의 목적을 구분했는가</p>
-  </li>
-  <li>
-    <p>Node Exporter와 kube-state-metrics가 제공하는 상태를 구분했는가</p>
-  </li>
-  <li>
-    <p>Label Cardinality가 불필요하게 증가하지 않는가</p>
-  </li>
-  <li>
-    <p>Prometheus Retention과 Storage 용량을 계산했는가</p>
-  </li>
-  <li>
-    <p>Alert에 담당자, 우선순위와 대응 절차가 연결됐는가</p>
-  </li>
-  <li>
-    <p>Monitoring Component 자체의 Resource, 고가용성과 Backup을 설계했는가</p>
-  </li>
-  <li>
-    <p>Metric Endpoint와 Dashboard 접근을 인증·Network Policy로 제한했는가</p>
-  </li>
-</ul>
-
-<blockquote>
-  <p><strong>최종 정리</strong></p>
-  <ul>
-    <li>
-      <p>Metrics Server는 HPA와 <code class="language-plaintext highlighter-rouge">kubectl top</code>에 필요한 현재 CPU·Memory Resource Metric을 제공합니다.</p>
-    </li>
-    <li>
-      <p>Prometheus는 Exporter와 Application Endpoint의 Metric을 Pull해 시계열로 저장합니다.</p>
-    </li>
-    <li>
-      <p>Node Exporter는 Host 상태를, kube-state-metrics는 Kubernetes API Object 상태를 공개합니다.</p>
-    </li>
-    <li>
-      <p>Prometheus가 Alert Rule을 평가하고 Alertmanager가 Notification을 Grouping·Deduplication·Routing합니다.</p>
-    </li>
-    <li>
-      <p>Prometheus Operator는 CRD와 Label Selector로 Monitoring Desired State를 Reconcile합니다.</p>
-    </li>
-  </ul>
-</blockquote>
-
-<h2 id="참고-자료">참고 자료</h2>
-
-<hr />
-
-<ul>
-  <li>
-    <p><a href="https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/">Kubernetes Resource Metrics Pipeline</a></p>
-  </li>
-  <li>
-    <p><a href="https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/">Kubernetes Resource Monitoring 도구</a></p>
-  </li>
-  <li>
-    <p><a href="https://prometheus.io/docs/introduction/overview/">Prometheus Architecture</a></p>
-  </li>
-  <li>
-    <p><a href="https://github.com/kubernetes/kube-state-metrics">kube-state-metrics</a></p>
-  </li>
-  <li>
-    <p><a href="https://prometheus-operator.dev/docs/getting-started/introduction/">Prometheus Operator</a></p>
-  </li>
-  <li>
-    <p><a href="https://prometheus.io/docs/alerting/latest/alertmanager/">Alertmanager</a></p>
-  </li>
-  <li>
-    <p><a href="https://prometheus.io/docs/practices/pushing/">Pushgateway 사용 기준</a></p>
-  </li>
-</ul>]]></content><author><name></name></author><category term="CloudNative" /><category term="AutoEverSW" /><category term="Monitoring" /><summary type="html"><![CDATA[Kubernetes Resource Metrics Pipeline과 Prometheus Full Monitoring Pipeline을 구분하고 Node Exporter, kube-state-metrics, Alertmanager와 Operator의 역할을 정리합니다]]></summary></entry></feed>
+</ul>]]></content><author><name></name></author><category term="CloudNative" /><category term="AutoEverSW" /><category term="Ansible" /><summary type="html"><![CDATA[Ansible Facts로 여러 Managed Node의 System 정보를 수집하고 dstat, iostat, vmstat와 df 결과를 안전하게 File로 저장하는 Playbook을 구성합니다]]></summary></entry></feed>
