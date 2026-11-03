@@ -4,6 +4,21 @@
       
       
       {
+        "title": "공용 계정 문제를 해결하기 위해 구축한 HashiCorp Vault 구성을 공식 문서와 비교하며 정리하기",
+        "url": "/project-8-orbit-vault-ssh-ca-study/",
+        "description": "공용 계정으로 서버에 들어가던 문제를 풀기 위해 팀이 인프라 초기에 둔 HashiCorp Vault를, 저장소의 이슈와 PR, Ansible 코드, 운영 문서를 따라 읽으며 설치부터 SSH CA, 개인 계정 분리, 앱 비밀값, 백업까지 공식 문서와 나란히 놓고 정리한 공부 기록",
+        "thumbnail": null,
+        "tags": ["Project","Orbit","Vault","Security","SSH"],
+        "series_key": "project",
+        "series_title": "Project",
+        "date_label": "2026년 11월 4일",
+        "reading_time_label": "31분 읽기",
+        "search": "공용 계정 문제를 해결하기 위해 구축한 hashicorp vault 구성을 공식 문서와 비교하며 정리하기 공용 계정으로 서버에 들어가던 문제를 풀기 위해 팀이 인프라 초기에 둔 hashicorp vault를, 저장소의 이슈와 pr, ansible 코드, 운영 문서를 따라 읽으며 설치부터 ssh ca, 개인 계정 분리, 앱 비밀값, 백업까지 공식 문서와 나란히 놓고 정리한 공부 기록 project orbit vault security ssh project"
+      },
+    
+      
+      
+      {
         "title": "네트워크 진입점을 하나로 사용하기 위해 호스트를 Tailscale subnet router로 전환하기",
         "url": "/project-7-orbit-tailscale-subnet-router/",
         "description": "노드마다 Tailscale 주소로 들어가고 VM은 astra를 거쳐 다시 접속하던 경로를, astra가 내부망을 Tailscale에 광고하는 subnet router 구성으로 바꿔 팀원이 내부망 주소와 이름 하나로 노드와 VM, Vault에 닿게 하고, 접근 정책으로 팀원의 범위를 좁힌 과정",
