@@ -99,6 +99,8 @@ sudo tailscale set --advertise-routes=10.0.0.0/24
 
 - `tailscale set` : 이 옵션 하나만 바꿉니다. 설계 문서에 적어 두었던 `tailscale up --advertise-routes`는 이미 `up` 된 기기에서 다른 옵션을 전부 다시 적지 않으면 거부되기 때문에 `set`을 썼습니다.
 
+여기서 광고는 astra가 Tailscale에 "`10.0.0.0/24`(내부망)로 가는 길을 알고 있으니 그쪽 주소로 가는 패킷은 나에게 보내라"고 알리는 것을 말합니다. 네트워크에서 경로를 알릴 때 쓰는 advertise(경로 알림)를 그대로 옮긴 말입니다. 이렇게 알려야 하는 이유는 팀원 기기가 처음에는 `10.0.0.203` 같은 주소로 가는 길을 모르기 때문입니다. 그 주소는 강의실 내부망에만 있어서, 기기는 집이나 강의실 와이파이 쪽으로 패킷을 보냈다가 실패하게 됩니다. astra는 내부망에 직접 붙어 있어 그 길을 알고 있으므로, astra가 자신이 그 길이라고 알려 주면 팀원 기기는 `10.0.0.x`로 가는 패킷을 Tailscale 터널에 실어 astra로 보내게 됩니다.
+
 광고한 경로는 관리 콘솔에서 승인해야 다른 기기에 보입니다. Machines에서 astra의 Edit route settings를 열어 `10.0.0.0/24`를 켭니다.
 
 ![](../../assets/post/2026-11-03-project-7-orbit-tailscale-subnet-router/03.webp)
