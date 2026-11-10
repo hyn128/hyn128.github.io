@@ -4,6 +4,21 @@
       
       
       {
+        "title": "모니터링 화면을 내부 전용 서비스 이름으로 접속하기 위해 nginx 리버스 프록시와 Let's Encrypt 와일드카드 인증서 구성하기",
+        "url": "/project-9-orbit-internal-reverse-proxy-letsencrypt/",
+        "description": "VM마다 주소와 포트가 달랐던 모니터링 화면을 공개하지 않고 팀원만 서비스 이름으로 접속하도록 astra에 내부 전용 nginx 리버스 프록시를 두고, 방화벽 체인과 Tailscale 정책으로 입구를 astra 하나로 좁힌 뒤, 자체 서명 인증서의 브라우저 경고를 Let's Encrypt DNS-01 와일드카드 인증서와 자동 갱신으로 없앤 과정",
+        "thumbnail": null,
+        "tags": ["Project","Orbit","Network","Nginx","TLS"],
+        "series_key": "project",
+        "series_title": "Project",
+        "date_label": "2026년 11월 10일",
+        "reading_time_label": "17분 읽기",
+        "search": "모니터링 화면을 내부 전용 서비스 이름으로 접속하기 위해 nginx 리버스 프록시와 let's encrypt 와일드카드 인증서 구성하기 vm마다 주소와 포트가 달랐던 모니터링 화면을 공개하지 않고 팀원만 서비스 이름으로 접속하도록 astra에 내부 전용 nginx 리버스 프록시를 두고, 방화벽 체인과 tailscale 정책으로 입구를 astra 하나로 좁힌 뒤, 자체 서명 인증서의 브라우저 경고를 let's encrypt dns-01 와일드카드 인증서와 자동 갱신으로 없앤 과정 project orbit network nginx tls project"
+      },
+    
+      
+      
+      {
         "title": "공용 계정 문제를 해결하기 위해 구축한 HashiCorp Vault 구성을 공식 문서와 비교하며 정리하기",
         "url": "/project-8-orbit-vault-ssh-ca-study/",
         "description": "공용 계정으로 서버에 들어가던 문제를 풀기 위해 팀이 인프라 초기에 둔 HashiCorp Vault를, 저장소의 이슈와 PR, Ansible 코드, 운영 문서를 따라 읽으며 설치부터 SSH CA, 개인 계정 분리, 앱 비밀값, 백업까지 공식 문서와 나란히 놓고 정리한 공부 기록",
